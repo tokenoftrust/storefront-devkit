@@ -1,0 +1,50 @@
+# Token of Trust — Storefront Devkit
+
+> Runnable templates, JSON Schemas, and examples for building high-performance, regulated
+> ecommerce storefronts on the ToT Storefront platform. Everything here is tenant-side (the files
+> a developer authors) and source-free. Start from a template, validate against a schema, ship via
+> the local dev loop (`tot dev`).
+
+## Start here
+
+- [AGENTS.md](./AGENTS.md): How an agent should use this repo, plus the non-negotiable
+  customization contract (the six golden rules the platform enforces).
+- [manifest.json](./manifest.json): Machine catalog of every asset — id, kind, path, description,
+  tags, contract version. Locate assets here.
+- [README.md](./README.md): Human overview, structure, and quick start.
+
+## Schemas (authoritative shape of every tenant-owned file)
+
+- [theme.schema.json](./schemas/theme.schema.json): Brand tokens — color, type, space, shape.
+- [chrome.schema.json](./schemas/chrome.schema.json): Header, nav/mega-menu, footer, newsletter.
+- [home.schema.json](./schemas/home.schema.json): Homepage blocks (block-palette@3) + product sources.
+- [scripts.schema.json](./schemas/scripts.schema.json): Registered sandboxed widget/script bundles.
+- [capabilities.schema.json](./schemas/capabilities.schema.json): Optional surface toggles.
+- [compliance.schema.json](./schemas/compliance.schema.json): Regulated-commerce config (flags/params only).
+- [tot-config.schema.json](./schemas/tot-config.schema.json): Tenant facts & metadata.
+
+## Templates (forkable starters)
+
+- [commerce-minimal](./templates/commerce-minimal/): A clean commerce store.
+- [marketing-minimal](./templates/marketing-minimal/): A marketing / landing site.
+- [regulated-vape](./templates/regulated-vape/): A compliant, age-restricted store.
+
+## Examples
+
+- [snippets/](./snippets/): Copy-paste fragments — blocks, chrome, compliance, product sources, theme presets.
+- [widgets/](./widgets/): Sandboxed widget examples with correct slot/strategy/isolation.
+- [recipes/](./recipes/): End-to-end worked tasks with exact file diffs.
+- [migration/](./migration/): Porting an existing store (website_* MCP flows + visual-parity template).
+- [industries/](./industries/): Build by regulated vertical — vape/nicotine, wine & spirits, hemp/CBD, firearms, marketplaces — each mapped to a template, a compliance profile, and Token of Trust products.
+- [private-apps/](./private-apps/): The app-developer track — connect your own backend service to a store via the standards-based private-app contract. Links to the canonical devbook (`recipe://storefront-private-apps-devbook`), the contract, the affiliate reference app, and the `tot app` CLI.
+
+## About the platform
+
+- Storefront platform & early access: https://storefront.tokenoftrust.store — commerce built for regulated industries; compliance is native and can't be turned off; own your exit.
+- Verification & compliance suite (Government ID, Biometric Face, Age Verification/Estimation/Gate, Fraud Prevention, AML, PACT Act, Excise/Sales/VAT Tax): https://tokenoftrust.com
+- Documentation: https://help.tokenoftrust.com
+
+## Optional
+
+- [ci/github-actions/validate.yml](./ci/github-actions/validate.yml): Gate PRs on `tot validate`.
+- [agent-kit/](./agent-kit/): Drop-ins for your own repo (AGENTS.md template, prompt recipes).

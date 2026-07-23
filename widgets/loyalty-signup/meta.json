@@ -1,0 +1,9 @@
+{
+  "id": "widget-loyalty-signup",
+  "kind": "widget",
+  "title": "Loyalty signup (sandboxed)",
+  "description": "A sandboxed loyalty-signup widget mounted beside product purchase controls. Demonstrates the correct scripts.json registration and the sandbox contract: no access to the page DOM, cookies, age gate, or checkout.",
+  "tags": ["widget", "sandbox", "loyalty"],
+  "slot": "product.aside",
+  "isolation": "sandbox"
+}

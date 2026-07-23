@@ -1,0 +1,2 @@
+# Put brand assets here: logo.svg, favicon.svg, hero images, fonts.
+# Reference them from theme.json (brand.*) and content/*.json with root-absolute paths (e.g. /brand/logo.svg).

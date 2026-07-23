@@ -1,0 +1,6 @@
+# Storefront Devkit — GitHub Pages site
+# Active only when GitHub Pages is enabled with source = /site (or this folder moved to /docs).
+User-agent: *
+Allow: /
+
+Sitemap: https://devkit.tokenoftrust.store/sitemap.xml

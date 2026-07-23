@@ -1,0 +1,9 @@
+{
+  "id": "template-regulated-vape",
+  "kind": "template",
+  "title": "Regulated vape store",
+  "description": "A compliant, age-restricted commerce store: 21+ age gate, FDA nicotine warning, PACT Act notice, Prop 65, state eligibility, and excise-tax display — all driven by the .tot/config.json compliance block. The legal wording is platform-owned; this template only flips flags and passes parameters.",
+  "tags": ["starter", "commerce", "regulated", "vape", "compliance"],
+  "contract": "block-palette@3",
+  "siteType": "commerce"
+}

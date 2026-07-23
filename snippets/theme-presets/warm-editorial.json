@@ -1,0 +1,24 @@
+{
+  "$schema": "../../schemas/theme.schema.json",
+  "color": {
+    "bg": "#F4F1EA",
+    "surface": "#FCFAF5",
+    "surface-2": "#ECE7DB",
+    "text": "#1C2624",
+    "muted": "#5C6663",
+    "primary": "#1F3A34",
+    "primary-contrast": "#F4F1EA",
+    "accent": "#B5612F",
+    "border": "#DCD6C9",
+    "success": "#3F6B4F",
+    "sale": "#9E3B2E"
+  },
+  "type": {
+    "display": { "family": "Fraunces", "weights": [500, 600] },
+    "body": { "family": "Source Serif 4", "weights": [400, 500, 600] },
+    "mono": { "family": "Space Mono", "weights": [400] },
+    "scale": 1.25,
+    "tracking": "-0.011em"
+  },
+  "shape": { "radius": { "sm": "3px", "md": "6px", "lg": "12px", "full": "999px" } }
+}

@@ -1,0 +1,9 @@
+{
+  "$comment": "Reference only — each value below is a valid `source` for a featured_products block. Use ONE at a time.",
+  "shortcuts": ["featured", "newest", "bestSelling", "onSale"],
+  "byCollection": { "collection": "devices" },
+  "byTag": { "tag": "salt-nic" },
+  "byHandles": { "handles": ["starter-kit", "replacement-pods"] },
+  "related": { "related": "starter-kit" },
+  "recentlyViewed": { "recentlyViewed": true }
+}

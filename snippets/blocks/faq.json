@@ -1,0 +1,9 @@
+{
+  "component": "faq",
+  "eyebrow": "FAQ",
+  "title": "Common questions",
+  "items": [
+    { "q": "How long does shipping take?", "a": "A concise answer." },
+    { "q": "What is your return policy?", "a": "A concise answer, or a link to a policy page." }
+  ]
+}

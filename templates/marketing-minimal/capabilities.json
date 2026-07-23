@@ -1,0 +1,4 @@
+{
+  "$schema": "../../schemas/capabilities.schema.json",
+  "cartCheckout": { "enabled": false }
+}

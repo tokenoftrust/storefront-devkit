@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tokenoftrust.com/storefront-devkit/schemas/chrome.schema.json",
+  "title": "ToT Storefront content/chrome.json",
+  "description": "The site frame: announcement, header nav (plain links, dropdowns, or mega menus), header CTAs, and footer (columns, newsletter, social, legal). Rendered by the platform's shared chrome components.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "announcement": {
+      "description": "Top promo strip. A string, or an object for a marquee/toned bar.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text": { "type": "string" },
+            "variant": { "type": "string", "enum": ["static", "marquee"] },
+            "tone": { "type": "string", "enum": ["primary", "sale", "accent"] }
+          },
+          "required": ["text"]
+        }
+      ]
+    },
+    "nav": {
+      "type": "array",
+      "description": "Primary navigation items.",
+      "items": { "$ref": "#/definitions/navItem" }
+    },
+    "headerCtas": {
+      "type": "array",
+      "description": "Buttons in the header (e.g. Login, Book Demo).",
+      "items": { "$ref": "#/definitions/cta" }
+    },
+    "footer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tagline": { "type": "string" },
+        "legal": { "type": "string", "description": "Legal / copyright line. For regulated tenants, required compliance wording is platform-owned — do not put fabricated legal text here." },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "title": { "type": "string" },
+              "links": { "type": "array", "items": { "$ref": "#/definitions/link" } }
+            },
+            "required": ["title", "links"]
+          }
+        },
+        "newsletter": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "title": { "type": "string" },
+            "body": { "type": "string" },
+            "placeholder": { "type": "string" },
+            "ageAttestation": { "type": "boolean" }
+          }
+        },
+        "social": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": { "label": { "type": "string" }, "href": { "type": "string" }, "iconPath": { "type": "string" } },
+            "required": ["label", "href"]
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" },
+        "href": { "type": "string" },
+        "external": { "type": "boolean" },
+        "badge": { "type": "string" }
+      },
+      "required": ["label", "href"]
+    },
+    "navItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A plain link, a single-column dropdown (children), or a multi-column mega menu (columns).",
+      "properties": {
+        "label": { "type": "string" },
+        "href": { "type": "string" },
+        "badge": { "type": "string" },
+        "flag": { "type": "boolean", "description": "Highlight this item" },
+        "children": { "type": "array", "items": { "$ref": "#/definitions/link" } },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": { "title": { "type": "string" }, "links": { "type": "array", "items": { "$ref": "#/definitions/link" } } },
+            "required": ["links"]
+          }
+        }
+      },
+      "required": ["label", "href"]
+    },
+    "cta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" },
+        "href": { "type": "string" },
+        "variant": { "type": "string", "enum": ["primary", "secondary", "ghost"] }
+      },
+      "required": ["label", "href"]
+    }
+  }
+}

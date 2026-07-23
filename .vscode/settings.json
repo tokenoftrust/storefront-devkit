@@ -1,0 +1,29 @@
+{
+  "//": "Copy this into your client project's .vscode/settings.json to get autocomplete + inline validation on tenant-owned files. Adjust the schema URLs to a pinned raw URL (or a local path) once the devkit is hosted.",
+  "json.schemas": [
+    {
+      "fileMatch": ["**/theme.json", "**/*.theme.json"],
+      "url": "./schemas/theme.schema.json"
+    },
+    {
+      "fileMatch": ["**/content/chrome.json"],
+      "url": "./schemas/chrome.schema.json"
+    },
+    {
+      "fileMatch": ["**/content/home.json"],
+      "url": "./schemas/home.schema.json"
+    },
+    {
+      "fileMatch": ["**/scripts.json"],
+      "url": "./schemas/scripts.schema.json"
+    },
+    {
+      "fileMatch": ["**/capabilities.json"],
+      "url": "./schemas/capabilities.schema.json"
+    },
+    {
+      "fileMatch": ["**/.tot/config.json"],
+      "url": "./schemas/tot-config.schema.json"
+    }
+  ]
+}

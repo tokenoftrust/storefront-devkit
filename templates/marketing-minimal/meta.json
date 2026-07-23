@@ -1,0 +1,8 @@
+{
+  "id": "template-marketing-minimal",
+  "kind": "template",
+  "title": "Marketing (minimal)",
+  "description": "A marketing / landing site with no cart: hero, trust bar, capability cards, FAQ, and a closing CTA band. Uses the marketing block set. Good for brand sites, campaign pages, or a pre-launch presence.",
+  "tags": ["starter", "marketing", "landing"],
+  "siteType": "marketing"
+}

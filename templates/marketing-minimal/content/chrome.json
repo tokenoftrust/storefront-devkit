@@ -1,0 +1,27 @@
+{
+  "$schema": "../../../schemas/chrome.schema.json",
+  "nav": [
+    { "label": "Product", "href": "/#product" },
+    { "label": "How it works", "href": "/#how" },
+    { "label": "Pricing", "href": "/pricing" }
+  ],
+  "headerCtas": [
+    { "label": "Sign in", "href": "/login", "variant": "ghost" },
+    { "label": "Get started", "href": "/start", "variant": "primary" }
+  ],
+  "footer": {
+    "tagline": "The short version of what you do, in one sentence.",
+    "legal": "© My Company.",
+    "columns": [
+      { "title": "Product", "links": [
+        { "label": "Overview", "href": "/#product" },
+        { "label": "Pricing", "href": "/pricing" }
+      ]},
+      { "title": "Company", "links": [
+        { "label": "About", "href": "/about" },
+        { "label": "Contact", "href": "/contact" }
+      ]}
+    ],
+    "social": []
+  }
+}

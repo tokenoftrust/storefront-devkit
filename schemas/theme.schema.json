@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tokenoftrust.com/storefront-devkit/schemas/theme.schema.json",
+  "title": "ToT Storefront theme.json",
+  "description": "Brand look for a tenant. A deep-partial override merged over the platform reference theme — set only what you want to change. Every value below maps to a CSS custom property the shared component library reads (e.g. color.primary -> --color-primary). Validated for known tokens + WCAG AA contrast at publish (text pairs error, muted warns).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "color": {
+      "type": "object",
+      "description": "Color tokens. The core palette is expected for a complete theme; the semantic/state tokens are optional and fall back to platform-derived defaults.",
+      "additionalProperties": false,
+      "properties": {
+        "bg": { "$ref": "#/definitions/color", "description": "Page background" },
+        "surface": { "$ref": "#/definitions/color", "description": "Raised card/panel surface" },
+        "text": { "$ref": "#/definitions/color", "description": "Primary body + heading text" },
+        "muted": { "$ref": "#/definitions/color", "description": "Secondary / caption text" },
+        "primary": { "$ref": "#/definitions/color", "description": "Brand anchor — primary CTAs, active nav, hero fill" },
+        "primary-contrast": { "$ref": "#/definitions/color", "description": "Readable text/icon color ON primary" },
+        "accent": { "$ref": "#/definitions/color", "description": "Single brand spark — badges, marks, large accent type" },
+        "border": { "$ref": "#/definitions/color", "description": "Hairline borders, dividers, input outlines" },
+        "success": { "$ref": "#/definitions/color", "description": "Success / in-stock / savings" },
+        "sale": { "$ref": "#/definitions/color", "description": "Sale / markdown price emphasis" },
+        "surface-2": { "$ref": "#/definitions/color", "description": "Subtle inset fill between bg and surface" },
+        "warning": { "$ref": "#/definitions/color", "description": "Warning / low-stock state" },
+        "error": { "$ref": "#/definitions/color", "description": "Error / out-of-stock / destructive" },
+        "info": { "$ref": "#/definitions/color", "description": "Informational (notices, help)" },
+        "accent-ink": { "$ref": "#/definitions/color", "description": "Accent tuned for small text/links on light surfaces (AA). Derived from accent if omitted." },
+        "primary-hover": { "$ref": "#/definitions/color", "description": "Hover/active shade of primary. Derived if omitted." },
+        "accent-hover": { "$ref": "#/definitions/color", "description": "Hover/active shade of accent. Derived if omitted." }
+      }
+    },
+    "type": {
+      "type": "object",
+      "description": "Typography tokens.",
+      "additionalProperties": false,
+      "properties": {
+        "display": { "$ref": "#/definitions/fontFace", "description": "Display / headline family" },
+        "body": { "$ref": "#/definitions/fontFace", "description": "Body copy family" },
+        "mono": { "$ref": "#/definitions/fontFace", "description": "Monospace family" },
+        "scale": { "type": "number", "description": "Modular type scale ratio (e.g. 1.25 = major third)" },
+        "tracking": { "type": "string", "description": "Base letter-spacing (e.g. \"-0.011em\")" }
+      }
+    },
+    "space": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "base": { "type": "number", "description": "Base spacing unit in px (e.g. 4)" },
+        "scale": { "type": "array", "items": { "type": "number" }, "description": "Spacing scale steps" },
+        "containerMaxWidth": { "type": "string", "description": "Max content width (e.g. \"1240px\")" },
+        "sectionRhythm": { "type": "string", "description": "Vertical rhythm between sections (e.g. a clamp())" }
+      }
+    },
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "radius": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sm": { "type": "string" },
+            "md": { "type": "string" },
+            "lg": { "type": "string" },
+            "full": { "type": "string" }
+          }
+        },
+        "borderWeights": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "thin": { "type": "string" },
+            "medium": { "type": "string" },
+            "thick": { "type": "string" }
+          }
+        },
+        "shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sm": { "type": "string" },
+            "md": { "type": "string" },
+            "lg": { "type": "string" }
+          }
+        }
+      }
+    },
+    "brand": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "logoLight": { "type": "string", "description": "Path under public/** to the light-mode logo" },
+        "logoDark": { "type": "string", "description": "Path under public/** to the dark-mode logo" },
+        "favicon": { "type": "string" },
+        "ogImage": { "type": "string", "description": "Default Open Graph share image" },
+        "motion": { "type": "string", "enum": ["full", "reduced", "none"], "description": "Motion preference default" }
+      }
+    }
+  },
+  "definitions": {
+    "color": {
+      "type": "string",
+      "description": "A CSS color — hex recommended (e.g. \"#1F3A34\").",
+      "pattern": "^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|rgb\\(.*\\)|rgba\\(.*\\)|hsl\\(.*\\)|hsla\\(.*\\)|color-mix\\(.*\\)|var\\(.*\\))$"
+    },
+    "fontFace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "family": { "type": "string", "description": "Font family name" },
+        "weights": { "type": "array", "items": { "type": "number" }, "description": "Weights to load" }
+      },
+      "required": ["family"]
+    }
+  }
+}

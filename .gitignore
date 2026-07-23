@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+# Local dev loop artifacts / caches
+.tot/cache/
+.tot-dev/
+dist/
+.DS_Store
+# Local env
+.env
+.env.*
+!.env.example

@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tokenoftrust.com/storefront-devkit/schemas/compliance.schema.json",
+  "title": "ToT Storefront compliance config (.tot/config.json#/compliance)",
+  "description": "Regulated-commerce configuration. IMPORTANT: the mandated LEGAL WORDING for every notice is platform-owned and rendered by the platform's compliance widgets. You only flip flags and pass small parameters (minAge, chemical names, state lists). A widget renders NOTHING when its field is absent. Never fabricate facts; never remove/hide/paraphrase a required warning; enforcement/decisions/calculations stay platform-owned.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "minAge": { "type": "integer", "description": "Minimum purchase age (e.g. 21). Presence signals the tenant is age/identity regulated." },
+    "nicotineWarning": { "type": "boolean", "description": "Show the FDA-mandated nicotine warning (wording fixed by law)." },
+    "pactAct": { "type": "boolean", "description": "Show the PACT Act notice (ENDS/vapor). Federal wording fixed by the platform." },
+    "adultSignature": { "type": "boolean", "description": "Show the adult-signature-on-delivery notice." },
+    "shippingRestriction": { "type": "string", "description": "Display text for shipping restrictions. The ship/no-ship DECISION stays platform-owned." },
+    "prop65": {
+      "description": "California Prop 65 warning. The mandated skeleton, symbol, and URL are platform-owned; you supply only harm endpoint(s) and chemical name(s).",
+      "oneOf": [
+        { "type": "boolean" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "harm": { "type": "string", "enum": ["cancer", "reproductive", "cancer-and-reproductive"] },
+            "chemicals": { "type": "array", "items": { "type": "string" } },
+            "url": { "type": "string" }
+          },
+          "required": ["harm"]
+        }
+      ]
+    },
+    "purchaseLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "DISPLAY only — enforcement stays platform/commerce-owned.",
+      "properties": { "text": { "type": "string" }, "reason": { "type": "string" } },
+      "required": ["text"]
+    },
+    "stateEligibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "DISPLAY only — does not decide eligibility for a cart/address.",
+      "properties": {
+        "restrictedStates": { "type": "array", "items": { "type": "string" } },
+        "eligibleStates": { "type": "array", "items": { "type": "string" } },
+        "note": { "type": "string" }
+      }
+    },
+    "exciseTax": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "DISPLAY cue only — the platform NEVER computes tax here; calculation is platform/commerce-owned.",
+      "properties": {
+        "note": { "type": "string" },
+        "jurisdictions": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": false, "properties": { "label": { "type": "string" }, "detail": { "type": "string" } }, "required": ["label", "detail"] }
+        }
+      },
+      "required": ["note"]
+    }
+  }
+}

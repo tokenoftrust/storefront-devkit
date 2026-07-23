@@ -1,0 +1,12 @@
+{
+  "$schema": "../../schemas/compliance.schema.json",
+  "minAge": 21,
+  "adultSignature": true,
+  "shippingRestriction": "Adult signature (21+) required on delivery. We ship only to states where direct-to-consumer alcohol shipping is permitted.",
+  "stateEligibility": {
+    "note": "Direct-to-consumer shipping is available only in states that permit it. Availability is confirmed at checkout by ship-to address."
+  },
+  "exciseTax": {
+    "note": "Applicable state alcohol excise and sales taxes are calculated at checkout."
+  }
+}

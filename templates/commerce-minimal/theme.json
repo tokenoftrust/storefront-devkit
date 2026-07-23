@@ -1,0 +1,40 @@
+{
+  "$schema": "../../schemas/theme.schema.json",
+  "color": {
+    "bg": "#FBFBF9",
+    "surface": "#FFFFFF",
+    "text": "#17181C",
+    "muted": "#5A5E68",
+    "primary": "#1B1F3B",
+    "primary-contrast": "#FBFBF9",
+    "accent": "#C2703D",
+    "border": "#E4E3DE",
+    "success": "#2F7D5B",
+    "sale": "#B23A2E"
+  },
+  "type": {
+    "display": { "family": "Fraunces", "weights": [500, 600] },
+    "body": { "family": "Inter", "weights": [400, 500, 600] },
+    "mono": { "family": "IBM Plex Mono", "weights": [400] },
+    "scale": 1.2,
+    "tracking": "-0.01em"
+  },
+  "space": {
+    "base": 4,
+    "containerMaxWidth": "1200px",
+    "sectionRhythm": "clamp(3.5rem, 8vw, 7rem)"
+  },
+  "shape": {
+    "radius": { "sm": "4px", "md": "8px", "lg": "16px", "full": "999px" },
+    "shadow": {
+      "sm": "0 1px 2px rgba(23,24,28,0.06)",
+      "md": "0 8px 28px -10px rgba(23,24,28,0.16)",
+      "lg": "0 24px 60px -20px rgba(23,24,28,0.22)"
+    }
+  },
+  "brand": {
+    "logoLight": "/brand/logo.svg",
+    "favicon": "/favicon.svg",
+    "motion": "full"
+  }
+}

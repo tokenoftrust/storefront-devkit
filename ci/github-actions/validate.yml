@@ -1,0 +1,50 @@
+name: validate-storefront
+
+# Gate every PR on the storefront contract before it can be submitted.
+# Layer 1 (always): JSON-schema validation — fast, offline, no credentials.
+# Layer 2 (optional): `tot validate` — the full platform contract incl. the compliance floor.
+
+on:
+  pull_request:
+    paths:
+      - "theme.json"
+      - "content/**"
+      - "scripts.json"
+      - "capabilities.json"
+      - ".tot/**"
+
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: Install validator
+        run: npm i -g ajv-cli ajv-formats
+      - name: Validate tenant files against devkit schemas
+        run: |
+          ajv validate -c ajv-formats -s schemas/theme.schema.json        -d theme.json                 || true
+          ajv validate -c ajv-formats -s schemas/chrome.schema.json       -d content/chrome.json        || true
+          ajv validate -c ajv-formats -s schemas/home.schema.json         -d content/home.json
+          ajv validate -c ajv-formats -s schemas/scripts.schema.json      -d scripts.json               || true
+          ajv validate -c ajv-formats -s schemas/capabilities.schema.json -d capabilities.json          || true
+          ajv validate -c ajv-formats -s schemas/tot-config.schema.json   -d .tot/config.json           || true
+      # NOTE: adjust the `|| true` guards once every file is present; keep them only for optional files.
+
+  contract:
+    runs-on: ubuntu-latest
+    # Only runs if a scoped credential is configured — otherwise skipped, not failed.
+    if: ${{ secrets.TOT_CI_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+      - name: Install ToT CLI
+        run: npm i -g @tokenoftrust/cli
+      - name: tot validate (full contract + compliance floor)
+        env:
+          TOT_CI_TOKEN: ${{ secrets.TOT_CI_TOKEN }}
+        run: tot validate

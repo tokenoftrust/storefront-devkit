@@ -1,0 +1,9 @@
+{
+  "id": "template-commerce-minimal",
+  "kind": "template",
+  "title": "Commerce (minimal)",
+  "description": "A clean, rebrandable commerce store: theme + chrome + a merchandised homepage + one editorial page. No regulated obligations. The fastest starting point for a general ecommerce build.",
+  "tags": ["starter", "commerce"],
+  "contract": "block-palette@3",
+  "siteType": "commerce"
+}

@@ -1,0 +1,15 @@
+{
+  "$comment": "Attach this to a catalog product's purchase_options. The platform's managed checkout renders and processes it — you never build subscription mechanics yourself.",
+  "purchase_options": [
+    { "id": "one_time", "kind": "one_time", "label": "One-time purchase" },
+    {
+      "id": "monthly",
+      "kind": "subscription",
+      "label": "Subscribe monthly",
+      "description": "Ships every month. Skip or cancel anytime.",
+      "savingsLabel": "Save 15%",
+      "priceAdjustment": { "type": "percent_off", "value": 15 },
+      "frequency": "1m"
+    }
+  ]
+}

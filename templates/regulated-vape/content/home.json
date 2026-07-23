@@ -1,0 +1,41 @@
+{
+  "$schema": "../../../schemas/home.schema.json",
+  "contract": "block-palette@3",
+  "seoTitle": "Acme Vapor — devices & e-liquid for adult customers",
+  "seoDescription": "Premium devices and e-liquid, curated for adult customers. 21+ only.",
+  "blocks": [
+    {
+      "component": "hero",
+      "eyebrow": "New arrivals",
+      "headline": "Premium devices & e-liquid",
+      "subhead": "Curated for adult customers. 21+ only.",
+      "ctaLabel": "Shop new arrivals",
+      "ctaHref": "/collections/new-arrivals"
+    },
+    {
+      "component": "featured_products",
+      "title": "Best sellers",
+      "source": "bestSelling",
+      "limit": 4
+    },
+    {
+      "component": "featured_products",
+      "title": "Salt nic",
+      "eyebrow": "Popular category",
+      "source": { "tag": "salt-nic" },
+      "limit": 8
+    },
+    {
+      "component": "featured_products",
+      "title": "On sale",
+      "source": "onSale",
+      "limit": 4
+    },
+    {
+      "component": "newsletter",
+      "title": "Deals & new arrivals",
+      "body": "Adults 21+ only. We never share your email.",
+      "placeholder": "Email address"
+    }
+  ]
+}

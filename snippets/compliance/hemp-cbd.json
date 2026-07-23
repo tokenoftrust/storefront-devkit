@@ -1,0 +1,9 @@
+{
+  "$schema": "../../schemas/compliance.schema.json",
+  "minAge": 21,
+  "shippingRestriction": "We ship only where these products are legal. Eligibility is confirmed at checkout by ship-to address.",
+  "stateEligibility": {
+    "note": "Availability varies by state and product. Some states restrict or prohibit shipment; eligibility is confirmed at checkout."
+  },
+  "purchaseLimit": { "text": "Quantity limits may apply per order", "reason": "per state law" }
+}

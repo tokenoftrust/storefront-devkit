@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/theme.schema.json",
+  "color": {
+    "bg": "#0E1116",
+    "surface": "#161A22",
+    "text": "#F2F4F8",
+    "muted": "#9AA3B2",
+    "primary": "#5B8CFF",
+    "primary-contrast": "#0E1116",
+    "accent": "#7AE0C3",
+    "border": "#242A35",
+    "success": "#57C08A",
+    "sale": "#FF7A6B"
+  },
+  "type": {
+    "display": { "family": "Clash Display", "weights": [500, 600] },
+    "body": { "family": "Inter", "weights": [400, 500] },
+    "mono": { "family": "JetBrains Mono", "weights": [400] },
+    "scale": 1.25,
+    "tracking": "-0.02em"
+  },
+  "space": { "base": 4, "containerMaxWidth": "1160px", "sectionRhythm": "clamp(4rem, 9vw, 8rem)" },
+  "shape": { "radius": { "sm": "6px", "md": "12px", "lg": "20px", "full": "999px" } },
+  "brand": { "logoLight": "/brand/logo.svg", "favicon": "/favicon.svg", "motion": "full" }
+}

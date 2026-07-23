@@ -1,0 +1,7 @@
+{
+  "component": "featured_products",
+  "title": "Best sellers",
+  "eyebrow": "Popular",
+  "source": "bestSelling",
+  "limit": 4
+}

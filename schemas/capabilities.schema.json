@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tokenoftrust.com/storefront-devkit/schemas/capabilities.schema.json",
+  "title": "ToT Storefront capabilities.json",
+  "description": "Requests optional surface changes. It may NOT weaken the compliance floor: for a regulated tenant, ageVerification and exciseTax cannot be disabled here (such a change is rejected). Safe uses are things like turning cart/checkout off for a marketing-only tenant.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "cartCheckout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } },
+      "description": "Enable/disable the managed cart + checkout. Disable only for marketing-only tenants."
+    },
+    "ageVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } },
+      "description": "REGULATED FLOOR: cannot be set false for a regulated tenant."
+    },
+    "exciseTax": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } },
+      "description": "REGULATED FLOOR: cannot be set false for a regulated tenant."
+    }
+  }
+}

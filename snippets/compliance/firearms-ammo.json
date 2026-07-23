@@ -1,0 +1,9 @@
+{
+  "$schema": "../../schemas/compliance.schema.json",
+  "minAge": 21,
+  "adultSignature": true,
+  "shippingRestriction": "Firearms ship to a licensed FFL dealer only. Ammunition and regulated accessories require adult signature and are restricted in some states/localities.",
+  "stateEligibility": {
+    "note": "Eligibility varies by product, state, and locality. Restricted items are confirmed at checkout by ship-to address."
+  }
+}

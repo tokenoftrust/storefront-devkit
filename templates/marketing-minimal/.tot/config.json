@@ -1,0 +1,5 @@
+{
+  "$schema": "../../../schemas/tot-config.schema.json",
+  "appDomain": "my-site.example",
+  "siteType": "marketing"
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "../../schemas/theme.schema.json",
+  "color": {
+    "bg": "#0B0E14",
+    "surface": "#12161F",
+    "surface-2": "#1A1F2B",
+    "text": "#EEF1F6",
+    "muted": "#98A2B3",
+    "primary": "#5B8CFF",
+    "primary-contrast": "#0B0E14",
+    "accent": "#7AE0C3",
+    "border": "#242B38",
+    "success": "#3FB27F",
+    "sale": "#FF7A6B"
+  },
+  "type": {
+    "display": { "family": "Archivo", "weights": [600, 700] },
+    "body": { "family": "Inter", "weights": [400, 500] },
+    "mono": { "family": "JetBrains Mono", "weights": [400] },
+    "scale": 1.2,
+    "tracking": "-0.01em"
+  },
+  "shape": { "radius": { "sm": "4px", "md": "8px", "lg": "16px", "full": "999px" } }
+}

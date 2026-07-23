@@ -1,0 +1,22 @@
+{
+  "$schema": "../../../schemas/tot-config.schema.json",
+  "appDomain": "acme-vapor.example",
+  "siteType": "commerce",
+  "compliance": {
+    "minAge": 21,
+    "nicotineWarning": true,
+    "pactAct": true,
+    "adultSignature": true,
+    "shippingRestriction": "Adult signature (21+) required on delivery. Not shipped via USPS.",
+    "prop65": { "harm": "reproductive", "chemicals": ["nicotine"] },
+    "stateEligibility": { "restrictedStates": ["UT", "AR", "VT"] },
+    "purchaseLimit": { "text": "2 units per order", "reason": "per state law" },
+    "exciseTax": {
+      "note": "Applicable state vapor excise taxes are calculated at checkout.",
+      "jurisdictions": [
+        { "label": "CA", "detail": "$0.05/ml" },
+        { "label": "NY", "detail": "20% wholesale" }
+      ]
+    }
+  }
+}

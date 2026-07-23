@@ -1,0 +1,11 @@
+{
+  "seoTitle": "About — My Store",
+  "seoDescription": "Why we make what we make.",
+  "blocks": [
+    {
+      "component": "editorial",
+      "title": "About us",
+      "body": "We make a small number of things, and we make them well. Replace this copy with your brand's story — keep it in JSON so it inherits the platform's layout, performance, and SEO."
+    }
+  ]
+}

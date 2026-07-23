@@ -1,0 +1,27 @@
+Token of Trust — Storefront Devkit
+Copyright (c) Token of Trust, Inc.
+
+SCOPE OF THIS LICENSE
+---------------------
+The license in the LICENSE file covers ONLY the contents of this devkit repository —
+the example templates, JSON Schemas, code snippets, sample widget code, and documentation.
+These are tenant-side examples you are encouraged to copy, modify, and use (including
+commercially) to build storefronts on the Token of Trust Storefront platform.
+
+This license does NOT cover the Token of Trust Storefront platform itself — the storefront
+renderer runtime, the `@tot/public-runtime` package, the `@tokenoftrust/storefront-runner`
+distributable, or any other Token of Trust platform source. Those are licensed separately
+under the "Token of Trust Source-Available License — Local Development Only" and are not
+granted by this repository's license.
+
+TRADEMARKS
+----------
+"Token of Trust" and related names, logos, and product names are trademarks of
+Token of Trust, Inc. This license grants no rights to use those marks. Do not use them in a
+way that implies endorsement of a fork or derivative work.
+
+LINKS
+-----
+Platform & early access: https://storefront.tokenoftrust.store
+Verification & compliance products: https://tokenoftrust.com
+Documentation: https://help.tokenoftrust.com

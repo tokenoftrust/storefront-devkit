@@ -1,0 +1,6 @@
+{
+  "$schema": "../../schemas/capabilities.schema.json",
+  "cartCheckout": { "enabled": true },
+  "ageVerification": { "enabled": true },
+  "exciseTax": { "enabled": true }
+}

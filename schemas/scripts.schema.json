@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tokenoftrust.com/storefront-devkit/schemas/scripts.schema.json",
+  "title": "ToT Storefront scripts.json",
+  "description": "Registered widget/script bundles. Scripts are NEVER inline — they are registered here and served by the platform. Sandboxed by default (opaque-origin iframe with no access to page cookies/DOM/age gate/checkout). Regulated tenants MUST use isolation: sandbox.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "scripts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "src": { "type": "string", "description": "Path to the registered bundle (e.g. \"widgets/loyalty.js\")." },
+          "slot": {
+            "type": "string",
+            "enum": ["product.aside", "home.section", "global.footer"],
+            "description": "Where the widget mounts. product.aside = beside product purchase controls; home.section = between homepage sections; global.footer = near the footer on every route."
+          },
+          "strategy": {
+            "type": "string",
+            "enum": ["defer", "on-idle", "on-interaction"],
+            "description": "When the bundle loads."
+          },
+          "isolation": {
+            "type": "string",
+            "enum": ["sandbox", "inline"],
+            "description": "sandbox (default) = opaque-origin iframe, no page access. inline = warned same-origin tier; NEVER for regulated tenants."
+          }
+        },
+        "required": ["src", "slot"]
+      }
+    }
+  },
+  "required": ["scripts"]
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "../../../schemas/home.schema.json",
+  "seoTitle": "My Company — one-line value proposition",
+  "seoDescription": "What you do, who it's for, and why it's better — in a sentence.",
+  "blocks": [
+    {
+      "component": "marketing_hero",
+      "eyebrow": "Introducing",
+      "headline": "A headline that states the outcome",
+      "subhead": "One clarifying sentence beneath it.",
+      "body": "A short paragraph that expands on the promise without overselling.",
+      "trust": ["Trusted by teams", "No credit card required", "Set up in minutes"],
+      "ctas": [
+        { "label": "Get started", "href": "/start", "variant": "primary" },
+        { "label": "Book a demo", "href": "/contact", "variant": "secondary" }
+      ],
+      "panel": {
+        "title": "In action",
+        "lines": ["Step one completed", "Step two completed", "Result delivered"]
+      }
+    },
+    {
+      "component": "trust_bar",
+      "items": ["10,000+ users", "99.9% uptime", "SOC 2", "GDPR"]
+    },
+    {
+      "component": "card_grid",
+      "anchor": "product",
+      "eyebrow": "Product",
+      "title": "Everything you need, in one place",
+      "variant": "capability",
+      "cards": [
+        { "icon": "⚡", "title": "Fast", "body": "Describe the first core capability." },
+        { "icon": "🔒", "title": "Secure", "body": "Describe the second core capability." },
+        { "icon": "🧩", "title": "Integrates", "body": "Describe the third core capability." }
+      ]
+    },
+    {
+      "component": "faq",
+      "eyebrow": "FAQ",
+      "title": "Common questions",
+      "items": [
+        { "q": "How does it work?", "a": "A concise answer." },
+        { "q": "What does it cost?", "a": "A concise answer, or a link to /pricing." }
+      ]
+    },
+    {
+      "component": "cta_band",
+      "title": "Ready to start?",
+      "subhead": "A one-line nudge to convert.",
+      "ctas": [{ "label": "Get started", "href": "/start", "variant": "primary" }]
+    }
+  ]
+}

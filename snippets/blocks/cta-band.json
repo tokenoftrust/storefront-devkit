@@ -1,0 +1,8 @@
+{
+  "component": "cta_band",
+  "title": "Ready to shop?",
+  "subhead": "A one-line nudge to convert.",
+  "ctas": [
+    { "label": "Shop now", "href": "/collections", "variant": "primary" }
+  ]
+}

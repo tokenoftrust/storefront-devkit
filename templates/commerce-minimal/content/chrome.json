@@ -1,0 +1,49 @@
+{
+  "$schema": "../../../schemas/chrome.schema.json",
+  "announcement": { "text": "Free shipping on orders over $75", "variant": "static", "tone": "primary" },
+  "nav": [
+    {
+      "label": "Shop",
+      "href": "/collections",
+      "columns": [
+        { "title": "Categories", "links": [
+          { "label": "New arrivals", "href": "/collections/new-arrivals" },
+          { "label": "Best sellers", "href": "/collections/best-sellers" },
+          { "label": "Sale", "href": "/collections/sale" }
+        ]},
+        { "title": "Collections", "links": [
+          { "label": "Everyday", "href": "/collections/everyday" },
+          { "label": "Limited", "href": "/collections/limited" }
+        ]}
+      ]
+    },
+    { "label": "About", "href": "/about" },
+    { "label": "Journal", "href": "/blog" }
+  ],
+  "headerCtas": [
+    { "label": "Account", "href": "/account", "variant": "ghost" }
+  ],
+  "footer": {
+    "tagline": "Considered goods, made to last.",
+    "legal": "© My Store. All rights reserved.",
+    "columns": [
+      { "title": "Shop", "links": [
+        { "label": "All products", "href": "/collections" },
+        { "label": "New arrivals", "href": "/collections/new-arrivals" },
+        { "label": "Sale", "href": "/collections/sale" }
+      ]},
+      { "title": "Company", "links": [
+        { "label": "About", "href": "/about" },
+        { "label": "Contact", "href": "/contact" }
+      ]},
+      { "title": "Help", "links": [
+        { "label": "Shipping & returns", "href": "/pages/shipping" },
+        { "label": "FAQ", "href": "/pages/faq" }
+      ]}
+    ],
+    "newsletter": { "title": "Join the list", "body": "New drops and occasional notes.", "placeholder": "Email address" },
+    "social": [
+      { "label": "Instagram", "href": "https://instagram.com/mystore" }
+    ]
+  }
+}

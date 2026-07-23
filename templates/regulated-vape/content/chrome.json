@@ -1,0 +1,42 @@
+{
+  "$schema": "../../../schemas/chrome.schema.json",
+  "announcement": { "text": "21+ only. Adult signature required on delivery.", "variant": "static", "tone": "primary" },
+  "nav": [
+    {
+      "label": "Shop",
+      "href": "/collections",
+      "columns": [
+        { "title": "Devices", "links": [
+          { "label": "Starter kits", "href": "/collections/starter-kits" },
+          { "label": "Pods & mods", "href": "/collections/pods-mods" }
+        ]},
+        { "title": "E-liquid", "links": [
+          { "label": "Salt nic", "href": "/collections/salt-nic" },
+          { "label": "Freebase", "href": "/collections/freebase" }
+        ]}
+      ]
+    },
+    { "label": "Brands", "href": "/brands" },
+    { "label": "Deals", "href": "/collections/sale", "flag": true }
+  ],
+  "headerCtas": [
+    { "label": "Account", "href": "/account", "variant": "ghost" }
+  ],
+  "footer": {
+    "tagline": "Products intended for adults of legal age only.",
+    "columns": [
+      { "title": "Shop", "links": [
+        { "label": "All products", "href": "/collections" },
+        { "label": "Salt nic", "href": "/collections/salt-nic" },
+        { "label": "Sale", "href": "/collections/sale" }
+      ]},
+      { "title": "Help", "links": [
+        { "label": "Shipping & signature", "href": "/pages/shipping" },
+        { "label": "Age verification", "href": "/pages/age-verification" },
+        { "label": "Contact", "href": "/contact" }
+      ]}
+    ],
+    "newsletter": { "title": "Deals & new arrivals", "placeholder": "Email address", "ageAttestation": true },
+    "social": []
+  }
+}

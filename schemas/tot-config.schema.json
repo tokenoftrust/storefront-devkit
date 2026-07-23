@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tokenoftrust.com/storefront-devkit/schemas/tot-config.schema.json",
+  "title": "ToT Storefront .tot/config.json",
+  "description": "Tenant facts & metadata. READ these to decide what is required and allowed; do NOT fabricate compliance facts. Some fields are platform-managed for a real tenant — treat this as the source of truth about the store, not a place to invent obligations.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "tenantId": { "type": "string", "description": "Tenant identifier." },
+    "appDomain": { "type": "string", "description": "The store's domain (e.g. \"acme-vapor.net\")." },
+    "siteType": {
+      "type": "string",
+      "enum": ["commerce", "marketing"],
+      "description": "commerce = a store with catalog + managed checkout; marketing = a content/landing site with no cart."
+    },
+    "compliance": {
+      "$ref": "https://tokenoftrust.com/storefront-devkit/schemas/compliance.schema.json",
+      "description": "Regulated-commerce configuration. See compliance.schema.json."
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "id": "recipe-add-subscription-option",
+  "kind": "recipe",
+  "title": "Add a subscription (Autopilot) option",
+  "description": "Offer a subscribe-and-save option the platform-safe way, using the purchase_options data shape on catalog products. Checkout/subscription mechanics stay platform-owned — you never build them as widgets or HTML.",
+  "tags": ["subscription", "checkout", "purchase-options", "autopilot"]
+}

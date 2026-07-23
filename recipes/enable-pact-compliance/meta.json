@@ -1,0 +1,7 @@
+{
+  "id": "recipe-enable-pact-compliance",
+  "kind": "recipe",
+  "title": "Enable PACT Act compliance",
+  "description": "Turn on the PACT Act notice, FDA nicotine warning, and vapor excise display for a nicotine/vape store by editing the .tot/config.json compliance block. The legal wording is platform-owned; you only set flags and parameters.",
+  "tags": ["compliance", "pact", "nicotine", "excise", "regulated"]
+}

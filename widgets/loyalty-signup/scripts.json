@@ -1,0 +1,11 @@
+{
+  "$schema": "../../schemas/scripts.schema.json",
+  "scripts": [
+    {
+      "src": "widgets/loyalty.js",
+      "slot": "product.aside",
+      "strategy": "on-interaction",
+      "isolation": "sandbox"
+    }
+  ]
+}

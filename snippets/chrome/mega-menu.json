@@ -1,0 +1,17 @@
+{
+  "label": "Shop",
+  "href": "/collections",
+  "columns": [
+    { "title": "Devices", "links": [
+      { "label": "Starter kits", "href": "/collections/starter-kits" },
+      { "label": "Pods & mods", "href": "/collections/pods-mods", "badge": "New" }
+    ]},
+    { "title": "E-liquid", "links": [
+      { "label": "Salt nic", "href": "/collections/salt-nic" },
+      { "label": "Freebase", "href": "/collections/freebase" }
+    ]},
+    { "title": "Deals", "links": [
+      { "label": "On sale", "href": "/collections/sale" }
+    ]}
+  ]
+}

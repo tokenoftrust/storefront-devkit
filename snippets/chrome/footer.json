@@ -1,0 +1,23 @@
+{
+  "tagline": "A short brand line.",
+  "legal": "© Your Store. All rights reserved.",
+  "columns": [
+    { "title": "Shop", "links": [
+      { "label": "All products", "href": "/collections" },
+      { "label": "New arrivals", "href": "/collections/new-arrivals" },
+      { "label": "Sale", "href": "/collections/sale" }
+    ]},
+    { "title": "Company", "links": [
+      { "label": "About", "href": "/about" },
+      { "label": "Contact", "href": "/contact" }
+    ]},
+    { "title": "Help", "links": [
+      { "label": "Shipping & returns", "href": "/pages/shipping" },
+      { "label": "FAQ", "href": "/pages/faq" }
+    ]}
+  ],
+  "newsletter": { "title": "Join the list", "placeholder": "Email address" },
+  "social": [
+    { "label": "Instagram", "href": "https://instagram.com/yourstore" }
+  ]
+}

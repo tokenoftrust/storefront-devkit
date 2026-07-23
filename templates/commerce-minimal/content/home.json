@@ -1,0 +1,42 @@
+{
+  "$schema": "../../../schemas/home.schema.json",
+  "contract": "block-palette@3",
+  "seoTitle": "My Store — considered goods, made to last",
+  "seoDescription": "A small catalog of everyday essentials, built to last. Free shipping over $75.",
+  "blocks": [
+    {
+      "component": "hero",
+      "eyebrow": "New season",
+      "headline": "Everyday essentials, made to last",
+      "subhead": "A tight, considered catalog — nothing you don't need.",
+      "ctaLabel": "Shop new arrivals",
+      "ctaHref": "/collections/new-arrivals"
+    },
+    {
+      "component": "featured_products",
+      "title": "Best sellers",
+      "eyebrow": "Popular",
+      "source": "bestSelling",
+      "limit": 4
+    },
+    {
+      "component": "featured_products",
+      "title": "Just in",
+      "eyebrow": "New arrivals",
+      "source": "newest",
+      "limit": 8
+    },
+    {
+      "component": "featured_products",
+      "title": "On sale",
+      "source": "onSale",
+      "limit": 4
+    },
+    {
+      "component": "newsletter",
+      "title": "Join the list",
+      "body": "New drops and occasional notes. No spam.",
+      "placeholder": "Email address"
+    }
+  ]
+}
