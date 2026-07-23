@@ -29,3 +29,7 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
   canonical shipped material (devbook `recipe://storefront-private-apps-devbook`, the contract, the
   affiliate reference app, the `tot app` CLI) rather than duplicating it. Clarifies the boundary
   between tenant `scripts.json` widgets and private-app widget launches.
+- Devbook-driven gap fills: `snippets/checkout/` (cart-drawer brand override; checkout stays
+  platform-owned), `snippets/seo/` (per-page `seoTitle`/`seoDescription`), and
+  `docs/store-performance-seo.md` (what the platform gives you free vs. the levers you control) —
+  so the commerce-checkout and performance-SEO devbooks have runnable backing examples.

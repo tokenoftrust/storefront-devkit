@@ -1,0 +1,4 @@
+{
+  "$comment": "Optional cart-drawer brand tweak. The managed cart drawer already inherits your theme tokens; use this only for small overrides. The CSS is applied scoped to the drawer's own root, so it cannot affect the rest of the page. Reference theme tokens (var(--color-*), var(--font-*), var(--radius-*)) rather than hard-coded values so it tracks your theme. Confirm the exact wiring with `tot validate`.",
+  "cartDrawerCss": "/* scoped under the cart drawer root */\n:root { --cart-accent: var(--color-primary); }\n.cart-title { font-family: var(--font-display); color: var(--color-text); }\n.cart-checkout-button { background: var(--color-primary); color: var(--color-primary-contrast); border-radius: var(--radius-md); }\n"
+}

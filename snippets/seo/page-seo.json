@@ -1,0 +1,5 @@
+{
+  "$comment": "The SEO fields you set at the top of content/home.json and content/pages/*.json. Keep titles ~50-60 chars and descriptions ~150-160 chars; write for humans, include the brand and the primary term naturally.",
+  "seoTitle": "Acme Vapor — premium devices & e-liquid for adults 21+",
+  "seoDescription": "Shop premium vape devices and e-liquid, curated for adult customers. Fast, compliant checkout. 21+ only."
+}

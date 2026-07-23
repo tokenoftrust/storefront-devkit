@@ -42,6 +42,8 @@
     { "id": "snippet-compliance", "kind": "snippet-set", "title": "Compliance widget configs", "path": "snippets/compliance", "tags": ["compliance"] },
     { "id": "snippet-product-sources", "kind": "snippet-set", "title": "Product source forms", "path": "snippets/product-sources", "tags": ["merchandising", "catalog"] },
     { "id": "snippet-theme-presets", "kind": "snippet-set", "title": "Theme presets", "path": "snippets/theme-presets", "tags": ["theme", "palette", "type"] },
+    { "id": "snippet-checkout", "kind": "snippet-set", "title": "Checkout / cart-drawer theming", "path": "snippets/checkout", "tags": ["checkout", "cart", "theming"] },
+    { "id": "snippet-seo", "kind": "snippet-set", "title": "Store SEO fields", "path": "snippets/seo", "tags": ["seo", "performance", "metadata"] },
 
     { "id": "widget-loyalty-signup", "kind": "widget", "title": "Loyalty signup (sandboxed)", "path": "widgets/loyalty-signup", "slot": "product.aside", "isolation": "sandbox", "tags": ["widget", "sandbox", "loyalty"] },
 
@@ -56,6 +58,7 @@
 
     { "id": "private-apps-track", "kind": "guide", "title": "Private Apps — the app-developer track", "path": "private-apps/README.md", "tags": ["private-apps", "apps", "integrations", "webhooks", "oauth", "escalation"], "links": { "devbook": "recipe://storefront-private-apps-devbook", "contract": "docs/private-apps/contract/ (storefront repo)", "referenceApp": "examples/affiliate-attribution/ (storefront repo)", "cli": "tot app scaffold" } },
 
+    { "id": "store-performance-seo", "kind": "guide", "title": "Store performance & SEO", "path": "docs/store-performance-seo.md", "tags": ["seo", "performance", "web-vitals", "structured-data", "store"] },
     { "id": "discoverability", "kind": "guide", "title": "Discoverability & SEO for this repo", "path": "docs/DISCOVERABILITY.md", "tags": ["seo", "discoverability", "github", "pages", "robots"] },
     { "id": "site-pages", "kind": "site", "title": "GitHub Pages landing (optional)", "path": "site", "tags": ["seo", "pages", "landing", "robots", "sitemap"] }
   ]
