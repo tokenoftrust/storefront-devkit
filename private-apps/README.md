@@ -38,6 +38,18 @@ The authoritative material ships with the platform. Start here:
   (`tot-app.json`, `fixtures/`, `server.js`, Dockerfile); `tot app dev` (`validate` / `emit` /
   `verify` / `mint`) is the local harness that signs fixture CloudEvents exactly like the real
   gateway so your verification code exercises the real path.
+- **The devkit source** — `packages/private-apps-devkit/src/{signing,jwt,manifest}.ts` in the
+  storefront repo is the one hand-authored implementation. It's `"private": true` and TS-only
+  today, so two dependency-free JS consumers — `packages/cli/src/vendor/private-apps-devkit.mjs`
+  (the published `@tokenoftrust/cli`) and `examples/affiliate-attribution/lib/private-apps-devkit.mjs`
+  (this standalone example) — carry clearly-labeled vendored copies. They're kept honest, not
+  silently drifting: a machine-enforced mirror test
+  (`examples/affiliate-attribution/test/private-apps-devkit.parity.test.js`) fails if the two
+  copies diverge below their headers, and a parity test in each consumer cross-verifies against
+  the real TS source whenever it's resolvable. This `private-apps/` track will link straight to
+  the devkit's package once it ships a plain-JS build installable outside the storefront monorepo
+  (tracked as `pa-devkit-publish`) — until then it stays documentation-only, per the "links, does
+  not duplicate" rule above.
 
 ## Quickstart (from the devbook)
 
@@ -67,7 +79,3 @@ Two different widget mechanisms, don't confuse them:
   a bundle as tenant customization. Good for a merchant's own small enhancements.
 - **Private-app widget launch** (D5, a *seam* — not live yet) — a platform-managed widget placement
   activated by an installed app, mounted in a sandboxed iframe with a minted launch token.
-
-> Naming note: the platform's affiliate example currently ships a `lib/private-apps-devkit.mjs`
-> helper. This `private-apps/` track is the intended public front door for that material — the two
-> should be reconciled to point at one place as the devkit is published.
