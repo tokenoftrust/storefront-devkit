@@ -14,6 +14,10 @@
       "url": "./schemas/home.schema.json"
     },
     {
+      "fileMatch": ["**/content/pages/*.json"],
+      "url": "./schemas/pages.schema.json"
+    },
+    {
       "fileMatch": ["**/scripts.json"],
       "url": "./schemas/scripts.schema.json"
     },

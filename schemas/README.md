@@ -8,6 +8,7 @@ are ambiguous, the schema wins.
 | `theme.schema.json` | `theme.json` | Deep-partial override of the reference theme; AA contrast checked at publish |
 | `chrome.schema.json` | `content/chrome.json` | Header, nav/mega, footer, newsletter, announcement |
 | `home.schema.json` | `content/home.json` | Block palette `block-palette@3` + product sources |
+| `pages.schema.json` | `content/pages/*.json` | Editorial/standalone pages; same `block-palette@3` format as home |
 | `scripts.schema.json` | `scripts.json` | Registered, sandboxed-by-default widget bundles |
 | `capabilities.schema.json` | `capabilities.json` | Optional toggles; cannot weaken the compliance floor |
 | `compliance.schema.json` | `.tot/config.json#/compliance` | Flags/params only — legal wording is platform-owned |

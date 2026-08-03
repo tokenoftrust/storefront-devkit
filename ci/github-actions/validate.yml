@@ -28,6 +28,7 @@ jobs:
           ajv validate -c ajv-formats -s schemas/theme.schema.json        -d theme.json                 || true
           ajv validate -c ajv-formats -s schemas/chrome.schema.json       -d content/chrome.json        || true
           ajv validate -c ajv-formats -s schemas/home.schema.json         -d content/home.json
+          if ls content/pages/*.json >/dev/null 2>&1; then ajv validate -c ajv-formats -s schemas/pages.schema.json -d "content/pages/*.json"; fi
           ajv validate -c ajv-formats -s schemas/scripts.schema.json      -d scripts.json               || true
           ajv validate -c ajv-formats -s schemas/capabilities.schema.json -d capabilities.json          || true
           ajv validate -c ajv-formats -s schemas/tot-config.schema.json   -d .tot/config.json           || true

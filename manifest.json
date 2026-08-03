@@ -28,6 +28,7 @@
     { "id": "schema-theme", "kind": "schema", "title": "theme.json schema", "path": "schemas/theme.schema.json", "describes": "theme.json", "tags": ["theme", "branding", "tokens"] },
     { "id": "schema-chrome", "kind": "schema", "title": "chrome.json schema", "path": "schemas/chrome.schema.json", "describes": "content/chrome.json", "tags": ["chrome", "nav", "footer"] },
     { "id": "schema-home", "kind": "schema", "title": "home.json schema (block-palette@3)", "path": "schemas/home.schema.json", "describes": "content/home.json", "contract": "block-palette@3", "tags": ["home", "blocks", "merchandising"] },
+    { "id": "schema-pages", "kind": "schema", "title": "pages/*.json schema (block-palette@3)", "path": "schemas/pages.schema.json", "describes": "content/pages/*.json", "contract": "block-palette@3", "tags": ["pages", "editorial", "blocks"] },
     { "id": "schema-scripts", "kind": "schema", "title": "scripts.json schema", "path": "schemas/scripts.schema.json", "describes": "scripts.json", "tags": ["widgets", "scripts", "sandbox"] },
     { "id": "schema-capabilities", "kind": "schema", "title": "capabilities.json schema", "path": "schemas/capabilities.schema.json", "describes": "capabilities.json", "tags": ["capabilities"] },
     { "id": "schema-compliance", "kind": "schema", "title": "compliance config schema", "path": "schemas/compliance.schema.json", "describes": ".tot/config.json#/compliance", "tags": ["compliance", "regulated"] },
