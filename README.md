@@ -47,12 +47,14 @@ Storefront tenant rather than customizing its tenant-owned files.
 
 - **Private apps are available now.** They connect your independently hosted service to one
   merchant tenant through a language-neutral, standards-based contract. Start at
-  [`apps/`](./apps/) and continue to the stable [`private-apps/`](./private-apps/) guide.
+  [`apps/`](./apps/) and then read the canonical [`apps/private/`](./apps/private/) contract. The
+  stable [`private-apps/`](./private-apps/) guide remains available for existing links.
 - **Public apps are reserved, not announced.** The devkit does not claim a public-app API,
   marketplace, installation flow, or review process. Do not infer one from this repository.
 - **No npm package is published from this devkit.** This GitHub repository is the canonical public
-  material for developers and LLMs; the ToT MCP recipe is a pointer/index. Developers may use the
-  language and framework appropriate to their service.
+  material for developers and LLMs, including the source-safe private-app contract; the ToT MCP
+  recipe is a pointer/index. Developers may use the language and framework appropriate to their
+  service.
 
 ## Quick start (coding agents / LLMs)
 

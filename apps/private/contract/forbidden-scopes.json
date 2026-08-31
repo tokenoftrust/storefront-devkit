@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1",
+  "description": "Machine-checkable denylist proving the compliance floor (compliance-floor-v1) is unreachable through the Private Apps contract. These scope ids are not part of the V1 catalog, must be rejected if requested in a tot-app.json manifest, and have no corresponding endpoint in openapi.yaml or topic in asyncapi.yaml. Every forbiddenScopes entry maps to one enumerated clause of floor.statement through its floorRef; Content-Security-Policy has no scope at all because no scope can add, weaken, or bypass it.",
+  "floor": {
+    "id": "compliance-floor-v1",
+    "statement": "Private apps can NEVER disable, replace, mutate, or bypass: age/identity verification; excise/tax enforcement; jurisdiction rules/eligibility; required legal/FDA/age/state/shipping warnings and their placement; Content-Security-Policy; promotion/publish (go-live) gates; signed-cart payloads; checkout totals/validity; PII minimization (no unrestricted access to customer PII or age/identity evidence). Apps get scoped, least-privilege, mostly-READ access, never write access to these surfaces, never DOM/cookie/checkout access."
+  },
+  "forbiddenScopes": [
+    {
+      "id": "checkout:mutate",
+      "forbids": "Any mutation of checkout totals, line pricing, cart contents, or checkout validity.",
+      "reason": "Checkout totals/validity are platform-owned and signed; a mutating app could change what a customer is charged.",
+      "floorRef": "checkout totals/validity"
+    },
+    {
+      "id": "tax:mutate",
+      "forbids": "Any change to excise/sales tax computation, rates, or collected amounts.",
+      "reason": "Excise/tax enforcement is legally mandated and platform-computed; apps must never alter it.",
+      "floorRef": "excise/tax enforcement"
+    },
+    {
+      "id": "identity:mutate",
+      "forbids": "Any change to age/identity verification state, result, or the requirement to verify.",
+      "reason": "Age/identity verification gates regulated sales; an app must never set, clear, or bypass it.",
+      "floorRef": "age/identity verification"
+    },
+    {
+      "id": "warnings:mutate",
+      "forbids": "Any change to required legal/FDA/age/state/shipping warning copy or its placement.",
+      "reason": "Warning copy and placement are source-required and legally binding; apps may not rewrite, hide, or reposition them.",
+      "floorRef": "required legal/FDA/age/state/shipping warnings and their placement"
+    },
+    {
+      "id": "jurisdiction:approve",
+      "forbids": "Approving, overriding, or expanding jurisdiction eligibility for a sale or shipment.",
+      "reason": "Jurisdiction rules/eligibility determine where a product may lawfully ship; only the platform decides.",
+      "floorRef": "jurisdiction rules/eligibility"
+    },
+    {
+      "id": "signed-cart:mutate",
+      "forbids": "Creating, altering, or re-signing signed-cart payloads.",
+      "reason": "Signed carts are the integrity boundary between storefront and checkout; forging them breaks trust in the price/contents.",
+      "floorRef": "signed-cart payloads"
+    },
+    {
+      "id": "promotion:publish",
+      "forbids": "Triggering or bypassing the promotion/publish (go-live) gate to push tenant changes live.",
+      "reason": "Go-live is evidence-gated and platform-owned; an app must not publish or skip the promote gate.",
+      "floorRef": "promotion/publish (go-live) gates"
+    },
+    {
+      "id": "pii:unrestricted",
+      "forbids": "Bulk or unrestricted access to customer PII (raw email/name/address, age/identity evidence, verification documents).",
+      "reason": "PII is minimized by scope; unrestricted access defeats data-minimization and exposes regulated identity evidence.",
+      "floorRef": "PII minimization (no unrestricted access to customer PII or age/identity evidence)"
+    }
+  ],
+  "csp": {
+    "note": "Content-Security-Policy is a floor surface with NO scope at all — forbidden or otherwise. Widgets render only through the existing platform-owned sandbox (allow-scripts, no allow-same-origin) and CSP-hash pinning; there is no contract path that lets an app add, weaken, or bypass CSP. Listed here so the floor's CSP clause is explicitly accounted for.",
+    "floorRef": "Content-Security-Policy"
+  }
+}

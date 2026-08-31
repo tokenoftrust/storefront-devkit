@@ -1,0 +1,47 @@
+{
+  "contractVersion": "1",
+  "id": "com.acme-agency.affiliate-attribution",
+  "name": "Acme Affiliate Attribution",
+  "version": "1.2.0",
+  "owner": {
+    "name": "Acme Agency",
+    "email": "apps@acme-agency.example",
+    "url": "https://acme-agency.example"
+  },
+  "description": "Tracks affiliate referrals, consumes order events, calculates commissions, and shows a small campaign widget.",
+  "installMode": "external",
+  "scopes": [
+    "catalog:read",
+    "orders:read:minimal",
+    "orders:webhook",
+    "attribution:write",
+    "widgets:launch"
+  ],
+  "webhooks": {
+    "endpoint": "https://affiliate.acme-agency.example/webhooks/tot",
+    "topics": [
+      "order.created",
+      "order.fulfilled",
+      "attribution.finalized"
+    ],
+    "signatureKeyId": "tot-storefront-2026-07"
+  },
+  "widgets": [
+    {
+      "placement": "product.aside",
+      "endpoint": "https://affiliate.acme-agency.example/widgets/referral-status",
+      "title": "Referral status"
+    }
+  ],
+  "adminLinks": [
+    {
+      "label": "Affiliate dashboard",
+      "href": "https://affiliate.acme-agency.example/dashboard"
+    }
+  ],
+  "telemetryMode": "sampled",
+  "retention": {
+    "eventLogDays": 30,
+    "piiRedaction": "default"
+  }
+}

@@ -1,0 +1,358 @@
+asyncapi: 2.6.0
+id: 'urn:com:tokenoftrust:storefront:private-apps:webhooks'
+info:
+  title: Storefront Private Apps Webhook Spine
+  version: "1.0.0"
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  description: >
+    Outbound webhook events delivered to installed Storefront Private Apps. Every event
+    is a CloudEvents 1.0 JSON envelope delivered over HTTPS POST and signed with HTTP
+    Message Signatures (RFC 9421). The app verifies the signature against the gateway's
+    published keys (JWKS / `/.well-known/tot-app-authorization-metadata`). Delivery is
+    at-least-once with retries, dead-lettering, and app-owned replay; receivers dedupe on
+    the CloudEvents `id`. No event grants an app the ability to approve restricted sales
+    or change any compliance obligation (see forbidden-scopes.json).
+
+defaultContentType: application/cloudevents+json
+
+tags:
+  - name: private-apps
+    description: Storefront Private Apps outbound webhook events.
+
+servers:
+  gateway:
+    url: '{tenant}.tokenoftrust.store'
+    protocol: https
+    description: >
+      The app's own HTTPS endpoint (declared in tot-app.json `webhooks.endpoint`) receives
+      the POST. This server block documents the delivering gateway origin per tenant.
+    variables:
+      tenant:
+        default: acme
+
+channels:
+  app.installed:
+    description: Emitted when an app install is activated for a tenant. Delivered to the install's own endpoint.
+    subscribe:
+      operationId: onAppInstalled
+      bindings:
+        http:
+          type: request
+          method: POST
+      message:
+        $ref: '#/components/messages/AppInstalled'
+
+  app.uninstalled:
+    description: Emitted when an app install is uninstalled. Final delivery before credentials/placements are revoked.
+    subscribe:
+      operationId: onAppUninstalled
+      message:
+        $ref: '#/components/messages/AppUninstalled'
+
+  catalog.product.updated:
+    description: Emitted when a published catalog product changes. Requires scope catalog:read.
+    subscribe:
+      operationId: onCatalogProductUpdated
+      message:
+        $ref: '#/components/messages/CatalogProductUpdated'
+
+  inventory.changed:
+    description: Emitted when inventory availability changes. Requires scope inventory:read.
+    subscribe:
+      operationId: onInventoryChanged
+      message:
+        $ref: '#/components/messages/InventoryChanged'
+
+  order.created:
+    description: Emitted when an order is created. Requires scope orders:webhook. Minimized order payload.
+    subscribe:
+      operationId: onOrderCreated
+      message:
+        $ref: '#/components/messages/OrderCreated'
+
+  order.fulfilled:
+    description: Emitted when an order is fulfilled. Requires scope orders:webhook.
+    subscribe:
+      operationId: onOrderFulfilled
+      message:
+        $ref: '#/components/messages/OrderFulfilled'
+
+  customer.marketing_consent.updated:
+    description: Emitted when a customer's marketing consent changes. Requires scope customers:read:minimal. Opaque customer id only.
+    subscribe:
+      operationId: onCustomerMarketingConsentUpdated
+      message:
+        $ref: '#/components/messages/CustomerMarketingConsentUpdated'
+
+  attribution.finalized:
+    description: Emitted when an attribution/commission record is finalized. Requires scope attribution:write.
+    subscribe:
+      operationId: onAttributionFinalized
+      message:
+        $ref: '#/components/messages/AttributionFinalized'
+
+components:
+  messageTraits:
+    cloudEventEnvelope:
+      headers:
+        type: object
+        description: HTTP delivery headers. The message is signed with HTTP Message Signatures.
+        properties:
+          Content-Type:
+            type: string
+            const: application/cloudevents+json
+          Signature-Input:
+            type: string
+            description: RFC 9421 signature parameters (keyid, created, covered components).
+          Signature:
+            type: string
+            description: RFC 9421 signature value over the covered components + body digest.
+          Content-Digest:
+            type: string
+            description: RFC 9530 digest of the request body, covered by the signature.
+        required: [Content-Type, Signature-Input, Signature, Content-Digest]
+
+  schemas:
+    CloudEventEnvelope:
+      type: object
+      description: CloudEvents 1.0 structured JSON envelope. `data` varies by event type.
+      additionalProperties: false
+      required: [specversion, id, source, type, time, datacontenttype, tenantid, appinstallid, dataschemaversion, data]
+      properties:
+        specversion:
+          type: string
+          const: "1.0"
+        id:
+          type: string
+          description: Unique event id. Stable across retries and replays; receivers dedupe on it.
+        source:
+          type: string
+          format: uri-reference
+          description: Emitting gateway + tenant, e.g. /tenants/acme/storefront.
+        type:
+          type: string
+          description: Reverse-DNS event type, prefixed com.tokenoftrust.storefront.
+          enum:
+            - com.tokenoftrust.storefront.app.installed
+            - com.tokenoftrust.storefront.app.uninstalled
+            - com.tokenoftrust.storefront.catalog.product.updated
+            - com.tokenoftrust.storefront.inventory.changed
+            - com.tokenoftrust.storefront.order.created
+            - com.tokenoftrust.storefront.order.fulfilled
+            - com.tokenoftrust.storefront.customer.marketing_consent.updated
+            - com.tokenoftrust.storefront.attribution.finalized
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschemaversion:
+          type: string
+          description: Schema version of the `data` payload (semver, contract-scoped).
+          const: "1"
+        tenantid:
+          type: string
+          description: CloudEvents extension. The tenant this event belongs to.
+        appinstallid:
+          type: string
+          description: CloudEvents extension. The app-install-id this delivery targets.
+        retrycount:
+          type: integer
+          minimum: 0
+          description: CloudEvents extension. Delivery attempt count (0 on first attempt).
+        totrequestid:
+          type: string
+          description: CloudEvents extension. Correlation id matching the API tot-request-id header.
+        traceparent:
+          type: string
+          description: CloudEvents extension. W3C Trace Context for end-to-end tracing.
+        data:
+          type: object
+          description: Event-specific payload; shape determined by `type`.
+
+    OrderData:
+      type: object
+      additionalProperties: false
+      required: [id, status, currency]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [created, fulfilled, cancelled] }
+        currency: { type: string }
+        customerHash: { type: string, description: "Reserved. V1 order.created and order.fulfilled events do not populate this field. Apps must not infer or reconstruct customer identity from order webhook data." }
+        subtotal: { type: number }
+        total: { type: number }
+        lineItems:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, quantity]
+            properties:
+              sku: { type: string }
+              handle: { type: string }
+              quantity: { type: integer }
+              lineTotal: { type: number }
+
+    CatalogProductUpdateData:
+      type: object
+      additionalProperties: false
+      required: [handle]
+      properties:
+        handle: { type: string }
+        id: { type: string }
+
+    InventoryChangedData:
+      type: object
+      additionalProperties: false
+      required: [sku, available]
+      properties:
+        sku: { type: string }
+        available: { type: boolean }
+        quantity: { type: integer }
+        policy: { type: string, enum: [continue, deny] }
+
+    CustomerMarketingConsentUpdatedData:
+      type: object
+      additionalProperties: false
+      required: [customerHash, marketingConsent]
+      properties:
+        customerHash: { type: string }
+        marketingConsent: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+
+    AttributionFinalizedData:
+      type: object
+      additionalProperties: false
+      required: [attributionId, orderId]
+      properties:
+        attributionId: { type: string }
+        orderId: { type: string }
+        campaign: { type: string }
+        commission:
+          type: object
+          additionalProperties: false
+          properties:
+            amount: { type: number }
+            currency: { type: string }
+
+  messages:
+    AppInstalled:
+      name: appInstalled
+      messageId: appInstalled
+      title: app.installed
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data:
+                type: object
+                additionalProperties: false
+                description: Envelope identity only — no fields, ever.
+
+    AppUninstalled:
+      name: appUninstalled
+      messageId: appUninstalled
+      title: app.uninstalled
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data:
+                type: object
+                additionalProperties: false
+                description: Envelope identity only — no fields, ever.
+
+    CatalogProductUpdated:
+      name: catalogProductUpdated
+      messageId: catalogProductUpdated
+      title: catalog.product.updated
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/CatalogProductUpdateData' }
+
+    InventoryChanged:
+      name: inventoryChanged
+      messageId: inventoryChanged
+      title: inventory.changed
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/InventoryChangedData' }
+
+    OrderCreated:
+      name: orderCreated
+      messageId: orderCreated
+      title: order.created
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/OrderData' }
+
+    OrderFulfilled:
+      name: orderFulfilled
+      messageId: orderFulfilled
+      title: order.fulfilled
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/OrderData' }
+
+    CustomerMarketingConsentUpdated:
+      name: customerMarketingConsentUpdated
+      messageId: customerMarketingConsentUpdated
+      title: customer.marketing_consent.updated
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/CustomerMarketingConsentUpdatedData' }
+
+    AttributionFinalized:
+      name: attributionFinalized
+      messageId: attributionFinalized
+      title: attribution.finalized
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/AttributionFinalizedData' }

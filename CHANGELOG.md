@@ -11,8 +11,11 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 - Clarified that the devkit is the public, source-free developer deliverable. It does not publish
   an npm library or platform runtime; private apps remain language-neutral and contract-first.
 - Established this repository's GitHub-relative `apps/` and `private-apps/` material as the
-  canonical public documentation for developers and LLMs. The ToT MCP recipe is a pointer/index;
-  the detailed public contract corpus follows in a separate cutover.
+  canonical public documentation for developers and LLMs. The ToT MCP recipe is a pointer/index.
+- Added the source-safe private-app contract corpus under `apps/private/`: manifest schema, scope
+  catalog, forbidden-scope denylist, OpenAPI/AsyncAPI definitions, synthetic fixtures, and concise
+  webhook/API guidance. Kept operator material, platform source, credentials, tenant data, and npm
+  package/runtime code out of the public devkit.
 
 ## [0.1.0] — first pass
 

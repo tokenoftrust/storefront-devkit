@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1",
+  "description": "Machine-readable V1 scope catalog for Storefront Private Apps. Every scope is least-privilege and mostly READ. The only write scopes are narrow, app-owned surfaces (attribution) and a UI-launch capability (widgets:launch) that grants no data access. No scope in this catalog can reach a compliance-floor surface; see forbidden-scopes.json.",
+  "scopes": [
+    {
+      "id": "catalog:read",
+      "grants": "Read published catalog products and collections for the installed tenant (GET /catalog/products, /catalog/products/{handle}).",
+      "access": "read",
+      "dataMinimization": "Public storefront catalog data only. No draft/internal-only fields beyond what the storefront already renders publicly.",
+      "pii": "none"
+    },
+    {
+      "id": "orders:read:minimal",
+      "grants": "Read a minimized order list and order detail (GET /orders, /orders/{id}).",
+      "access": "read",
+      "dataMinimization": "Order id, status, currency, line SKUs/handles, quantities, subtotals/totals, timestamps. NO raw checkout payload, NO signed-cart material, NO tax-computation internals.",
+      "pii": "minimal — customer identity defaults to an opaque customer hash stable per (tenant, app-install-id): the same customer resolves to the same hash within one app install (so the app stays internally consistent across its own order.created/order.fulfilled/attribution.finalized events), but the hash is NOT comparable across apps on the same tenant, preventing cross-app re-identification. No email/name/address unless a future, separately-approved elevated scope exists."
+    },
+    {
+      "id": "orders:webhook",
+      "grants": "Subscribe to order lifecycle events (order.created, order.fulfilled) delivered as signed CloudEvents.",
+      "access": "read (event delivery)",
+      "dataMinimization": "Same minimized order shape as orders:read:minimal, delivered in the event payload.",
+      "pii": "minimal — customer hash only by default (stable per (tenant, app-install-id); not comparable across apps on the same tenant)."
+    },
+    {
+      "id": "customers:read:minimal",
+      "grants": "Read minimal marketing-relevant customer state (e.g. marketing consent) keyed by opaque customer id; subscribe to customer.marketing_consent.updated.",
+      "access": "read",
+      "dataMinimization": "Opaque customer id + marketing consent state + timestamps. NO age/identity evidence, NO verification result, NO document data, NO raw contact PII by default.",
+      "pii": "minimal and named — consent state keyed by an opaque customer id stable per (tenant, app-install-id) and not comparable across apps on the same tenant; never age/identity evidence."
+    },
+    {
+      "id": "inventory:read",
+      "grants": "Read inventory availability/quantity for the tenant's catalog (GET /inventory) and subscribe to inventory.changed.",
+      "access": "read",
+      "dataMinimization": "Availability, quantity, and policy per variant/SKU only.",
+      "pii": "none"
+    },
+    {
+      "id": "reports:read",
+      "grants": "Read limited, pre-defined report snapshots/exports (GET /reports).",
+      "access": "read",
+      "dataMinimization": "Aggregate report snapshots only; no row-level PII beyond what the minimal order/customer scopes already permit.",
+      "pii": "none-to-minimal (aggregated)."
+    },
+    {
+      "id": "attribution:write",
+      "grants": "Write app-owned attribution/commission records via the idempotent POST /attribution endpoint.",
+      "access": "write (app-owned surface only)",
+      "dataMinimization": "Writes only into the app's own attribution namespace. Cannot alter orders, price, tax, checkout validity, or any platform record.",
+      "pii": "none — references order id + attribution id + opaque customer hash."
+    },
+    {
+      "id": "widgets:launch",
+      "grants": "Activate declared sandboxed widget placements and mint short-lived widget launch tokens for the app's platform-managed iframes.",
+      "access": "ui-launch (no data read/write)",
+      "dataMinimization": "Launch token carries tenant, env, slot, route, optional product handle, locale, theme hints, trace id — never secrets or customer PII.",
+      "pii": "none",
+      "verification": "The token's aud/sub are the app INSTALL id (not the tenant) — an app verifying a launch token MUST check aud/sub match its own install id, so a token leaked to one install can't be replayed against a sibling install on the same tenant."
+    }
+  ]
+}

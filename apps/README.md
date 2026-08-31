@@ -14,11 +14,9 @@ standards-based private-app contract. Use them for backend integrations such as 
 inventory synchronization; signed lifecycle webhooks; app-owned records; and approved app UI
 placements.
 
-Start with [the private-app guide](../private-apps/README.md). Together with this page, it is the
-canonical public documentation for the current app-developer path: orientation, boundaries, and
-links that are safe to share with developers and coding agents. Detailed publicly releasable
-contract material will be added here in a separate cutover; do not fill that gap with platform
-source or inferred APIs.
+Start with [the canonical private-app contract](./private/README.md). It includes the public-safe
+schema, scope catalog, denylist, OpenAPI/AsyncAPI definitions, synthetic examples, and concise
+webhook/API guidance. [`private-apps/`](../private-apps/) remains the stable legacy guide.
 
 `private-apps/` remains the stable, direct URL for this current guide. This `apps/` directory is
 the broader front door; links to the existing private-app material are intentionally not broken.
@@ -47,6 +45,5 @@ paths—starting with [`apps/`](./) and [`private-apps/`](../private-apps/)—ra
 MCP recipe as the authority. `recipe://storefront-private-apps-devbook` is a discovery pointer and
 index to this material; it does not supersede the repository.
 
-This public material does not copy platform source, private APIs, secrets, or implementation
-internals. A later cutover will add the detailed, public contract corpus here without changing that
-boundary.
+This public material does not copy platform source, private APIs, secrets, tenant data, operator
+runbooks, or implementation internals.

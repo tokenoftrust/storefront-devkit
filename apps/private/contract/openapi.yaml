@@ -1,0 +1,720 @@
+openapi: 3.1.0
+info:
+  title: Storefront Private Apps API
+  version: "1.0.0"
+  x-contractVersion: "1"
+  description: >
+    Scoped, least-privilege API for installed Storefront Private Apps. All access is
+    tenant-scoped from the app's JWT claims (never from caller-supplied tenant input),
+    authenticated with a short-lived bearer JWT issued by the Storefront App Gateway
+    (OAuth2 client-credentials grant). Every endpoint documents the single scope it
+    requires. There is NO endpoint for any compliance-floor surface (see
+    forbidden-scopes.json): no checkout/tax/age-identity/warning/jurisdiction/
+    signed-cart/promote mutation, and no DOM/cookie/checkout access.
+  contact:
+    name: Token of Trust Storefront
+    url: https://storefront.tokenoftrust.com
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: https://{tenant}.tokenoftrust.store/api/apps/v1
+    description: Live tenant gateway
+    variables:
+      tenant:
+        default: acme
+  - url: https://tot-preview.tokenoftrust.store/api/apps/v1
+    description: Shared preview gateway (test env)
+
+tags:
+  - name: metadata
+    description: App install identity and health.
+  - name: catalog
+    description: Scoped catalog reads.
+  - name: orders
+    description: Minimal order reads.
+  - name: inventory
+    description: Inventory availability reads.
+  - name: reports
+    description: Report snapshots.
+  - name: attribution
+    description: App-owned idempotent attribution writes.
+  - name: webhooks
+    description: Delivery health and app-owned replay.
+
+security:
+  - appJwt: []
+
+paths:
+  /app:
+    get:
+      tags: [metadata]
+      operationId: getAppInstall
+      summary: Read this install's metadata
+      description: >
+        Returns the calling app's install record as resolved from the JWT: app id,
+        version, tenant, env, granted scopes, status, and declared widget placements.
+        Requires no additional scope beyond a valid token.
+      x-requiredScope: null
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Install metadata.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppInstall' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /health:
+    get:
+      tags: [metadata]
+      operationId: getInstallHealth
+      summary: Read this install's delivery/telemetry health
+      description: >
+        Returns webhook delivery health for the install: last success, failure streak,
+        DLQ count, p95 delivery latency, last status, last error class, and recent trace
+        ids. Sensitive payload bodies are never included.
+      x-requiredScope: null
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Install health snapshot.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstallHealth' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /catalog/products:
+    get:
+      tags: [catalog]
+      operationId: listCatalogProducts
+      summary: List published catalog products
+      x-requiredScope: catalog:read
+      description: Requires scope `catalog:read`. Public catalog data only.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: collection
+          in: query
+          schema: { type: string }
+          description: Collection handle filter.
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Free-text search.
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 24 }
+      responses:
+        '200':
+          description: Paged product list.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /catalog/products/{handle}:
+    get:
+      tags: [catalog]
+      operationId: getCatalogProduct
+      summary: Read one published product by handle
+      x-requiredScope: catalog:read
+      description: Requires scope `catalog:read`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: handle
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Product detail.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /orders:
+    get:
+      tags: [orders]
+      operationId: listOrders
+      summary: List minimal orders
+      x-requiredScope: orders:read:minimal
+      description: >
+        Requires scope `orders:read:minimal`. Returns the minimized order shape only —
+        no raw checkout payload, no signed-cart material, no tax internals, customer as
+        opaque hash.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: status
+          in: query
+          schema: { type: string, enum: [created, fulfilled, cancelled] }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 24 }
+      responses:
+        '200':
+          description: Paged minimal order list.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /orders/{id}:
+    get:
+      tags: [orders]
+      operationId: getOrder
+      summary: Read one minimal order
+      x-requiredScope: orders:read:minimal
+      description: Requires scope `orders:read:minimal`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Minimal order detail.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /inventory:
+    get:
+      tags: [inventory]
+      operationId: listInventory
+      summary: Read inventory availability
+      x-requiredScope: inventory:read
+      description: Requires scope `inventory:read`. Availability/quantity/policy per SKU only.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: sku
+          in: query
+          schema: { type: string }
+          description: Optional SKU filter.
+      responses:
+        '200':
+          description: Inventory list.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports:
+    get:
+      tags: [reports]
+      operationId: listReports
+      summary: List report snapshots
+      x-requiredScope: reports:read
+      description: Requires scope `reports:read`. Aggregate snapshots only.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Report snapshot list.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /attribution:
+    post:
+      tags: [attribution]
+      operationId: writeAttribution
+      summary: Write an app-owned attribution/commission record (idempotent)
+      x-requiredScope: attribution:write
+      description: >
+        Requires scope `attribution:write`. Idempotent: the `Idempotency-Key` header is
+        REQUIRED. A replay reusing a key with a DIFFERENT request body (body hash
+        mismatch) is rejected with 409. Writes only into the app's own attribution
+        namespace — it cannot alter orders, price, tax, or checkout. The referenced
+        `orderId` MUST belong to the calling tenant/install; an order that is not owned by
+        this tenant is rejected with 403 under the same tenant-ownership rule as reads.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AttributionWrite' }
+      responses:
+        '201':
+          description: Attribution record created (or the stable prior result on idempotent replay).
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AttributionRecord' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Idempotency-Key reused with a mismatched body hash.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /webhooks/deliveries:
+    get:
+      tags: [webhooks]
+      operationId: listWebhookDeliveries
+      summary: List recent webhook delivery records for this install
+      x-requiredScope: null
+      x-authorization: install-owns-delivery
+      description: >
+        Authorized by app-install ownership, not a single event scope: any installed app
+        with at least one active webhook subscription may list ITS OWN delivery records
+        (a delivery is visible only to the install that received it). Returns status,
+        attempt count, DLQ state, and trace ids. Sensitive payload bodies are redacted by
+        default.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: state
+          in: query
+          schema: { type: string, enum: [delivered, retrying, dead-lettered] }
+      responses:
+        '200':
+          description: Delivery record list.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /webhooks/deliveries/{deliveryId}/replay:
+    post:
+      tags: [webhooks]
+      operationId: replayWebhookDelivery
+      summary: Replay a delivery for this app installation
+      x-requiredScope: null
+      x-authorization: install-owns-delivery
+      description: >
+        Authorized by app-install ownership, not a single event scope: an installed app may
+        replay only a delivery it owns (any active webhook subscription qualifies).
+        Re-enqueues a prior delivery. Idempotent via `Idempotency-Key`; the original event id
+        and schema version are preserved so the receiver can dedupe.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: deliveryId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '202':
+          description: Replay accepted and enqueued.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delivery' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Idempotency-Key reused with a mismatched body hash.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    appJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Short-lived JWT access token issued by the Storefront App Gateway via the OAuth2
+        client-credentials grant. The client secret is server-side only and never
+        returned after creation. Tokens are verified against the gateway JWKS at
+        `/.well-known/jwks.json`; authorization metadata (issuer, supported scopes,
+        HTTP Message Signature keys) is published at
+        `/.well-known/tot-app-authorization-metadata`. Required claims: `iss`, `aud`,
+        `sub` (app-install-id), `tenant`, `env`, `scopes`, `iat`, `exp`, `jti`.
+        The token-issuance endpoint is documented separately from this app API. Use only the
+        installation credentials supplied through the approved setup flow. JWKS and
+        authorization-metadata discovery belong here.
+
+  parameters:
+    Traceparent:
+      name: traceparent
+      in: header
+      required: false
+      description: W3C Trace Context. Propagated through the gateway and echoed on the response.
+      schema:
+        type: string
+        pattern: '^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >
+        Client-generated idempotency key. Required on all writes. Reusing a key with a
+        different request body (body hash mismatch) is rejected with 409.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+
+  headers:
+    TotRequestId:
+      description: Per-request correlation id, present on every response.
+      schema: { type: string }
+    Traceparent:
+      description: Echoed W3C Trace Context for the served request.
+      schema: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Missing, expired, malformed, or revoked token; suspended/uninstalled app.
+      headers:
+        tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Token valid but lacks the required scope, or tenant claim mismatch.
+      headers:
+        tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found for this tenant.
+      headers:
+        tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadRequest:
+      description: Malformed request (e.g. missing Idempotency-Key).
+      headers:
+        tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unprocessable:
+      description: Well-formed request that fails validation.
+      headers:
+        tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code (e.g. scope_denied, tenant_mismatch, idempotency_conflict, token_expired).
+        message: { type: string }
+        requestId: { type: string }
+
+    AppInstall:
+      type: object
+      additionalProperties: false
+      required: [appId, appVersion, tenant, env, scopes, status]
+      properties:
+        appId: { type: string }
+        appVersion: { type: string }
+        installId: { type: string, description: The app-install-id (JWT sub). }
+        tenant: { type: string }
+        env: { type: string, enum: [development, test, sandbox, production] }
+        status: { type: string, enum: [active, suspended] }
+        scopes:
+          type: array
+          items:
+            type: string
+            enum:
+              - catalog:read
+              - orders:read:minimal
+              - orders:webhook
+              - customers:read:minimal
+              - inventory:read
+              - reports:read
+              - attribution:write
+              - widgets:launch
+        widgetPlacements:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [placement, endpoint]
+            properties:
+              placement:
+                type: string
+                enum: [product.aside, home.section, global.footer]
+              endpoint:
+                type: string
+                format: uri
+                description: HTTPS URL that serves the sandboxed widget's content. Must be https.
+              title:
+                type: string
+                description: Label shown near the widget in approved placement controls.
+
+    InstallHealth:
+      type: object
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [healthy, degraded, unhealthy] }
+        lastSuccessAt: { type: string, format: date-time }
+        failureStreak: { type: integer, minimum: 0 }
+        dlqCount: { type: integer, minimum: 0 }
+        p95DeliveryMs: { type: integer, minimum: 0 }
+        lastStatus: { type: integer }
+        lastErrorClass: { type: string }
+        recentTraceIds:
+          type: array
+          items: { type: string }
+
+    ProductList:
+      type: object
+      additionalProperties: false
+      required: [products, page, pageSize, total]
+      properties:
+        products:
+          type: array
+          items: { $ref: '#/components/schemas/Product' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    Product:
+      type: object
+      description: Minimized public catalog product (subset of the storefront CatalogProduct).
+      additionalProperties: false
+      required: [id, handle, title, status, priceRange]
+      properties:
+        id: { type: string }
+        handle: { type: string }
+        title: { type: string }
+        status: { type: string, enum: [active, draft, archived] }
+        vendor: { type: string }
+        productType: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        priceRange:
+          type: object
+          additionalProperties: false
+          required: [min, max, currency]
+          properties:
+            min: { type: number }
+            max: { type: number }
+            currency: { type: string, description: ISO 4217. }
+        updatedAt: { type: string, format: date-time }
+
+    OrderList:
+      type: object
+      additionalProperties: false
+      required: [orders, page, pageSize, total]
+      properties:
+        orders:
+          type: array
+          items: { $ref: '#/components/schemas/Order' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+
+    Order:
+      type: object
+      description: >
+        Minimized order. Deliberately excludes raw checkout payload, signed-cart
+        material, tax-computation internals, and raw customer PII.
+      additionalProperties: false
+      required: [id, status, currency, customerHash, createdAt]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [created, fulfilled, cancelled] }
+        currency: { type: string }
+        customerHash:
+          type: string
+          description: >
+            Opaque customer hash, stable per (tenant, app-install-id): consistent within
+            this app install but not comparable across apps on the same tenant. Not
+            reversible to PII.
+        subtotal: { type: number }
+        total: { type: number }
+        lineItems:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, quantity]
+            properties:
+              sku: { type: string }
+              handle: { type: string }
+              quantity: { type: integer, minimum: 1 }
+              lineTotal: { type: number }
+        createdAt: { type: string, format: date-time }
+        fulfilledAt: { type: string, format: date-time }
+
+    InventoryList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, available]
+            properties:
+              sku: { type: string }
+              available: { type: boolean }
+              quantity: { type: integer }
+              policy: { type: string, enum: [deny, continue] }
+
+    ReportList:
+      type: object
+      additionalProperties: false
+      required: [reports]
+      properties:
+        reports:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, generatedAt]
+            properties:
+              id: { type: string }
+              title: { type: string }
+              generatedAt: { type: string, format: date-time }
+              format: { type: string, enum: [json, csv] }
+              downloadUrl: { type: string, format: uri }
+
+    AttributionWrite:
+      type: object
+      description: App-owned attribution/commission record. References platform ids; never mutates them.
+      additionalProperties: false
+      required: [attributionId, orderId]
+      properties:
+        attributionId:
+          type: string
+          description: App-generated stable id for this attribution event.
+        orderId:
+          type: string
+          description: >
+            The order this attribution references (read-only reference). MUST belong to the
+            calling tenant/install; a cross-tenant orderId is rejected with 403.
+        campaign: { type: string }
+        referralCode: { type: string }
+        customerHash:
+          type: string
+          description: >
+            The app's OWN per-(tenant, app-install) customerHash, as echoed back from a prior
+            GET /orders / GET /orders/{id} read — a 64-character hex sha256 digest. Never a raw
+            customer identifier; validated against that shape and rejected (400) otherwise. Not
+            re-hashed — stored exactly as given.
+        commission:
+          type: object
+          additionalProperties: false
+          properties:
+            amount: { type: number }
+            currency: { type: string }
+
+    AttributionRecord:
+      type: object
+      additionalProperties: false
+      required: [attributionId, orderId, recordedAt]
+      properties:
+        attributionId: { type: string }
+        orderId: { type: string }
+        campaign: { type: string }
+        referralCode: { type: string }
+        commission:
+          type: object
+          additionalProperties: false
+          properties:
+            amount: { type: number }
+            currency: { type: string }
+        recordedAt: { type: string, format: date-time }
+
+    DeliveryList:
+      type: object
+      additionalProperties: false
+      required: [deliveries]
+      properties:
+        deliveries:
+          type: array
+          items: { $ref: '#/components/schemas/Delivery' }
+
+    Delivery:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, eventId, topic, state]
+      properties:
+        deliveryId: { type: string }
+        eventId: { type: string }
+        topic:
+          type: string
+          enum:
+            - app.installed
+            - app.uninstalled
+            - catalog.product.updated
+            - inventory.changed
+            - order.created
+            - order.fulfilled
+            - customer.marketing_consent.updated
+            - attribution.finalized
+        state: { type: string, enum: [delivered, retrying, dead-lettered] }
+        attempts: { type: integer, minimum: 0 }
+        lastStatus: { type: integer }
+        lastTraceId: { type: string }
+        updatedAt: { type: string, format: date-time }

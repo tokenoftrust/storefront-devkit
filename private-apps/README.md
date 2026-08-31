@@ -27,10 +27,10 @@ event in the contract can touch it.
 ## Public documentation authority
 
 For public documentation and LLM use, this GitHub repository is the authority. Navigate by
-repository-relative paths: [`../apps/`](../apps/) is the app front door and this
-`private-apps/README.md` is the stable current guide. The detailed, publicly releasable contract
-corpus will be added to this repository in a separate cutover; until then, do not invent missing
-endpoints, scopes, lifecycle behavior, or a public-app surface.
+repository-relative paths: [`../apps/`](../apps/) is the app front door and
+[`../apps/private/`](../apps/private/) is the canonical private-app contract, including schemas,
+scope rules, API/event definitions, safe fixtures, and implementation guidance. This
+`private-apps/README.md` remains the stable compatibility guide.
 
 `recipe://storefront-private-apps-devbook` on the ToT MCP is a pointer and index to this public
 material. It is useful for discovery, but it is not the source of truth and does not override this
@@ -38,6 +38,8 @@ repository.
 
 ## Current guidance
 
+- **Public contract** — use [`../apps/private/`](../apps/private/) as the normative public
+  material. Do not infer behavior outside its schema, scope catalog, OpenAPI, or AsyncAPI files.
 - **The CLI** — `tot app scaffold <name>` creates a runnable, language-neutral skeleton
   (`tot-app.json`, `fixtures/`, `server.js`, Dockerfile); `tot app dev` (`validate` / `emit` /
   `verify` / `mint`) is the local harness that signs fixture CloudEvents exactly like the real

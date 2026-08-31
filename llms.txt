@@ -17,10 +17,12 @@
 
 - [apps/](./apps/): The public app-developer front door. Private apps are available now; public
   apps are reserved and must not be inferred from this repository.
-- [private-apps/](./private-apps/): Stable guide for the current, language-neutral private-app
-  contract: independently hosted services, signed webhooks, scoped APIs, and the compliance
-  boundary. This repository is canonical public documentation for LLMs and developers; the MCP
-  recipe `recipe://storefront-private-apps-devbook` is a pointer/index, not a source of truth.
+- [apps/private/](./apps/private/): Canonical private-app contract for LLMs and developers:
+  manifest schema, scope catalog, forbidden-scope denylist, OpenAPI/AsyncAPI, safe fixtures, and
+  webhook/API guidance.
+- [private-apps/](./private-apps/): Stable compatibility guide for the current, language-neutral
+  private-app path. The MCP recipe `recipe://storefront-private-apps-devbook` is a pointer/index,
+  not a source of truth.
 
 ## Schemas (authoritative shape of every tenant-owned file)
 

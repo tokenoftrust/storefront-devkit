@@ -52,19 +52,21 @@ strongly encouraged so consumers can pin compatibility.
 ## The hard boundary (what is NEVER accepted here)
 
 This repo is strictly **tenant-side** except for the public, documentation-only [`apps/`](./apps/)
-front door. Do not add:
+track and its source-safe private-app contract corpus. Do not add:
 
 - Any reference to platform source paths, build internals, deploy/runner mechanics, or private
   APIs.
 - Anything that requires reading the platform codebase to understand or use.
 - Platform runtime, npm package source, application source, generated build artifacts, or release
-  automation. The Apps track remains language-neutral guidance; its canonical public
-  documentation lives in this repository, while the ToT MCP recipe is a discovery index.
+  automation. The Apps track remains language-neutral guidance and public contract material; its
+  canonical documentation lives in this repository, while the ToT MCP recipe is a discovery index.
+- Credentials, private keys, real tenant data, operator-only runbooks, order-forward/operations
+  internals, or any document that instructs a developer to bypass the published app contract.
 - Any example that weakens the compliance floor (disabling age/ID verification or excise, hiding
   required warnings, raw HTML/inline JS for regulated tenants).
 
-If an asset can't be understood and used by someone who has only ever seen tenant-owned files and
-the ToT MCP, it doesn't belong here.
+If an asset can't be understood and used from this public repository—using the ToT MCP only as a
+discovery index—it doesn't belong here.
 
 ## Validation
 

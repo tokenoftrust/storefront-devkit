@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://storefront.tokenoftrust.com/schemas/private-apps/tot-app.schema.json",
+  "title": "tot-app.json",
+  "description": "Declarative manifest for a Storefront Private App. Describes an app's identity, the least-privilege scopes it requests, the events it subscribes to, the sandboxed widget slots it may occupy, and (for the optional ToT-hosted runtime) its egress allowlist. The manifest is per-app and language-neutral; it never binds a tenant — install records do that. Contract version 1 (semver).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "id",
+    "name",
+    "version",
+    "owner",
+    "installMode",
+    "scopes"
+  ],
+  "properties": {
+    "contractVersion": {
+      "description": "Major version of the Private Apps contract this manifest targets. This file documents v1.",
+      "type": "string",
+      "const": "1"
+    },
+    "id": {
+      "description": "Stable, globally-unique app id in reverse-DNS-ish form. Immutable across versions.",
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "name": {
+      "description": "Human-readable display name shown in admin install/health UI.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "version": {
+      "description": "App version, semver. Distinct from contractVersion.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "owner": {
+      "description": "The party responsible for the app (agency, merchant team, or partner).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "email"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "email": { "type": "string", "format": "email" },
+        "url": { "type": "string", "format": "uri" }
+      }
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "installMode": {
+      "description": "Where the app runs. 'external' apps are self-hosted and reach the gateway over the public contract. 'hosted' is platform-managed; availability and setup are outside this public contract. The same manifest shape applies to both.",
+      "type": "string",
+      "enum": ["external", "hosted"]
+    },
+    "scopes": {
+      "description": "Least-privilege scopes the app requests at install time. Constrained to the V1 catalog; unknown or forbidden scope strings are rejected. See scopes.json.",
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": [
+          "catalog:read",
+          "orders:read:minimal",
+          "orders:webhook",
+          "customers:read:minimal",
+          "inventory:read",
+          "reports:read",
+          "attribution:write",
+          "widgets:launch"
+        ]
+      }
+    },
+    "webhooks": {
+      "description": "Event subscriptions and the endpoint that receives them. Requires the matching read scope (e.g. order topics require orders:webhook).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoint", "topics"],
+      "properties": {
+        "endpoint": {
+          "description": "HTTPS URL that receives signed CloudEvents. Must be https.",
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "topics": {
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "app.installed",
+              "app.uninstalled",
+              "catalog.product.updated",
+              "inventory.changed",
+              "order.created",
+              "order.fulfilled",
+              "customer.marketing_consent.updated",
+              "attribution.finalized"
+            ]
+          }
+        },
+        "signatureKeyId": {
+          "description": "Optional keyid the app expects in the HTTP Message Signature 'Signature-Input'. If omitted, the gateway advertises the active keyid via its JWKS/signature-metadata endpoint.",
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "widgets": {
+      "description": "Sandboxed widget placements the app requests. Requires the widgets:launch scope. Placements are limited to the platform-owned slots; widgets render in a platform-managed sandboxed iframe, never as merchant-pasted script.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["placement", "endpoint"],
+        "properties": {
+          "placement": {
+            "type": "string",
+            "enum": ["product.aside", "home.section", "global.footer"]
+          },
+          "endpoint": {
+            "description": "HTTPS URL that serves the sandboxed widget's content. Must be https.",
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "title": {
+            "description": "Label shown near the widget in admin placement controls.",
+            "type": "string",
+            "maxLength": 80
+          }
+        }
+      }
+    },
+    "adminLinks": {
+      "description": "Deep links surfaced in the Storefront admin app-detail view (e.g. the app's own dashboard). Informational only; they never confer platform authority.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "href"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "href": { "type": "string", "format": "uri", "pattern": "^https://" }
+        }
+      }
+    },
+    "telemetryMode": {
+      "description": "How much OpenTelemetry the gateway retains for this app's traffic. 'errors-only' keeps failing/denied spans; 'sampled' keeps a sampled slice; 'full' keeps every span (higher cost).",
+      "type": "string",
+      "enum": ["errors-only", "sampled", "full"],
+      "default": "sampled"
+    },
+    "retention": {
+      "description": "Data-retention policy for delivery logs and any app-scoped operational records the platform keeps on the app's behalf.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "eventLogDays": {
+          "description": "Days the platform retains webhook delivery records for this install.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365,
+          "default": 30
+        },
+        "piiRedaction": {
+          "description": "'default' redacts sensitive payload bodies from admin health; 'strict' additionally minimizes any optional identifiers to opaque ids/hashes.",
+          "type": "string",
+          "enum": ["default", "strict"],
+          "default": "default"
+        }
+      }
+    },
+    "hosting": {
+      "description": "Optional. Present only for the ToT-hosted runtime (installMode: hosted). Ignored for external apps.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "description": "Container image reference for the hosted runtime.",
+          "type": "string",
+          "maxLength": 256
+        },
+        "allowedHosts": {
+          "description": "Egress allowlist. Default egress is deny-all; only these hosts are reachable from the container, and unknown hosts are denied and logged.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+          }
+        }
+      }
+    }
+  }
+}

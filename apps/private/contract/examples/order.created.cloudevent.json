@@ -1,0 +1,36 @@
+{
+  "specversion": "1.0",
+  "id": "evt_01J9Z3Q7M2K8V6C4B0N5X7Y2A1",
+  "source": "/tenants/acme/storefront",
+  "type": "com.tokenoftrust.storefront.order.created",
+  "time": "2026-07-21T18:42:07.512Z",
+  "datacontenttype": "application/json",
+  "dataschemaversion": "1",
+  "tenantid": "acme",
+  "appinstallid": "inst_01J9Z2R4H5T3W1P8D6F0K9M2C7",
+  "retrycount": 0,
+  "totrequestid": "req_7f3c9a1e2b4d",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+  "data": {
+    "id": "ord_10482",
+    "status": "created",
+    "currency": "USD",
+    "customerHash": "9a7f2c4e8b1d60336a2f0c1e7d4b8395f0a1c2d3e4f5061728394a5b6c7d8e9",
+    "subtotal": 84.0,
+    "total": 91.35,
+    "lineItems": [
+      {
+        "sku": "VAPE-KIT-STARTER",
+        "handle": "starter-kit",
+        "quantity": 1,
+        "lineTotal": 49.0
+      },
+      {
+        "sku": "PODS-MENTHOL-4PK",
+        "handle": "menthol-pods-4pk",
+        "quantity": 1,
+        "lineTotal": 35.0
+      }
+    ]
+  }
+}
