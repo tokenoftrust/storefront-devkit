@@ -1,11 +1,15 @@
-# Private Apps — the second track
+# Private Apps — available now
 
-This devkit has **two tracks**, for two different jobs:
+Private apps are the current app-developer path in the Storefront Devkit. The broader
+[`apps/`](../apps/) front door also reserves a future public-app path, but no public-app capability
+is available or implied today.
+
+This devkit has two current jobs:
 
 | Track | Job | You author | Lives in |
 |---|---|---|---|
 | **Tenant customization** (the rest of this repo) | Build/brand a store | tenant files (`theme.json`, `content/*`, `scripts.json`) interpreted by the platform | this devkit |
-| **Private apps** (this folder) | Connect *your own service* to a merchant's store | a standards-based **app** in any language | the canonical sources linked below |
+| **Private apps** (this folder) | Connect *your own service* to a merchant's store | a standards-based **app** in any language | this public devkit |
 
 If you're building or branding a storefront, stay in the other track. Come here when a client needs
 a **backend integration** — pulling catalog/order/inventory data, reacting to lifecycle events,
@@ -15,43 +19,34 @@ writing app-owned records (e.g. affiliate attribution), or rendering a small UI 
 
 A private app is **your service, hosted anywhere, in any language**, connected to **one merchant
 tenant** through a language-neutral contract — OpenAPI + JSON Schema + AsyncAPI + CloudEvents + JWT
-(OAuth2 client-credentials) + HTTP Message Signatures. **No ToT SDK is required**, and app code
+(OAuth2 client-credentials) + HTTP Message Signatures. **No ToT package is required**, and app code
 **never runs in the shared platform Worker**. The compliance floor (age/identity, tax, jurisdiction,
 warnings, CSP, go-live, signed-cart, checkout totals) is **unreachable** — no scope, endpoint, or
 event in the contract can touch it.
 
-## Canonical resources (this track links, it does not duplicate)
+## Public documentation authority
 
-The authoritative material ships with the platform. Start here:
+For public documentation and LLM use, this GitHub repository is the authority. Navigate by
+repository-relative paths: [`../apps/`](../apps/) is the app front door and this
+`private-apps/README.md` is the stable current guide. The detailed, publicly releasable contract
+corpus will be added to this repository in a separate cutover; until then, do not invent missing
+endpoints, scopes, lifecycle behavior, or a public-app surface.
 
-- **The devbook** — `recipe://storefront-private-apps-devbook` on the ToT MCP. Read it end-to-end
-  the first time: manifest → OAuth/JWT → RFC 9421 signature verification → webhook handling →
-  widget launch (a *seam* — not live yet) → local fixture harness → telemetry → install → replay →
-  suspend/uninstall → external vs ToT-hosted → guardrails.
-- **The contract** (in the storefront repo, `docs/private-apps/contract/`):
-  `tot-app.schema.json` (the manifest schema), `openapi.yaml`, `asyncapi.yaml`, `scopes.json`
-  (the 8-scope V1 catalog), `forbidden-scopes.json` (the machine-checkable compliance denylist).
-- **The reference app** — `examples/affiliate-attribution/` in the storefront repo: a complete,
-  open-sourceable Node app (OAuth, webhook signature verification, CloudEvents handlers, commission
-  ledger, dashboard, sandbox widget page, tests, Dockerfile, fixtures). The best worked example.
+`recipe://storefront-private-apps-devbook` on the ToT MCP is a pointer and index to this public
+material. It is useful for discovery, but it is not the source of truth and does not override this
+repository.
+
+## Current guidance
+
 - **The CLI** — `tot app scaffold <name>` creates a runnable, language-neutral skeleton
   (`tot-app.json`, `fixtures/`, `server.js`, Dockerfile); `tot app dev` (`validate` / `emit` /
   `verify` / `mint`) is the local harness that signs fixture CloudEvents exactly like the real
   gateway so your verification code exercises the real path.
-- **The devkit source** — `packages/private-apps-devkit/src/{signing,jwt,manifest}.ts` in the
-  storefront repo is the one hand-authored implementation. It's `"private": true` and TS-only
-  today, so two dependency-free JS consumers — `packages/cli/src/vendor/private-apps-devkit.mjs`
-  (the published `@tokenoftrust/cli`) and `examples/affiliate-attribution/lib/private-apps-devkit.mjs`
-  (this standalone example) — carry clearly-labeled vendored copies. They're kept honest, not
-  silently drifting: a machine-enforced mirror test
-  (`examples/affiliate-attribution/test/private-apps-devkit.parity.test.js`) fails if the two
-  copies diverge below their headers, and a parity test in each consumer cross-verifies against
-  the real TS source whenever it's resolvable. This `private-apps/` track will link straight to
-  the devkit's package once it ships a plain-JS build installable outside the storefront monorepo
-  (tracked as `pa-devkit-publish`) — until then it stays documentation-only, per the "links, does
-  not duplicate" rule above.
+- **No published npm library** — this devkit intentionally does not distribute an npm library or
+  platform runtime. Implement against the documented standards and use the CLI's fixtures to test
+  your service. This keeps the public developer deliverable language-neutral and source-free.
 
-## Quickstart (from the devbook)
+## Quickstart
 
 1. **Author `tot-app.json`** — declare `id`, `owner`, `installMode`, and the fewest **scopes** you
    need (from the 8-scope V1 catalog). Validate against `tot-app.schema.json`.

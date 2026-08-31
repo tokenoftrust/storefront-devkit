@@ -1,7 +1,7 @@
 # Token of Trust — Storefront Devkit
 
 **Runnable starting points, schemas, and examples for building high-performance, regulated
-ecommerce storefronts on the Token of Trust (ToT) Storefront platform.**
+ecommerce storefronts and app integrations on the Token of Trust (ToT) Storefront platform.**
 
 This repo is the *companion* to the ToT Storefront **devbooks** (the task-by-task how-to guides
 served over the ToT MCP). The devbooks teach you *how*; this repo gives you *runnable files* —
@@ -9,7 +9,8 @@ fork a starter, copy a snippet, validate against a schema, ship.
 
 You do **not** need access to the platform source code to use anything here. Everything in this
 repo is **tenant-side**: the exact files you author (`theme.json`, `content/*.json`,
-`scripts.json`, `public/**`) and the machine-checkable schemas that describe them. Nothing here
+`scripts.json`, `public/**`) and the machine-checkable schemas that describe them. The
+[`apps/`](./apps/) track provides public, source-free navigation for app developers. Nothing here
 reveals platform internals.
 
 ---
@@ -39,6 +40,20 @@ New here? Read the **[`storefront-devbook-index`](https://mcp.tokenoftrust.com)*
 (search `scope:storefront genre:devbook` on the ToT MCP) — it gives you the mental model. Then
 come back and start from a template.
 
+## Apps: connect your service to a storefront
+
+Use the **[`apps/`](./apps/)** track when you are building software that integrates with a
+Storefront tenant rather than customizing its tenant-owned files.
+
+- **Private apps are available now.** They connect your independently hosted service to one
+  merchant tenant through a language-neutral, standards-based contract. Start at
+  [`apps/`](./apps/) and continue to the stable [`private-apps/`](./private-apps/) guide.
+- **Public apps are reserved, not announced.** The devkit does not claim a public-app API,
+  marketplace, installation flow, or review process. Do not infer one from this repository.
+- **No npm package is published from this devkit.** This GitHub repository is the canonical public
+  material for developers and LLMs; the ToT MCP recipe is a pointer/index. Developers may use the
+  language and framework appropriate to their service.
+
 ## Quick start (coding agents / LLMs)
 
 Read these three files, in order, before doing anything:
@@ -67,8 +82,9 @@ The organizing principles (why it looks like this):
 - **Schemas are the source of truth for shape.** Every tenant-owned file type has a JSON Schema.
   Templates and snippets validate against them in CI, editors autocomplete from them, and agents
   check against them. If the contract is ambiguous, the schema wins.
-- **Everything is tenant-side and source-free.** Every file mirrors what you author for a real
-  tenant. Nothing here needs — or exposes — platform source.
+- **Everything is public-safe and source-free.** Tenant assets mirror what you author for a real
+  tenant; the Apps track documents a public integration surface. Nothing here needs — or exposes —
+  platform source.
 - **Versioned to the contract.** Assets declare which contract they target (e.g.
   `block-palette@3`) in their `meta.json`, so you can pin to what your tenant supports.
 
@@ -117,7 +133,9 @@ storefront-devkit/
 │
 ├── migration/             ← porting an existing store (website_* MCP flows + visual-parity template)
 │
-├── private-apps/          ← SECOND TRACK: connect your own service via the private-app contract (links to canonical sources)
+├── apps/                  ← app-developer front door: private apps today; public apps reserved
+│
+├── private-apps/          ← stable private-app guide (current, language-neutral contract)
 │
 ├── industries/            ← by-vertical guides (vape, alcohol, hemp/CBD, firearms, marketplaces)
 │
@@ -138,7 +156,8 @@ storefront-devkit/
 | `ci/` | Gate your team's PRs on `tot validate` before submitting |
 | `agent-kit/` | Make your own coding agent obey the customization contract |
 | `migration/` | Port a client's existing store onto the platform |
-| `private-apps/` | Connect your own backend service to a store (the app-developer track) |
+| `apps/` | Find the app-developer path: private apps today, public apps reserved |
+| `private-apps/` | Connect your own backend service to a store (stable private-app guide) |
 | `industries/` | Build for a specific regulated vertical (vape, alcohol, hemp/CBD, firearms, marketplaces) |
 | `docs/` | Understand how the repo gets found (SEO / discoverability checklist) |
 | `site/` | Publish a searchable landing page via GitHub Pages (optional) |
@@ -150,7 +169,8 @@ storefront-devkit/
 3. No raw HTML, inline scripts, `onclick=`, or `javascript:` URLs for regulated tenants.
 4. Checkout & subscriptions are platform-owned — use managed checkout + the `purchase_options` shape.
 5. Prefer data + tokens over anything that looks like code.
-6. Escalate, don't smuggle: sandboxed widget → private app → single-tenant extraction.
+6. Escalate, don't smuggle: sandboxed widget → private app → single-tenant extraction. Start the
+   app-developer path at [`apps/`](./apps/).
 
 ## Versioning & compatibility
 

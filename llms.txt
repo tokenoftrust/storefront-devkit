@@ -1,9 +1,9 @@
 # Token of Trust — Storefront Devkit
 
 > Runnable templates, JSON Schemas, and examples for building high-performance, regulated
-> ecommerce storefronts on the ToT Storefront platform. Everything here is tenant-side (the files
-> a developer authors) and source-free. Start from a template, validate against a schema, ship via
-> the local dev loop (`tot dev`).
+> ecommerce storefronts and app integrations on the ToT Storefront platform. Tenant assets are the
+> files a developer authors; the Apps track is public, source-free integration guidance. Start from
+> a template, validate against a schema, ship via the local dev loop (`tot dev`).
 
 ## Start here
 
@@ -12,6 +12,15 @@
 - [manifest.json](./manifest.json): Machine catalog of every asset — id, kind, path, description,
   tags, contract version. Locate assets here.
 - [README.md](./README.md): Human overview, structure, and quick start.
+
+## Apps
+
+- [apps/](./apps/): The public app-developer front door. Private apps are available now; public
+  apps are reserved and must not be inferred from this repository.
+- [private-apps/](./private-apps/): Stable guide for the current, language-neutral private-app
+  contract: independently hosted services, signed webhooks, scoped APIs, and the compliance
+  boundary. This repository is canonical public documentation for LLMs and developers; the MCP
+  recipe `recipe://storefront-private-apps-devbook` is a pointer/index, not a source of truth.
 
 ## Schemas (authoritative shape of every tenant-owned file)
 
@@ -36,7 +45,6 @@
 - [recipes/](./recipes/): End-to-end worked tasks with exact file diffs.
 - [migration/](./migration/): Porting an existing store (website_* MCP flows + visual-parity template).
 - [industries/](./industries/): Build by regulated vertical — vape/nicotine, wine & spirits, hemp/CBD, firearms, marketplaces — each mapped to a template, a compliance profile, and Token of Trust products.
-- [private-apps/](./private-apps/): The app-developer track — connect your own backend service to a store via the standards-based private-app contract. Links to the canonical devbook (`recipe://storefront-private-apps-devbook`), the contract, the affiliate reference app, and the `tot app` CLI.
 
 ## About the platform
 

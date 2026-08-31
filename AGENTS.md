@@ -12,7 +12,9 @@ publish.
    crawl directories blindly.
 3. [`schemas/`](./schemas/) — the machine-checkable shape of every tenant-owned file. When shape
    is ambiguous, the schema is authoritative.
-4. The devbooks on the ToT MCP (`scope:storefront genre:devbook`) — task-by-task depth.
+4. [`apps/`](./apps/) and [`private-apps/`](./private-apps/) when working on an app integration.
+   For public documentation, these repository-relative paths are authoritative. The ToT MCP recipe
+   `recipe://storefront-private-apps-devbook` is only a discovery index.
 
 ## The mental model
 
@@ -55,8 +57,10 @@ request needs a net-new component, route, server/checkout/compliance behavior, c
 5. **Prefer data + tokens.** Reach for `theme.json` and `content/*` first, always.
 6. **Escalate, don't smuggle.** Sandboxed widget → **private app** → single-tenant extraction.
    Private apps are a shipped, separate developer surface (your own service connected via a
-   standards-based contract) — see [`private-apps/`](./private-apps/) and the devbook
-   `recipe://storefront-private-apps-devbook`. Do not rebuild backend behavior as tenant content.
+   standards-based contract) — start at [`apps/`](./apps/), then see the stable
+   [`private-apps/`](./private-apps/) guide. For public documentation these repository-relative
+   paths are authoritative; the MCP recipe `recipe://storefront-private-apps-devbook` is an index.
+   Do not rebuild backend behavior as tenant content.
 
 ## Workflow
 

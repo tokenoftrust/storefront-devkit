@@ -51,11 +51,15 @@ strongly encouraged so consumers can pin compatibility.
 
 ## The hard boundary (what is NEVER accepted here)
 
-This repo is strictly **tenant-side**. Do not add:
+This repo is strictly **tenant-side** except for the public, documentation-only [`apps/`](./apps/)
+front door. Do not add:
 
 - Any reference to platform source paths, build internals, deploy/runner mechanics, or private
   APIs.
 - Anything that requires reading the platform codebase to understand or use.
+- Platform runtime, npm package source, application source, generated build artifacts, or release
+  automation. The Apps track remains language-neutral guidance; its canonical public
+  documentation lives in this repository, while the ToT MCP recipe is a discovery index.
 - Any example that weakens the compliance floor (disabling age/ID verification or excise, hiding
   required warnings, raw HTML/inline JS for regulated tenants).
 

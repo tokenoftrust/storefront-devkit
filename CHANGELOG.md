@@ -2,6 +2,18 @@
 
 All notable changes to the Storefront Devkit. Format loosely follows Keep a Changelog.
 
+## Unreleased
+
+### Changed
+- Added `apps/` as the public app-developer front door. It directs developers to the available
+  private-app contract, preserves the stable `private-apps/` path, and reserves (without claiming)
+  a future public-app track.
+- Clarified that the devkit is the public, source-free developer deliverable. It does not publish
+  an npm library or platform runtime; private apps remain language-neutral and contract-first.
+- Established this repository's GitHub-relative `apps/` and `private-apps/` material as the
+  canonical public documentation for developers and LLMs. The ToT MCP recipe is a pointer/index;
+  the detailed public contract corpus follows in a separate cutover.
+
 ## [0.1.0] — first pass
 
 ### Added
