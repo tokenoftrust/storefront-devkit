@@ -4,6 +4,29 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 
 ## Unreleased
 
+### Added
+- `schemas/chrome.v2.schema.json` — brings the `chrome.json` schema current with the platform's
+  actual `ChromeConfig` contract (`header`/`footer` split, explicit `header.variant`/
+  `footer.variant`, a required stable `id` on every nav item, CTA, and footer link). The prior
+  `chrome.schema.json` (top-level `nav`/`headerCtas`, `footer.tagline`/`legal`, no ids) had drifted
+  from the real platform contract — it does not validate against `validateChromeConfig` in
+  `@tot/public-runtime` today and is kept in place, unversioned-in-place, only for the templates
+  and snippets already authored against it (`CONTRIBUTING.md`'s "breaking a schema → publish a new
+  versioned file" rule). New `chrome.json` content should target v2.
+- `schemas/chrome-assignments.schema.json` — schema for the previously-undocumented
+  `content/chrome-assignments.json` (per-page `headerVariant`/`footerVariant` overrides for
+  raw-HTML pages), matching `validateChromeAssignments` in `@tot/public-runtime`.
+- `snippets/chrome/tokenoftrust-chrome.json` and `tokenoftrust-chrome-assignments.json` — a real,
+  complete worked example (tokenoftrust.com's own chrome + a per-page header override on its
+  Contact Sales + thank-you pages), validated against v2/chrome-assignments.
+
+### Known gap (not fixed in this change)
+- `templates/commerce-minimal`, `templates/marketing-minimal`, `templates/regulated-vape`, and
+  `snippets/chrome/footer.json`/`mega-menu.json` are still authored against the legacy v1 schema
+  and have not been migrated to v2 — they do not reflect what the real platform currently accepts
+  for `content/chrome.json`. Tracked as follow-up work, not addressed here to keep this change
+  scoped to the schema fix + new reference example.
+
 ### Changed
 - Added `apps/` as the public app-developer front door. It directs developers to the available
   private-app contract, preserves the stable `private-apps/` path, and reserves (without claiming)

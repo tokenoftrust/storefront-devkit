@@ -1,0 +1,272 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tokenoftrust.com/storefront-devkit/schemas/chrome.v2.schema.json",
+  "title": "ToT Storefront content/chrome.json (v2 — consolidated header/footer contract)",
+  "description": "The site frame: header (variant, brand, nav, CTAs, search, utility nav, announcement) and footer (variant, columns, newsletter, social, trust marks, bottom bar). Every nav/link/CTA item carries a stable `id` independent of its label. Supersedes chrome.schema.json (v1) — v1 stays valid for content already authored against it; author new content against v2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["header", "footer"],
+  "properties": {
+    "lang": { "type": "string", "description": "<html lang>. Defaults to \"en\"." },
+    "head": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "favicon": { "type": "string" },
+        "themeStylesheets": { "type": "array", "items": { "type": "string" } },
+        "themeColor": { "type": "string" }
+      }
+    },
+    "skipLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "href": { "type": "string" }, "label": { "type": "string" } }
+    },
+    "warningBar": { "type": "string", "description": "FDA/compliance warning strip at the very top." },
+    "sharedMarketingCss": {
+      "type": "boolean",
+      "description": "Opt in to the shared commerce-marketing stylesheet for raw-page body content."
+    },
+    "header": { "$ref": "#/definitions/header" },
+    "footer": { "$ref": "#/definitions/footer" },
+    "ageGate": { "$ref": "#/definitions/ageGate" },
+    "complianceStrip": { "type": "string" },
+    "disclaimer": { "type": "string" },
+    "disclaimers": {
+      "type": "object",
+      "description": "Per-product-category disclaimer HTML, keyed by product_type.",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "definitions": {
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "href"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable identifier, independent of `label` copy — every nav/link/CTA item needs one."
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "href": { "type": "string", "minLength": 1 },
+        "external": { "type": "boolean" },
+        "badge": { "type": "string" }
+      }
+    },
+    "actionLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "href"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "href": { "type": "string", "minLength": 1 }
+      }
+    },
+    "megaColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["links"],
+      "properties": {
+        "title": { "type": "string" },
+        "links": { "type": "array", "items": { "$ref": "#/definitions/link" } }
+      }
+    },
+    "navItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "href"],
+      "description": "A plain link, a single-column dropdown (children), or a multi-column mega menu (columns).",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "href": { "type": "string", "minLength": 1 },
+        "external": { "type": "boolean" },
+        "badge": { "type": "string" },
+        "flag": { "type": "boolean", "description": "Emphasized/highlighted treatment." },
+        "children": { "type": "array", "items": { "$ref": "#/definitions/link" } },
+        "columns": { "type": "array", "items": { "$ref": "#/definitions/megaColumn" } }
+      }
+    },
+    "cta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "href"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "href": { "type": "string", "minLength": 1 },
+        "variant": { "type": "string", "enum": ["primary", "secondary", "ghost"] }
+      }
+    },
+    "socialLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "href"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "href": { "type": "string", "minLength": 1 },
+        "iconPath": { "type": "string", "description": "Inline-SVG path data (single <path d=\"…\">)." }
+      }
+    },
+    "logo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "alt"],
+      "properties": {
+        "src": { "type": "string", "minLength": 1 },
+        "alt": { "type": "string", "minLength": 1 },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      }
+    },
+    "wordmarkSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": { "text": { "type": "string" }, "className": { "type": "string" } }
+    },
+    "brand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label"],
+      "properties": {
+        "href": { "type": "string", "description": "Defaults to \"/\"." },
+        "label": { "type": "string", "minLength": 1, "description": "Accessible name (aria-label / img alt)." },
+        "logo": { "$ref": "#/definitions/logo" },
+        "wordmark": { "type": "array", "items": { "$ref": "#/definitions/wordmarkSpan" } },
+        "placeholder": { "type": "boolean" }
+      }
+    },
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "action": { "type": "string", "description": "Defaults to \"/search\"." },
+        "placeholder": { "type": "string" },
+        "label": { "type": "string", "description": "sr-only label. Defaults to \"Search\"." }
+      }
+    },
+    "utilityNav": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "links": { "type": "array", "items": { "$ref": "#/definitions/link" } },
+        "locale": { "type": "array", "items": { "type": "string" } },
+        "social": { "type": "array", "items": { "$ref": "#/definitions/socialLink" } },
+        "memberCue": { "$ref": "#/definitions/actionLink" }
+      }
+    },
+    "announcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variant", "messages"],
+      "properties": {
+        "variant": { "type": "string", "enum": ["marquee", "bar", "solid"] },
+        "messages": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "label": { "type": "string" },
+        "dismissible": { "type": "boolean", "description": "\"bar\" only." },
+        "rotateMs": { "type": "number", "description": "\"bar\" only, needs messages.length > 1." },
+        "storageKey": { "type": "string" }
+      }
+    },
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variant", "brand", "nav"],
+      "properties": {
+        "variant": { "type": "string", "enum": ["primary", "minimal"] },
+        "brand": { "$ref": "#/definitions/brand" },
+        "nav": { "type": "array", "items": { "$ref": "#/definitions/navItem" } },
+        "search": { "$ref": "#/definitions/search" },
+        "utilityNav": { "$ref": "#/definitions/utilityNav" },
+        "announcement": { "$ref": "#/definitions/announcement" },
+        "memberCue": { "$ref": "#/definitions/actionLink" },
+        "accountHref": { "type": "string" },
+        "cartHref": { "type": "string" },
+        "ctas": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/cta" },
+          "description": "Marketing conversion CTAs (non-commerce tenants), shown in place of the commerce search/saved controls."
+        }
+      }
+    },
+    "footerColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "links"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "links": { "type": "array", "items": { "$ref": "#/definitions/link" } }
+      }
+    },
+    "footerBrand": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "logo": { "$ref": "#/definitions/logo" },
+        "wordmark": { "type": "array", "items": { "$ref": "#/definitions/wordmarkSpan" } },
+        "text": { "type": "string", "description": "Tagline / contact text (rendered with <br> on newlines)." }
+      }
+    },
+    "footerNewsletter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "action": { "type": "string", "description": "Defaults to /api/newsletter." },
+        "placeholder": { "type": "string" },
+        "source": { "type": "string", "description": "Hidden `source` field value, e.g. \"footer\"." },
+        "ageAttestation": { "type": "boolean", "description": "Render the \"I confirm I am 21+\" checkbox (regulated tenants)." }
+      }
+    },
+    "trustMark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["icon", "label"],
+      "properties": {
+        "icon": { "type": "string", "description": "Inline SVG markup (paths/rects/circles), viewBox 0 0 24 24." },
+        "label": { "type": "string", "minLength": 1 }
+      }
+    },
+    "footer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variant", "columns"],
+      "properties": {
+        "variant": { "type": "string", "enum": ["default"] },
+        "brand": { "$ref": "#/definitions/footerBrand" },
+        "columns": { "type": "array", "items": { "$ref": "#/definitions/footerColumn" } },
+        "newsletter": { "$ref": "#/definitions/footerNewsletter" },
+        "trustMarks": { "type": "array", "items": { "$ref": "#/definitions/trustMark" } },
+        "payments": { "type": "array", "items": { "type": "string" }, "description": "Accepted-payment marks (text tokens, e.g. \"VISA\")." },
+        "social": { "type": "array", "items": { "$ref": "#/definitions/socialLink" } },
+        "warning": { "type": "string", "description": "Bold compliance/nicotine warning block." },
+        "bottom": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "copyright": { "type": "string" }, "note": { "type": "string" } }
+        }
+      }
+    },
+    "ageGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minAge"],
+      "properties": {
+        "minAge": { "type": "number" },
+        "storageKey": { "type": "string" },
+        "title": { "type": "string" },
+        "lede": { "type": "string" },
+        "yesLabel": { "type": "string" },
+        "noLabel": { "type": "string" },
+        "denyText": { "type": "string" },
+        "fineText": { "type": "string", "description": "Fine-print warning under the actions (e.g. the FDA nicotine line)." },
+        "mark": { "type": "array", "items": { "$ref": "#/definitions/wordmarkSpan" } }
+      }
+    }
+  }
+}
