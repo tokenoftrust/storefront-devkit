@@ -1,0 +1,6 @@
+{
+  "assignments": {
+    "/contact/contact-sales": { "headerVariant": "minimal" },
+    "/contact/contact-sales/thank-you": { "headerVariant": "minimal" }
+  }
+}

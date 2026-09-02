@@ -1,0 +1,79 @@
+{
+  "lang": "en",
+  "head": {
+    "favicon": "/tenants/tokenoftrust.com/favicon.png",
+    "themeStylesheets": ["/tenants/tokenoftrust.com/themes/tot-navy.css"]
+  },
+  "sharedMarketingCss": true,
+  "header": {
+    "variant": "primary",
+    "brand": {
+      "href": "/",
+      "label": "Token of Trust",
+      "logo": {
+        "src": "/tenants/tokenoftrust.com/logo-wordmark.png",
+        "alt": "Token of Trust",
+        "width": 180,
+        "height": 32
+      }
+    },
+    "nav": [
+      { "id": "nav-platform", "label": "Platform", "href": "/#platform" },
+      { "id": "nav-industries", "label": "Industries", "href": "/#industries" },
+      { "id": "nav-resources", "label": "Resources", "href": "https://help.tokenoftrust.com", "external": true },
+      { "id": "nav-pricing", "label": "Pricing", "href": "https://tokenoftrust.com/pricing/", "external": true },
+      { "id": "nav-login", "label": "Login", "href": "https://app.tokenoftrust.com", "external": true }
+    ],
+    "ctas": [
+      { "id": "cta-book-demo", "label": "Book Demo", "href": "https://tokenoftrust.com/contact/", "variant": "secondary" },
+      { "id": "cta-start-free", "label": "Start For Free", "href": "https://app.tokenoftrust.com", "variant": "primary" }
+    ]
+  },
+  "footer": {
+    "variant": "default",
+    "brand": {
+      "text": "Customer verification and compliance for regulated ecommerce. 200+ countries. We will never sell your data."
+    },
+    "columns": [
+      {
+        "title": "Platform",
+        "links": [
+          { "id": "ftr-platform-idv", "label": "Identity Verification", "href": "/#platform" },
+          { "id": "ftr-platform-age", "label": "Age Assurance", "href": "/#platform" },
+          { "id": "ftr-platform-fraud", "label": "Fraud Prevention", "href": "/#platform" },
+          { "id": "ftr-platform-evidence", "label": "Compliance Evidence", "href": "/#platform" },
+          { "id": "ftr-platform-aml", "label": "AML · PACT Act · Tax", "href": "/#platform" }
+        ]
+      },
+      {
+        "title": "Industries",
+        "links": [
+          { "id": "ftr-industries-alcohol", "label": "Alcohol", "href": "/#industries" },
+          { "id": "ftr-industries-vape", "label": "Tobacco & Vape", "href": "/#industries" },
+          { "id": "ftr-industries-age-restricted", "label": "Age-Restricted Goods", "href": "/#industries" },
+          { "id": "ftr-industries-marketplaces", "label": "Marketplaces", "href": "/#industries" }
+        ]
+      },
+      {
+        "title": "Company",
+        "links": [
+          { "id": "ftr-company-pricing", "label": "Pricing", "href": "https://tokenoftrust.com/pricing/", "external": true },
+          { "id": "ftr-company-contact", "label": "Contact Sales", "href": "https://tokenoftrust.com/contact/", "external": true },
+          { "id": "ftr-company-resources", "label": "Resources", "href": "https://help.tokenoftrust.com", "external": true },
+          { "id": "ftr-company-login", "label": "Login", "href": "https://app.tokenoftrust.com", "external": true }
+        ]
+      },
+      {
+        "title": "Legal",
+        "links": [
+          { "id": "ftr-legal-privacy", "label": "Privacy Policy", "href": "https://tokenoftrust.com/privacy/", "external": true },
+          { "id": "ftr-legal-terms", "label": "Terms", "href": "https://tokenoftrust.com/terms/", "external": true }
+        ]
+      }
+    ],
+    "social": [],
+    "bottom": {
+      "note": "GDPR · CCPA · PIPEDA compliant. 256-bit SSL. We will never sell your data."
+    }
+  }
+}

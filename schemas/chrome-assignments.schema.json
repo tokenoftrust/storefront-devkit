@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tokenoftrust.com/storefront-devkit/schemas/chrome-assignments.schema.json",
+  "title": "ToT Storefront content/chrome-assignments.json",
+  "description": "Per-page header/footer variant overrides for raw-HTML pages (content/pages-html/**.html). Only pages that should differ from chrome.json's site-wide header.variant/footer.variant need an entry — everything else uses the site default. Requires chrome.v2.schema.json's header/footer variant contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["assignments"],
+  "properties": {
+    "assignments": {
+      "type": "object",
+      "description": "Keyed by the page's full path: a required leading slash, no trailing slash, including any parent section (e.g. \"/contact/contact-sales\", NOT \"/contact-sales\"). Derive it from the page's file path under content/pages-html/: drop that prefix and \".html\", keep the leading slash. Matching is exact after stripping a trailing slash only — no prefix or glob matching, so an assignment on a nested page never affects its parent or siblings.",
+      "propertyNames": {
+        "pattern": "^/([^/]+(/[^/]+)*)?$"
+      },
+      "additionalProperties": { "$ref": "#/definitions/entry" }
+    }
+  },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "description": "At least one of headerVariant/footerVariant must be set — an entry overriding neither overrides nothing.",
+      "properties": {
+        "headerVariant": { "type": "string", "enum": ["primary", "minimal"] },
+        "footerVariant": { "type": "string", "enum": ["default"] }
+      }
+    }
+  }
+}

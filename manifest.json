@@ -27,7 +27,9 @@
   ],
   "assets": [
     { "id": "schema-theme", "kind": "schema", "title": "theme.json schema", "path": "schemas/theme.schema.json", "describes": "theme.json", "tags": ["theme", "branding", "tokens"] },
-    { "id": "schema-chrome", "kind": "schema", "title": "chrome.json schema", "path": "schemas/chrome.schema.json", "describes": "content/chrome.json", "tags": ["chrome", "nav", "footer"] },
+    { "id": "schema-chrome", "kind": "schema", "title": "chrome.json schema (v1, legacy)", "path": "schemas/chrome.schema.json", "describes": "content/chrome.json", "tags": ["chrome", "nav", "footer", "legacy"], "supersededBy": "schema-chrome-v2" },
+    { "id": "schema-chrome-v2", "kind": "schema", "title": "chrome.json schema (v2 — header/footer + stable ids)", "path": "schemas/chrome.v2.schema.json", "describes": "content/chrome.json", "contract": "chrome@2", "tags": ["chrome", "nav", "footer", "header", "variants"] },
+    { "id": "schema-chrome-assignments", "kind": "schema", "title": "chrome-assignments.json schema (per-page header/footer variant overrides)", "path": "schemas/chrome-assignments.schema.json", "describes": "content/chrome-assignments.json", "contract": "chrome@2", "tags": ["chrome", "assignments", "variants", "raw-html"] },
     { "id": "schema-home", "kind": "schema", "title": "home.json schema (block-palette@3)", "path": "schemas/home.schema.json", "describes": "content/home.json", "contract": "block-palette@3", "tags": ["home", "blocks", "merchandising"] },
     { "id": "schema-pages", "kind": "schema", "title": "pages/*.json schema (block-palette@3)", "path": "schemas/pages.schema.json", "describes": "content/pages/*.json", "contract": "block-palette@3", "tags": ["pages", "editorial", "blocks"] },
     { "id": "schema-scripts", "kind": "schema", "title": "scripts.json schema", "path": "schemas/scripts.schema.json", "describes": "scripts.json", "tags": ["widgets", "scripts", "sandbox"] },
