@@ -5,6 +5,11 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Added
+- Agency Kit free tier: `tools/` (single-page checks — `validate-page.sh`,
+  `validate-page-browser.mjs`, `perf-audit.mjs`, `style-concept-audit.mjs`, the style-concept
+  manifest schema, Lighthouse helpers, and tests), `docs/dev-loop-reference.md`,
+  `docs/shared-chrome.md`, `docs/style-concept-audit.md`, `docs/regulated-compliance.md`, and 13
+  developer books under `docs/books/`.
 - `schemas/chrome.v2.schema.json` — brings the `chrome.json` schema current with the platform's
   actual `ChromeConfig` contract (`header`/`footer` split, explicit `header.variant`/
   `footer.variant`, a required stable `id` on every nav item, CTA, and footer link). The prior

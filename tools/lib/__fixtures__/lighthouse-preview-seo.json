@@ -1,0 +1,137 @@
+{
+  "categories": {
+    "seo": {
+      "id": "seo",
+      "score": 0.66,
+      "auditRefs": [
+        {
+          "id": "is-crawlable",
+          "weight": 4.043478260869565,
+          "group": "seo-crawl"
+        },
+        {
+          "id": "document-title",
+          "weight": 1,
+          "group": "seo-content"
+        },
+        {
+          "id": "meta-description",
+          "weight": 1,
+          "group": "seo-content"
+        },
+        {
+          "id": "http-status-code",
+          "weight": 1,
+          "group": "seo-crawl"
+        },
+        {
+          "id": "link-text",
+          "weight": 1,
+          "group": "seo-content"
+        },
+        {
+          "id": "crawlable-anchors",
+          "weight": 1,
+          "group": "seo-crawl"
+        },
+        {
+          "id": "robots-txt",
+          "weight": 1,
+          "group": "seo-crawl"
+        },
+        {
+          "id": "image-alt",
+          "weight": 0,
+          "group": "seo-content"
+        },
+        {
+          "id": "hreflang",
+          "weight": 1,
+          "group": "seo-content"
+        },
+        {
+          "id": "canonical",
+          "weight": 1,
+          "group": "seo-content"
+        },
+        {
+          "id": "structured-data",
+          "weight": 0,
+          "group": null
+        }
+      ]
+    }
+  },
+  "audits": {
+    "document-title": {
+      "id": "document-title",
+      "score": 1,
+      "scoreDisplayMode": "binary"
+    },
+    "image-alt": {
+      "id": "image-alt",
+      "score": null,
+      "scoreDisplayMode": "notApplicable"
+    },
+    "meta-description": {
+      "id": "meta-description",
+      "score": 1,
+      "scoreDisplayMode": "binary"
+    },
+    "http-status-code": {
+      "id": "http-status-code",
+      "score": 1,
+      "scoreDisplayMode": "binary"
+    },
+    "link-text": {
+      "id": "link-text",
+      "score": 1,
+      "scoreDisplayMode": "binary"
+    },
+    "crawlable-anchors": {
+      "id": "crawlable-anchors",
+      "score": 1,
+      "scoreDisplayMode": "binary"
+    },
+    "is-crawlable": {
+      "id": "is-crawlable",
+      "score": 0,
+      "scoreDisplayMode": "binary",
+      "details": {
+        "type": "table",
+        "headings": [
+          {
+            "key": "source",
+            "valueType": "code",
+            "label": "Blocking Directive Source"
+          }
+        ],
+        "items": [
+          {
+            "source": "x-robots-tag: noindex, nofollow"
+          }
+        ]
+      }
+    },
+    "robots-txt": {
+      "id": "robots-txt",
+      "score": 1,
+      "scoreDisplayMode": "binary"
+    },
+    "hreflang": {
+      "id": "hreflang",
+      "score": 1,
+      "scoreDisplayMode": "binary"
+    },
+    "canonical": {
+      "id": "canonical",
+      "score": 1,
+      "scoreDisplayMode": "binary"
+    },
+    "structured-data": {
+      "id": "structured-data",
+      "score": null,
+      "scoreDisplayMode": "manual"
+    }
+  }
+}

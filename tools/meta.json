@@ -1,0 +1,8 @@
+{
+  "id": "page-checks",
+  "kind": "tooling",
+  "title": "Single-page checks and style-concept audit",
+  "description": "Dependency-light quality checks for one page or one store checkout: HTTP and SEO gates, browser gates (pixel diff, console, mobile, axe, Lighthouse, CSP), a performance audit, and the style-concept audit with its manifest schema.",
+  "tags": ["validation", "performance", "accessibility", "lighthouse", "style", "audit", "free-tier"],
+  "requires": { "node": ">=20" }
+}

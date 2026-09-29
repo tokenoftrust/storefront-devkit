@@ -1,0 +1,14 @@
+{
+  "name": "storefront-devkit-page-checks",
+  "private": true,
+  "type": "module",
+  "description": "Single-page quality checks for a Storefront store: mechanical gates, browser gates, performance audit and the style-concept audit.",
+  "scripts": {
+    "test": "node --test *.test.mjs lib/*.test.mjs"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "lighthouse": "^13.4.0",
+    "playwright-core": "^1.61.1"
+  }
+}
