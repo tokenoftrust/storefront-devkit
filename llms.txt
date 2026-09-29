@@ -48,6 +48,16 @@
 - [migration/](./migration/): Porting an existing store (website_* MCP flows + visual-parity template).
 - [industries/](./industries/): Build by regulated vertical — vape/nicotine, wine & spirits, hemp/CBD, firearms, marketplaces — each mapped to a template, a compliance profile, and Token of Trust products.
 
+## Tools and guides
+
+- [tools/](./tools/): Single-page checks — `validate-page.sh`, `validate-page-browser.mjs`,
+  `perf-audit.mjs`, and `style-concept-audit.mjs` with its manifest schema. Run `npm install && npm test`.
+- [docs/dev-loop-reference.md](./docs/dev-loop-reference.md): `tot dev`, `validate`, `preview`, `sync`.
+- [docs/style-concept-audit.md](./docs/style-concept-audit.md): What the style-concept audit checks and how to read it.
+- [docs/shared-chrome.md](./docs/shared-chrome.md): Chrome and merchandising sections are shared components.
+- [docs/books/](./docs/books/): Long-form developer books; start at
+  [storefront-devbook-index.md](./docs/books/storefront-devbook-index.md).
+
 ## About the platform
 
 - Storefront platform & early access: https://storefront.tokenoftrust.store — commerce built for regulated industries; compliance is native and can't be turned off; own your exit.

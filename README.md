@@ -141,7 +141,9 @@ storefront-devkit/
 │
 ├── industries/            ← by-vertical guides (vape, alcohol, hemp/CBD, firearms, marketplaces)
 │
-├── docs/                  ← repo meta: DISCOVERABILITY.md (SEO / how the repo gets found)
+├── tools/                 ← single-page checks: validate-page, browser gates, perf audit, style-concept audit
+│
+├── docs/                  ← guides (dev loop, shared chrome, style-concept audit), books/, and repo meta
 │
 └── site/                  ← optional GitHub Pages landing (robots.txt, sitemap.xml, index.html) — inert until Pages is enabled
 ```
@@ -161,7 +163,8 @@ storefront-devkit/
 | `apps/` | Find the app-developer path: private apps today, public apps reserved |
 | `private-apps/` | Connect your own backend service to a store (stable private-app guide) |
 | `industries/` | Build for a specific regulated vertical (vape, alcohol, hemp/CBD, firearms, marketplaces) |
-| `docs/` | Understand how the repo gets found (SEO / discoverability checklist) |
+| `tools/` | Check one page or one store: HTTP/SEO gates, browser gates, performance, style-concept audit |
+| `docs/` | Read the dev-loop reference, the long-form developer books (`docs/books/`), and the discoverability checklist |
 | `site/` | Publish a searchable landing page via GitHub Pages (optional) |
 
 ## The contract in six rules (full detail in [`AGENTS.md`](./AGENTS.md))

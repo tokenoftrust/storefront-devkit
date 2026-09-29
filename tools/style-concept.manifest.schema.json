@@ -1,0 +1,621 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:site-migration:style-concept-manifest",
+  "title": "Site migration manifest with style concept tracking",
+  "type": "object",
+  "required": ["tenant", "generatedAt", "pages"],
+  "properties": {
+    "tenant": { "type": "string", "minLength": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "styleConcept": {
+      "type": "object",
+      "required": ["id", "version", "sourcePages", "stylesheet"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "version": {
+          "type": "string",
+          "pattern": "^v?[0-9]+(\\.[0-9]+){0,2}$",
+          "description": "Canonical migration concept versions should use v-prefix form such as v1.1. Existing semver baselines may be retained until the next coordinator-owned manifest cleanup."
+        },
+        "name": { "type": "string" },
+        "themeId": { "type": "string" },
+        "styleGuideVersion": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "sourcePages": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^/" }
+        },
+        "stylesheet": {
+          "type": "object",
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^/tenants/.+\\.css$",
+              "description": "Root-relative public URL path. Must start with /tenants/<tenant>/ and must not be a filesystem path."
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "Raw lowercase SHA-256 hex string. Do not prefix with sha256:."
+            },
+            "bytes": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "stylesheetPath": {
+          "type": "string",
+          "description": "Legacy alias; prefer styleConcept.stylesheet.path."
+        },
+        "stylesheetUrl": {
+          "type": "string",
+          "description": "Legacy alias; prefer styleConcept.stylesheet.path."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Legacy alias; prefer styleConcept.stylesheet.sha256."
+        },
+        "tokens": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          },
+          "additionalProperties": true
+        },
+        "baselinePages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["slug", "screenshot", "sha256"],
+            "properties": {
+              "slug": { "type": "string", "pattern": "^/" },
+              "screenshot": { "type": "string" },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "baseline": { "$ref": "#/$defs/baseline" },
+        "storyboard": { "$ref": "#/$defs/styleStoryboard" },
+        "approved": { "type": "boolean" },
+        "approvedAt": { "type": "string" },
+        "approvedBy": { "type": "string" },
+        "enhancedVersion": {
+          "type": "string",
+          "pattern": "^v[0-9]+(\\.[0-9]+){0,2}$",
+          "description": "Next planned concept version for hardening work, e.g. v1.1."
+        },
+        "ecommerceQualityBar": { "$ref": "#/$defs/ecommerceQualityBar" },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "themes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "path", "role"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+          "version": { "type": "string", "pattern": "^v?[0-9]+(\\.[0-9]+){0,2}$" },
+          "role": { "type": "string", "enum": ["current", "candidate", "legacy"] },
+          "path": {
+            "type": "string",
+            "pattern": "^/tenants/.+\\.css$",
+            "description": "Root-relative public URL path beginning with /tenants/<tenant>/."
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Raw lowercase SHA-256 hex string, no sha256: prefix."
+          },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "source": { "type": "string" },
+          "stylesheetUrl": {
+            "type": "string",
+            "description": "Legacy/consumer URL alias; prefer themes[].path."
+          },
+          "descriptor": {
+            "type": "string",
+            "description": "Theme descriptor JSON path, typically tenants/<tenant>/content/themes/<theme>.json."
+          },
+          "baseline": { "$ref": "#/$defs/baseline" },
+          "conceptId": { "type": "string" },
+          "conceptVersion": { "type": "string", "pattern": "^v?[0-9]+(\\.[0-9]+){0,2}$" },
+          "enhancedVersion": { "type": "string", "pattern": "^v[0-9]+(\\.[0-9]+){0,2}$" },
+          "approved": { "type": "boolean" },
+          "switchable": { "type": "boolean" },
+          "switchParam": { "type": "string" },
+          "previewOnly": { "type": "boolean" },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "styleGuide": {
+      "type": "object",
+      "required": ["route", "status", "previewOnly", "includeInSitemap"],
+      "properties": {
+        "id": { "type": "string" },
+        "route": { "type": "string", "pattern": "^/" },
+        "sourcePath": { "type": "string" },
+        "version": { "type": "string", "pattern": "^v?[0-9]+(\\.[0-9]+){0,2}$" },
+        "themeId": { "type": "string" },
+        "themeIds": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["draft", "review-ready", "approved"] },
+        "standalone": { "type": "boolean" },
+        "indexRoute": { "type": "string", "pattern": "^/" },
+        "retainedForComparison": { "type": "boolean" },
+        "previewOnly": { "type": "boolean" },
+        "noindex": { "type": "boolean" },
+        "includeInSitemap": { "type": "boolean" },
+        "reviewedBy": { "type": "string" },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "lastValidatedAt": { "type": "string", "format": "date-time" },
+        "baseline": {
+          "type": "object",
+          "properties": {
+            "screenshot": { "type": "string" },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          },
+          "additionalProperties": false
+        },
+        "qualityGates": {
+          "type": "object",
+          "additionalProperties": { "type": ["boolean", "null"] }
+        },
+        "ecommerceQualityBar": { "$ref": "#/$defs/ecommerceQualityBar" },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "styleGuides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "route", "themeId", "status", "standalone", "previewOnly", "includeInSitemap"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+          "route": { "type": "string", "pattern": "^/" },
+          "sourcePath": { "type": "string" },
+          "version": { "type": "string", "pattern": "^v?[0-9]+(\\.[0-9]+){0,2}$" },
+          "themeId": { "type": "string" },
+          "themeIds": { "type": "array", "items": { "type": "string" } },
+          "status": { "type": "string", "enum": ["draft", "review-ready", "approved"] },
+          "standalone": { "type": "boolean" },
+          "indexRoute": { "type": "string", "pattern": "^/" },
+          "retainedForComparison": { "type": "boolean" },
+          "previewOnly": { "type": "boolean" },
+          "noindex": { "type": "boolean" },
+          "includeInSitemap": { "type": "boolean" },
+          "reviewedBy": { "type": "string" },
+          "approvedAt": { "type": "string", "format": "date-time" },
+          "lastValidatedAt": { "type": "string", "format": "date-time" },
+          "baseline": {
+            "type": "object",
+            "properties": {
+              "screenshot": { "type": "string" },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            },
+            "additionalProperties": false
+          },
+          "qualityGates": {
+            "type": "object",
+            "additionalProperties": { "type": ["boolean", "null"] }
+          },
+          "ecommerceQualityBar": { "$ref": "#/$defs/ecommerceQualityBar" },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "styleGuideIndex": {
+      "type": "object",
+      "required": ["route", "previewOnly", "includeInSitemap", "linksToThemeIds"],
+      "properties": {
+        "route": { "type": "string", "pattern": "^/" },
+        "sourcePath": { "type": "string" },
+        "previewOnly": { "type": "boolean" },
+        "noindex": { "type": "boolean" },
+        "includeInSitemap": { "type": "boolean" },
+        "linksToThemeIds": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ecommerceQualityBar": { "$ref": "#/$defs/ecommerceQualityBar" },
+    "acceptedRisks": {
+      "type": "array",
+      "description": "Auditable gate waivers or deferrals. Use only with reviewer signoff; absence means no accepted risks.",
+      "items": { "$ref": "#/$defs/acceptedRisk" }
+    },
+    "styleGaps": {
+      "type": "array",
+      "description": "Elements found during propagation that are not yet covered by the approved storyboard/style guide.",
+      "items": { "$ref": "#/$defs/styleGap" }
+    },
+    "fidelityAudit": { "$ref": "#/$defs/fidelityAudit" },
+    "changelog": {
+      "type": "array",
+      "description": "Structured, newest-first log of what happened during the migration — append an entry whenever a page/tooling/process/schema change lands. The 'what happened along the way' record.",
+      "items": { "$ref": "#/$defs/changelogEntry" }
+    },
+    "pointsOfFriction": {
+      "type": "array",
+      "description": "Structured log of anything difficult/time-consuming/painful. Reviewed at end-of-page: generalizable, still-'pending' entries become improvement feedback to the tot-mcp storefront project.",
+      "items": { "$ref": "#/$defs/pointOfFriction" }
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["slug"],
+        "properties": {
+          "slug": { "type": "string", "pattern": "^/" },
+          "sourceUrl": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["marketing", "commerce", "external", "redirect", "do-not-migrate"]
+          },
+          "portTier": { "type": "string", "enum": ["T0", "T1", "T2", "T3"] },
+          "tier": {
+            "type": "string",
+            "enum": ["T0", "T1", "T2", "T3"],
+            "description": "Legacy alias for portTier; prefer portTier."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["todo", "ported", "hardened", "structured", "blocked", "skipped"]
+          },
+          "sourceHash": { "type": "string" },
+          "portedHash": { "type": "string" },
+          "portedPath": {
+            "type": ["string", "null"],
+            "description": "Repo path of the ported page source. null asserts the page has NO tenant-owned source — it renders from a platform-generic fallback. That is a different, stronger statement than omitting the key, which means nobody has looked."
+          },
+          "assets": { "type": "array", "items": { "type": "string" } },
+          "styleConcept": {
+            "type": "object",
+            "required": ["id", "version", "conforms"],
+            "properties": {
+              "id": { "type": "string" },
+              "version": { "type": "string" },
+              "conforms": { "type": "boolean" },
+              "usesSharedStylesheet": { "type": "boolean" },
+              "lastRestyled": { "type": ["string", "null"], "format": "date-time" },
+              "stylesheetHash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+              "note": { "type": "string" },
+              "notes": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
+          "pixelBaseline": {
+            "type": "object",
+            "required": ["mode", "path"],
+            "properties": {
+              "mode": { "type": "string", "enum": ["source", "concept", "accepted-restyle"] },
+              "path": { "type": "string" },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "approvedBy": { "type": "string" },
+              "approvedAt": { "type": "string", "format": "date-time" }
+            },
+            "additionalProperties": false
+          },
+          "gates": {
+            "type": "object",
+            "additionalProperties": { "type": ["boolean", "null"] }
+          },
+          "issues": { "type": "array", "items": { "type": "string" } },
+          "claimedBy": { "type": ["string", "null"] },
+          "fixLogPath": { "type": "string" },
+          "reportPath": { "type": "string" },
+          "fidelity": { "$ref": "#/$defs/fidelity" },
+          "lastRun": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "$defs": {
+    "screenshotVerified": {
+      "type": "object",
+      "required": ["date"],
+      "description": "Record of a screenshot render-check. Evidence binaries stay in developer space and are NOT committed; this records the fact only.",
+      "properties": {
+        "date": { "type": "string", "description": "Date/date-time the render was screenshot-checked." },
+        "method": { "type": "string", "description": "How it was captured/compared, e.g. 'shot.mjs render vs live'." },
+        "confirms": { "type": "string", "description": "What the shot validated (chrome, hero, links resolve 200, etc.)." },
+        "ref": { "type": "string", "description": "Optional STABLE developer-space reference (session scratchpad / gitignored dev dir). Never a committed binary path." }
+      },
+      "additionalProperties": false
+    },
+    "fidelity": {
+      "type": "object",
+      "required": ["status"],
+      "description": "Per-page visual-fidelity verdict vs the live source; distinct from portTier and from the boolean gates map.",
+      "properties": {
+        "status": { "type": "string", "enum": ["not-audited", "pending", "pass", "minor-deviations", "fail"] },
+        "auditedAt": { "type": "string" },
+        "verdict": { "type": "string" },
+        "findings": { "type": "array", "items": { "type": "string" }, "description": "Ranked mismatch notes, e.g. '#5 (med): ...'." },
+        "openGaps": { "type": "array", "items": { "type": "string" }, "description": "styleGap ids still open for this page." },
+        "screenshotVerified": { "$ref": "#/$defs/screenshotVerified" }
+      },
+      "additionalProperties": false
+    },
+    "fidelityAudit": {
+      "type": "object",
+      "description": "Site-level record of a section-for-section fidelity compare against the live source.",
+      "properties": {
+        "status": { "type": "string", "enum": ["not-started", "in-progress", "complete"] },
+        "auditedAt": { "type": "string" },
+        "scope": { "type": "string" },
+        "reportPath": { "type": "string" },
+        "result": { "type": "object", "additionalProperties": { "type": "integer" }, "description": "Findings count by severity, e.g. {blocker,high,medium,low}." },
+        "resolved": { "type": "array", "items": { "type": "string" } },
+        "screenshotVerified": { "type": "string" },
+        "note": { "type": "string" },
+        "devHarnessNote": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "changelogEntry": {
+      "type": "object",
+      "required": ["date", "summary"],
+      "description": "One structured entry in the migration changelog.",
+      "properties": {
+        "date": { "type": "string", "description": "Date or date-time of the change." },
+        "category": { "type": "string", "enum": ["reorg", "content", "chrome", "audit", "fix", "validate", "tooling", "process", "schema"], "description": "Kind of change." },
+        "summary": { "type": "string", "description": "One-line human-readable description of what happened." },
+        "page": { "type": "string", "description": "Affected page slug, if page-scoped." },
+        "refs": { "type": "array", "items": { "type": "string" }, "description": "Cross-refs: commit hashes, report finding ids (#N), styleGap/pointOfFriction ids, report paths." }
+      },
+      "additionalProperties": false
+    },
+    "pointOfFriction": {
+      "type": "object",
+      "required": ["id", "date", "summary", "painType", "disposition"],
+      "description": "A friction encountered during the migration — the raw material for continuous playbook improvement. Reviewed at end-of-page to decide whether to route feedback to the tot-mcp storefront project.",
+      "properties": {
+        "id": { "type": "string", "description": "Stable id, e.g. pf-1." },
+        "date": { "type": "string" },
+        "page": { "type": "string", "description": "Affected page slug, or 'all' for site-wide." },
+        "phase": { "type": "string", "description": "Where it hit, e.g. crawl, author, chrome, validate, verify, reconcile, tooling, dev-harness, setup." },
+        "summary": { "type": "string", "description": "What was difficult/time-consuming/painful." },
+        "painType": { "type": "array", "minItems": 1, "items": { "type": "string", "enum": ["difficult", "time-consuming", "painful", "error-prone", "surprising"] } },
+        "timeCostMin": { "type": "number", "description": "Rough minutes lost, for prioritizing which frictions to fix first." },
+        "rootCause": { "type": "string" },
+        "suggestedImprovement": { "type": "string", "description": "Concrete tooling/playbook change that would remove this friction next time." },
+        "generalizable": { "type": "boolean", "description": "True if this is a migration tooling/playbook gap (feedback candidate), not a one-off tenant quirk." },
+        "disposition": { "type": "string", "enum": ["pending", "sent", "linked", "internal-only", "not-warranted", "wont-fix"], "description": "End-of-page review outcome. 'pending' = still to triage; 'sent' = filed via tot_feedback with no matching existing issue; 'linked' = filed via tot_feedback, then matched one of the returned similarOpenIssues candidates and linked it (upvote) via tot_feedback_link." },
+        "feedbackRef": { "type": "string", "description": "The tot-mcp storefront feedback id: the new reportId when 'sent', or the canonical open-issue id it was linked to (upvoted) when 'linked'." }
+      },
+      "additionalProperties": false
+    },
+    "styleStoryboard": {
+      "type": "object",
+      "required": ["inspirationPages", "uncoveredElementPolicy"],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "Human-readable explanation of the look/feel and why the inspiration pages define it."
+        },
+        "status": { "type": "string", "enum": ["draft", "review-ready", "approved"] },
+        "inspirationPages": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/inspirationPage" }
+        },
+        "uncoveredElementPolicy": { "$ref": "#/$defs/uncoveredElementPolicy" },
+        "styleGaps": {
+          "type": "array",
+          "description": "Legacy/nested location; prefer top-level styleGaps[] for site backlog visibility.",
+          "items": { "$ref": "#/$defs/styleGap" }
+        },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "inspirationPage": {
+      "type": "object",
+      "required": ["slug", "role", "captures"],
+      "properties": {
+        "slug": { "type": "string", "pattern": "^/" },
+        "sourceUrl": { "type": "string" },
+        "role": {
+          "type": "string",
+          "description": "Why this page is an inspiration source, e.g. brand-system, dense-conversion, navigation-footer."
+        },
+        "captures": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Concrete visual/UX patterns learned from this page."
+        },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "uncoveredElementPolicy": {
+      "type": "object",
+      "required": ["defaultAction", "dispositions", "instructions"],
+      "properties": {
+        "defaultAction": {
+          "type": "string",
+          "description": "Short instruction for page workers when a page needs an element not represented by the guide."
+        },
+        "dispositions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "reuse-existing",
+              "adapt-existing",
+              "extend-style-guide",
+              "page-specific-exception",
+              "needs-review",
+              "blocked-boundary-or-claims"
+            ]
+          }
+        },
+        "instructions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "pauseWhen": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "styleGap": {
+      "type": "object",
+      "required": ["id", "element", "status", "disposition"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "page": { "type": "string", "pattern": "^/" },
+        "element": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["open", "resolved", "accepted-risk", "blocked"] },
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "reuse-existing",
+            "adapt-existing",
+            "extend-style-guide",
+            "page-specific-exception",
+            "needs-review",
+            "blocked-boundary-or-claims"
+          ]
+        },
+        "owner": { "type": "string" },
+        "severity": { "type": "string", "enum": ["blocker", "high", "medium", "low"], "description": "Impact ranking for backlog ordering; mirrors the compare-report severity." },
+        "source": { "type": "string", "description": "Provenance of the gap, e.g. 'compare-report #1' or a validator id." },
+        "reviewBy": { "type": "string" },
+        "guideUpdateRequired": { "type": "boolean" },
+        "resolvedBy": { "type": "string" },
+        "resolvedAt": { "type": "string" },
+        "notes": { "type": "string" },
+        "issueId": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "baseline": {
+      "type": "object",
+      "required": ["version", "path", "sha256"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^v?[0-9]+(\\.[0-9]+){0,2}$",
+          "description": "Snapshot/concept version for this retained baseline."
+        },
+        "path": {
+          "type": "string",
+          "description": "Root-relative public URL for a retained asset, or repo-relative path for a report/baseline artifact."
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Raw lowercase SHA-256 hex string. Do not prefix with sha256:."
+        },
+        "note": { "type": "string" },
+        "approvedAt": { "type": "string" },
+        "approvedBy": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ecommerceQualityBar": {
+      "type": "object",
+      "required": ["version", "status"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^v[0-9]+(\\.[0-9]+){0,2}$",
+          "description": "Enhanced concept version, e.g. v1.1."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["planned", "draft", "review-ready", "approved", "accepted-risk"]
+        },
+        "appliesToThemeIds": { "type": "array", "items": { "type": "string" } },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "a11y-as-conversion",
+              "mobile-tap-targets-and-fonts",
+              "performance-budget",
+              "token-contrast",
+              "guide-coverage",
+              "trust-social-proof-components",
+              "semantic-tokens",
+              "full-interactive-states",
+              "accessible-forms",
+              "cta-hierarchy",
+              "color-scheme-and-reduced-motion"
+            ]
+          }
+        },
+        "blockedBy": { "type": "array", "items": { "type": "string" } },
+        "resolved": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Reviewer-readable list of quality-bar items already resolved in this concept round."
+        },
+        "validation": {
+          "type": "string",
+          "description": "Compact validation summary, with artifact paths kept in reports rather than pasted verbatim."
+        },
+        "validatedAt": {
+          "type": "string",
+          "description": "Date or date-time of the last quality-bar validation."
+        },
+        "acceptedRisks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/acceptedRisk" }
+        },
+        "claimsPolicy": {
+          "type": "string",
+          "description": "How ratings/badges/testimonials/guarantees are sourced; use needs-review until real proof is supplied."
+        },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "acceptedRisk": {
+      "type": "object",
+      "required": ["gate", "rationale", "by", "at"],
+      "properties": {
+        "gate": {
+          "type": "string",
+          "description": "Gate name being accepted or deferred, e.g. perf, tokenContrast, guideCoverage."
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why this risk is acceptable, time-bounded, or deferred."
+        },
+        "by": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Reviewer or owner who accepted the risk."
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the risk was accepted."
+        },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "scope": { "type": "string" },
+        "followUp": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}
