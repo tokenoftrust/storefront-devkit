@@ -30,13 +30,16 @@ public/                 brand assets
 
 ## Adapt it to your client
 
-1. In `.tot/config.json`, set the **real** facts: `minAge`, which notices apply
+1. In `.tot/config.json`, set `tenant` and `scope` to the store's registered id (its domain) and use
+   the same id as the `tenants/<id>/` segment of every `mappings[].repo`.
+2. Still in `.tot/config.json`, set the **real** facts: `ruleProfile`, `minAge`, which notices apply
    (`nicotineWarning`, `pactAct`, `prop65`, `adultSignature`), the real `stateEligibility` lists,
    and the `exciseTax` note/jurisdictions. **Do not invent these** — take them from the client's
    actual obligations.
-2. Rebrand `theme.json` and add assets to `public/`.
-3. Merchandise `content/home.json` with real collections/tags.
-4. `tot validate` — it checks the compliance floor is intact.
+3. Rebrand `theme.json` and add assets to `public/`.
+4. Merchandise `content/home.json` with real collections/tags.
+5. `tot validate` — it checks the compliance floor is intact and names any key the platform does
+   not read.
 
 ## Do not
 

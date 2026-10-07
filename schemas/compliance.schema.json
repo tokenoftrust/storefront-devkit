@@ -4,8 +4,9 @@
   "title": "ToT Storefront compliance config (.tot/config.json#/compliance)",
   "description": "Regulated-commerce configuration. IMPORTANT: the mandated LEGAL WORDING for every notice is platform-owned and rendered by the platform's compliance widgets. You only flip flags and pass small parameters (minAge, chemical names, state lists). A widget renders NOTHING when its field is absent. Never fabricate facts; never remove/hide/paraphrase a required warning; enforcement/decisions/calculations stay platform-owned.",
   "type": "object",
-  "additionalProperties": true,
+  "additionalProperties": false,
   "properties": {
+    "ruleProfile": { "type": "string", "enum": ["vape-nicotine-us"], "description": "The reviewed rule profile checkout enforcement evaluates (e.g. state no-ship and flavored-ENDS rules). A regulated store with no profile fails checkout closed." },
     "minAge": { "type": "integer", "description": "Minimum purchase age (e.g. 21). Presence signals the tenant is age/identity regulated." },
     "nicotineWarning": { "type": "boolean", "description": "Show the FDA-mandated nicotine warning (wording fixed by law)." },
     "pactAct": { "type": "boolean", "description": "Show the PACT Act notice (ENDS/vapor). Federal wording fixed by the platform." },

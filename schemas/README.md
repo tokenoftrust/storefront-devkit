@@ -12,7 +12,7 @@ are ambiguous, the schema wins.
 | `scripts.schema.json` | `scripts.json` | Registered, sandboxed-by-default widget bundles |
 | `capabilities.schema.json` | `capabilities.json` | Optional toggles; cannot weaken the compliance floor |
 | `compliance.schema.json` | `.tot/config.json#/compliance` | Flags/params only — legal wording is platform-owned |
-| `tot-config.schema.json` | `.tot/config.json` | Tenant facts & metadata |
+| `tot-config.schema.json` | `.tot/config.json` | Store id, file mappings, and declared facts (siteType, compliance, capabilities, features); rejects keys the platform does not read |
 
 ## Use them
 
