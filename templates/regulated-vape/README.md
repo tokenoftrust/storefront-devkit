@@ -38,8 +38,10 @@ public/                 brand assets
    actual obligations.
 3. Rebrand `theme.json` and add assets to `public/`.
 4. Merchandise `content/home.json` with real collections/tags.
-5. `tot validate` — it checks the compliance floor is intact and names any key the platform does
-   not read.
+5. `tot validate` — it checks the compliance floor is intact and warns about any key the platform
+   does not read (a typo like `nicotineWarnings` means the warning will NOT render). Going live with
+   one, or with a release that drops a notice the live store shows, waits for the store owner's
+   approval.
 
 ## Do not
 

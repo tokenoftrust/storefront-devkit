@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://tokenoftrust.com/storefront-devkit/schemas/tot-config.schema.json",
   "title": "ToT Storefront .tot/config.json",
-  "description": "The store's identity, its file layout, and its declared platform facts (siteType, compliance, capabilities, features). These facts apply identically in `tot dev`, hosted preview, and the live site. Every key here is one the platform reads; a key it does not read renders nothing, so this schema rejects unknown keys. Do NOT fabricate compliance facts.",
+  "description": "The store's identity, its file layout, and its declared platform facts (siteType, compliance, capabilities, features). These facts apply identically in `tot dev`, hosted preview, and the live site. Every key here is one the platform reads. A key it does not read renders nothing, so your editor flags it here, and `tot validate` reports it as a warning naming the key you most likely meant; going live then waits for the store owner to approve it. Do NOT fabricate compliance facts.",
   "type": "object",
   "additionalProperties": false,
   "required": ["tenant", "scope", "mappings"],
@@ -52,6 +52,11 @@
     "capabilities": {
       "$ref": "https://tokenoftrust.com/storefront-devkit/schemas/capabilities.schema.json",
       "description": "Build-time capability defaults; a committed capabilities.json overrides them per environment. Cannot weaken the compliance floor."
+    },
+    "embeds": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Reviewed third-party embed providers this store uses, by slug (e.g. \"youtube\", \"vimeo\"). The platform owns each provider's exact origins."
     },
     "features": {
       "type": "object",
