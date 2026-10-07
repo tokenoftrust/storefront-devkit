@@ -1,5 +1,13 @@
 {
   "$schema": "../../../schemas/tot-config.schema.json",
-  "appDomain": "my-store.example",
+  "tenant": "my-store.example",
+  "scope": "my-store.example",
+  "mappings": [
+    { "workspace": "theme.json", "repo": "tenants/my-store.example/theme.json", "kind": "file" },
+    { "workspace": "capabilities.json", "repo": "tenants/my-store.example/capabilities.json", "kind": "file" },
+    { "workspace": "scripts.json", "repo": "tenants/my-store.example/scripts.json", "kind": "file" },
+    { "workspace": "content/", "repo": "tenants/my-store.example/content/", "kind": "tree" },
+    { "workspace": "public/", "repo": "tenants/my-store.example/public/", "kind": "tree" }
+  ],
   "siteType": "commerce"
 }

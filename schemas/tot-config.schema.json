@@ -2,20 +2,71 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://tokenoftrust.com/storefront-devkit/schemas/tot-config.schema.json",
   "title": "ToT Storefront .tot/config.json",
-  "description": "Tenant facts & metadata. READ these to decide what is required and allowed; do NOT fabricate compliance facts. Some fields are platform-managed for a real tenant — treat this as the source of truth about the store, not a place to invent obligations.",
+  "description": "The store's identity, its file layout, and its declared platform facts (siteType, compliance, capabilities, features). These facts apply identically in `tot dev`, hosted preview, and the live site. Every key here is one the platform reads; a key it does not read renders nothing, so this schema rejects unknown keys. Do NOT fabricate compliance facts.",
   "type": "object",
-  "additionalProperties": true,
+  "additionalProperties": false,
+  "required": ["tenant", "scope", "mappings"],
   "properties": {
-    "tenantId": { "type": "string", "description": "Tenant identifier." },
-    "appDomain": { "type": "string", "description": "The store's domain (e.g. \"acme-vapor.net\")." },
+    "$schema": { "type": "string", "description": "Editor hint pointing at this schema. Ignored by the platform." },
+    "tenant": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The store's registered id — its domain, e.g. \"acme-vapor.example\". Must equal `scope`."
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The store's data scope. Must equal `tenant` (the registered id)."
+    },
+    "mappings": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Where each part of this repo lands in the storefront. `workspace` is the path in this repo; `repo` is the storefront target under tenants/<tenant>/.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["workspace", "repo", "kind"],
+        "properties": {
+          "workspace": { "type": "string", "minLength": 1, "description": "Path in this repo, e.g. \"content/\" or \"theme.json\"." },
+          "repo": { "type": "string", "pattern": "^tenants/[^/]+/", "description": "Storefront target, e.g. \"tenants/acme-vapor.example/content/\". Use the registered id as the tenant segment." },
+          "kind": { "type": "string", "enum": ["file", "tree"], "description": "\"file\" for a single file, \"tree\" for a directory." }
+        }
+      }
+    },
+    "hostPlatform": {
+      "type": "string",
+      "enum": ["tot-storefront"],
+      "description": "Declares that this checkout is served by the ToT storefront, so `tot validate` treats the platform's commerce routes (/collections, /products, /cart, ...) as existing."
+    },
+    "sample": { "type": "boolean", "description": "Set by `tot dev --sample` on a scaffolded sample checkout. Do not set by hand." },
+    "seed": { "type": "object", "description": "Provenance written by the platform when it seeds a new store repo. Do not edit." },
     "siteType": {
       "type": "string",
       "enum": ["commerce", "marketing"],
-      "description": "commerce = a store with catalog + managed checkout; marketing = a content/landing site with no cart."
+      "description": "commerce = a store with catalog + managed checkout (the default); marketing = a content/landing site with no cart."
     },
     "compliance": {
       "$ref": "https://tokenoftrust.com/storefront-devkit/schemas/compliance.schema.json",
       "description": "Regulated-commerce configuration. See compliance.schema.json."
+    },
+    "capabilities": {
+      "$ref": "https://tokenoftrust.com/storefront-devkit/schemas/capabilities.schema.json",
+      "description": "Build-time capability defaults; a committed capabilities.json overrides them per environment. Cannot weaken the compliance floor."
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per-flag overrides of the siteType defaults. List only the flags you want to flip.",
+      "properties": {
+        "catalog": { "type": "boolean", "description": "Catalog surfaces: /collections, /products/*, listing grids, PDPs." },
+        "productSearch": { "type": "boolean", "description": "Header search typeahead." },
+        "savedItems": { "type": "boolean", "description": "Wishlist / saved items." },
+        "quickView": { "type": "boolean", "description": "Product quick-view dialog." },
+        "newsletter": { "type": "boolean", "description": "Newsletter capture forms." },
+        "commerceSitemap": { "type": "boolean", "description": "Product/collection URLs in the XML sitemap." },
+        "productJsonLd": { "type": "boolean", "description": "Product-offer JSON-LD." },
+        "ageGate": { "type": "boolean", "description": "Soft age-affirmation gate (also needs compliance.minAge)." }
+      }
     }
   }
 }

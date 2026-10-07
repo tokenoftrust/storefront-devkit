@@ -1,8 +1,17 @@
 {
   "$schema": "../../../schemas/tot-config.schema.json",
-  "appDomain": "acme-vapor.example",
+  "tenant": "acme-vapor.example",
+  "scope": "acme-vapor.example",
+  "mappings": [
+    { "workspace": "theme.json", "repo": "tenants/acme-vapor.example/theme.json", "kind": "file" },
+    { "workspace": "capabilities.json", "repo": "tenants/acme-vapor.example/capabilities.json", "kind": "file" },
+    { "workspace": "scripts.json", "repo": "tenants/acme-vapor.example/scripts.json", "kind": "file" },
+    { "workspace": "content/", "repo": "tenants/acme-vapor.example/content/", "kind": "tree" },
+    { "workspace": "public/", "repo": "tenants/acme-vapor.example/public/", "kind": "tree" }
+  ],
   "siteType": "commerce",
   "compliance": {
+    "ruleProfile": "vape-nicotine-us",
     "minAge": 21,
     "nicotineWarning": true,
     "pactAct": true,

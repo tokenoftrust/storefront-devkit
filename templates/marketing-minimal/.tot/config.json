@@ -1,5 +1,12 @@
 {
   "$schema": "../../../schemas/tot-config.schema.json",
-  "appDomain": "my-site.example",
+  "tenant": "my-site.example",
+  "scope": "my-site.example",
+  "mappings": [
+    { "workspace": "theme.json", "repo": "tenants/my-site.example/theme.json", "kind": "file" },
+    { "workspace": "capabilities.json", "repo": "tenants/my-site.example/capabilities.json", "kind": "file" },
+    { "workspace": "content/", "repo": "tenants/my-site.example/content/", "kind": "tree" },
+    { "workspace": "public/", "repo": "tenants/my-site.example/public/", "kind": "tree" }
+  ],
   "siteType": "marketing"
 }
