@@ -5,6 +5,17 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Added
+- `block-palette@7`: hero `notice` — a short plain-text status pill above the eyebrow. An
+  `editorial` block with neither `image` nor `imageSeed` renders as a single text column.
+  `home.schema.json` now also describes the hero's `headlineAccent`, `featureCollection`,
+  `imageAlt` and `slides`, and the editorial block's real fields (`body_html`, `image`,
+  `imageAlt`, `imageSeed`, `align`, `eyebrow`, CTA).
+- `theme.schema.json`: `type.headings` (`hero`/`h1`/`h2`/`h3` fixed sizes for matching a source
+  site's headings), `color.hero-eyebrow`, `brand.heroVariant`, `brand.headerVariant`,
+  `shape.tapTarget`, and the optional interaction/conversion colours (`focus-ring`, `disabled`,
+  `disabled-contrast`, `field-border`, `star`, `cta`, `cta-hover`, `cta-contrast`, `trust`) the
+  platform already accepts. `brand.motion` no longer offers `none`, which the platform refuses.
+  `$schema`/`_note` meta keys validate.
 - Agency Kit free tier: `tools/` (single-page checks — `validate-page.sh`,
   `validate-page-browser.mjs`, `perf-audit.mjs`, `style-concept-audit.mjs`, the style-concept
   manifest schema, Lighthouse helpers, and tests), `docs/dev-loop-reference.md`,

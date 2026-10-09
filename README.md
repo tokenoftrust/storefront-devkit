@@ -103,7 +103,7 @@ storefront-devkit/
 ├── schemas/               ← JSON Schemas for every tenant-owned file (the contract, machine-checkable)
 │   ├── theme.schema.json
 │   ├── chrome.schema.json
-│   ├── home.schema.json           (block-palette@3)
+│   ├── home.schema.json           (block-palette@7)
 │   ├── scripts.schema.json
 │   ├── capabilities.schema.json
 │   ├── compliance.schema.json
