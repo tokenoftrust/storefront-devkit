@@ -5,6 +5,7 @@
   "description": "Brand look for a tenant. A deep-partial override merged over the platform reference theme — set only what you want to change. Every value below maps to a CSS custom property the shared component library reads (e.g. color.primary -> --color-primary). Validated for known tokens + WCAG AA contrast at publish (text pairs error, muted warns).",
   "type": "object",
   "additionalProperties": false,
+  "patternProperties": { "^[_$]": { "description": "Doc/meta keys ($schema, _note) — ignored by the platform." } },
   "properties": {
     "color": {
       "type": "object",
@@ -27,7 +28,17 @@
         "info": { "$ref": "#/definitions/color", "description": "Informational (notices, help)" },
         "accent-ink": { "$ref": "#/definitions/color", "description": "Accent tuned for small text/links on light surfaces (AA). Derived from accent if omitted." },
         "primary-hover": { "$ref": "#/definitions/color", "description": "Hover/active shade of primary. Derived if omitted." },
-        "accent-hover": { "$ref": "#/definitions/color", "description": "Hover/active shade of accent. Derived if omitted." }
+        "accent-hover": { "$ref": "#/definitions/color", "description": "Hover/active shade of accent. Derived if omitted." },
+        "focus-ring": { "$ref": "#/definitions/color", "description": "Keyboard focus outline. Defaults to accent." },
+        "disabled": { "$ref": "#/definitions/color", "description": "Disabled/loading control fill. Derived if omitted." },
+        "disabled-contrast": { "$ref": "#/definitions/color", "description": "Text/icon on a disabled control. Defaults to muted." },
+        "field-border": { "$ref": "#/definitions/color", "description": "Form-field outline (stronger than border). Derived if omitted." },
+        "star": { "$ref": "#/definitions/color", "description": "Review/rating star fill. Defaults to accent." },
+        "cta": { "$ref": "#/definitions/color", "description": "Primary call-to-action fill (buy button, hero CTA). Defaults to primary." },
+        "cta-hover": { "$ref": "#/definitions/color", "description": "Hover/active shade of cta. Defaults to primary-hover." },
+        "cta-contrast": { "$ref": "#/definitions/color", "description": "Text/icon on cta. Defaults to primary-contrast." },
+        "trust": { "$ref": "#/definitions/color", "description": "Trust/reassurance accent (guarantees, compliance badges). Defaults to success." },
+        "hero-eyebrow": { "$ref": "#/definitions/color", "description": "Home hero eyebrow text. Defaults to muted on a light hero, a translucent primary-contrast on a bold hero." }
       }
     },
     "type": {
@@ -39,7 +50,18 @@
         "body": { "$ref": "#/definitions/fontFace", "description": "Body copy family" },
         "mono": { "$ref": "#/definitions/fontFace", "description": "Monospace family" },
         "scale": { "type": "number", "description": "Modular type scale ratio (e.g. 1.25 = major third)" },
-        "tracking": { "type": "string", "description": "Base letter-spacing (e.g. \"-0.011em\")" }
+        "tracking": { "type": "string", "description": "Base letter-spacing (e.g. \"-0.011em\")" },
+        "headings": {
+          "type": "object",
+          "description": "Fixed heading sizes. Each set level replaces the fluid display-scale size: hero sizes the home hero headline; h1/h2/h3 size every other heading of that level (page and listing titles, block titles, headings in page body copy). Unset levels keep the fluid scale. Use to match a source site's heading sizes.",
+          "additionalProperties": false,
+          "properties": {
+            "hero": { "$ref": "#/definitions/cssSize" },
+            "h1": { "$ref": "#/definitions/cssSize" },
+            "h2": { "$ref": "#/definitions/cssSize" },
+            "h3": { "$ref": "#/definitions/cssSize" }
+          }
+        }
       }
     },
     "space": {
@@ -83,7 +105,8 @@
             "md": { "type": "string" },
             "lg": { "type": "string" }
           }
-        }
+        },
+        "tapTarget": { "type": "string", "description": "Minimum interactive tap-target size (e.g. \"44px\"). Defaults to 44px." }
       }
     },
     "brand": {
@@ -94,7 +117,9 @@
         "logoDark": { "type": "string", "description": "Path under public/** to the dark-mode logo" },
         "favicon": { "type": "string" },
         "ogImage": { "type": "string", "description": "Default Open Graph share image" },
-        "motion": { "type": "string", "enum": ["full", "reduced", "none"], "description": "Motion preference default" }
+        "motion": { "type": "string", "enum": ["full", "reduced"], "description": "Motion preference default" },
+        "headerVariant": { "type": "string", "enum": ["light", "dark"], "description": "Header bar: light (default) or dark (primary-colour bar with the light logo)" },
+        "heroVariant": { "type": "string", "enum": ["bold", "light", "banner"], "description": "Home hero treatment: bold (default — full-bleed primary background, light text), light (page background, brand colour on headline and CTA), banner (the hero image edge-to-edge, for source artwork that already carries the copy)" }
       }
     }
   },
@@ -103,6 +128,12 @@
       "type": "string",
       "description": "A CSS color — hex recommended (e.g. \"#1F3A34\").",
       "pattern": "^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|rgb\\(.*\\)|rgba\\(.*\\)|hsl\\(.*\\)|hsla\\(.*\\)|color-mix\\(.*\\)|var\\(.*\\))$"
+    },
+    "cssSize": {
+      "type": "string",
+      "description": "A CSS length or math function over lengths, e.g. \"28px\", \"1.75rem\", \"clamp(1.5rem, 4vw, 2rem)\".",
+      "maxLength": 120,
+      "pattern": "^[0-9a-zA-Z.%(),+\\-*/ ]*[0-9a-zA-Z%)]$"
     },
     "fontFace": {
       "type": "object",
