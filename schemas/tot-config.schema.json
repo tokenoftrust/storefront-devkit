@@ -44,7 +44,7 @@
       "type": "string",
       "minLength": 1,
       "pattern": "\\S",
-      "description": "The store's name as visitors read it, e.g. \"Prime Vapor Club\": the page-title suffix (\"About — Prime Vapor Club\"), og:site_name, the Organization structured-data name, the breadcrumb root, the default blog heading and the default copyright line. Unset = the name the store was provisioned with, often its bare domain."
+      "description": "The store's name as visitors read it, e.g. \"Prime Vapor Club\": the page-title suffix (\"About — Prime Vapor Club\"), og:site_name, the Organization structured-data name, the default blog heading and the default copyright line. Unset = the name the store was provisioned with, often its bare domain."
     },
     "siteType": {
       "type": "string",
