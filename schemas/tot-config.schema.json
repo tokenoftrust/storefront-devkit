@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://tokenoftrust.com/storefront-devkit/schemas/tot-config.schema.json",
   "title": "ToT Storefront .tot/config.json",
-  "description": "The store's identity, its file layout, and its declared platform facts (siteType, compliance, capabilities, features). These facts apply identically in `tot dev`, hosted preview, and the live site. Every key here is one the platform reads. A key it does not read renders nothing, so your editor flags it here, and `tot validate` reports it as a warning naming the key you most likely meant; going live then waits for the store owner to approve it. Do NOT fabricate compliance facts.",
+  "description": "The store's identity, its file layout, and its declared platform facts (displayName, siteType, compliance, capabilities, features, embeds). These facts apply identically in `tot dev`, hosted preview, and the live site. Every key here is one the platform reads. A key it does not read renders nothing, so your editor flags it here, and `tot validate` reports it as a warning naming the key you most likely meant; going live then waits for the store owner to approve it. Do NOT fabricate compliance facts.",
   "type": "object",
   "additionalProperties": false,
   "required": ["tenant", "scope", "mappings"],
@@ -40,6 +40,12 @@
     },
     "sample": { "type": "boolean", "description": "Set by `tot dev --sample` on a scaffolded sample checkout. Do not set by hand." },
     "seed": { "type": "object", "description": "Provenance written by the platform when it seeds a new store repo. Do not edit." },
+    "displayName": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "The store's name as visitors read it, e.g. \"Prime Vapor Club\": the page-title suffix (\"About — Prime Vapor Club\"), og:site_name, the Organization structured-data name, the breadcrumb root, the default blog heading and the default copyright line. Unset = the name the store was provisioned with, often its bare domain."
+    },
     "siteType": {
       "type": "string",
       "enum": ["commerce", "marketing"],
