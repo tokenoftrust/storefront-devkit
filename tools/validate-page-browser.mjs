@@ -32,6 +32,15 @@ import {
   shouldRerun,
   UNMEASURED_REASONS,
 } from "./lib/lighthouse-stability.mjs";
+import {
+  AGE_GATE_AFFIRMATION_PREFIX,
+  AGE_GATE_AFFIRMED_VALUE,
+  AGE_GATE_HOST_SELECTOR,
+  affirmationKeysFromLookups,
+  describeAffirmation,
+  gatedLighthouseUnmeasured,
+  judgeAgeGate,
+} from "./lib/age-gate.mjs";
 import { rescoreForChannel } from "./lib/lighthouse-channel-exemptions.mjs";
 import {
   GIVEAWAY_CEILING,
@@ -213,6 +222,17 @@ function compactErrorMessage(err) {
 let previewAssetChannel = null;
 
 /**
+ * The platform age gate's affirmation, armed once per run after the `ageGate` record has watched
+ * the gate read its key on a fresh load (see lib/age-gate.mjs). While set, every page the scored
+ * passes open starts already affirmed for this origin, so they measure the page an affirmed
+ * visitor sees rather than the gate over an inert page. Null when the page has no gate.
+ *
+ * Declared here for the same temporal-dead-zone reason as the binding above.
+ * @type {{origin: string, keys: string[]} | null}
+ */
+let ageGateAffirmation = null;
+
+/**
  * The source's Lighthouse scores for THIS page — the comparand the parity gate judges against.
  *
  * Declared here for the same reason as the binding above: it is read inside a hoisted function.
@@ -285,9 +305,32 @@ function setPreviewAssetChannel(base, versionId, token) {
   }
 }
 
-/** Every page in this run must carry the asset channel, or its images silently 404. */
-async function newPageWithPreview(browser, opts) {
+/**
+ * Every page in this run must carry the asset channel, or its images silently 404.
+ *
+ * It also starts affirmed past the platform age gate once the run has armed that affirmation,
+ * so a scored pass measures the page rather than the gate. `affirmAgeGate: false` is for the
+ * passes that measure the gate itself (the `ageGate` record) or deliberately load the page as a
+ * first-time visitor would (CSP, so the gate's own markup is inside the policy check).
+ */
+async function newPageWithPreview(browser, opts, { affirmAgeGate = true } = {}) {
   const page = await browser.newPage(opts);
+  await armPage(page, { affirmAgeGate });
+  return page;
+}
+
+/**
+ * The same, in a context the caller owns and closes. axe's Playwright builder refuses a page
+ * made by `browser.newPage()`, so the passes that run axe open their page this way.
+ */
+async function newContextPageWithPreview(browser, opts, { affirmAgeGate = true } = {}) {
+  const context = await browser.newContext(opts);
+  const page = await context.newPage();
+  await armPage(page, { affirmAgeGate });
+  return { context, page };
+}
+
+async function armPage(page, { affirmAgeGate }) {
   if (previewAssetChannel) {
     const { origin, versionId, token } = previewAssetChannel;
     await page.context().addCookies([
@@ -295,7 +338,38 @@ async function newPageWithPreview(browser, opts) {
       { name: "tot_preview", value: token, url: origin },
     ]).catch(() => undefined);
   }
-  return page;
+  if (affirmAgeGate && ageGateAffirmation) {
+    // Runs before any page script on every navigation, so the gate's first read already finds
+    // the visitor affirmed. Scoped to the page's own origin: a cross-origin frame never gets it.
+    await page.addInitScript(({ origin, keys, value }) => {
+      if (location.origin !== origin) return;
+      for (const key of keys) {
+        try {
+          localStorage.setItem(key, value);
+        } catch {
+          // Storage refused: the gate opens and the capture's own check reports it.
+        }
+      }
+    }, { ...ageGateAffirmation, value: AGE_GATE_AFFIRMED_VALUE });
+  }
+}
+
+/**
+ * Is the platform age gate on this page, and is it blocking it right now?
+ *
+ * The gate's contents sit in a closed shadow root, so this reads only what the gate does to the
+ * light DOM: while it is open, focus rests on its host (focus inside a shadow root retargets to
+ * the host) and the page behind it is made inert. Either is enough to call it blocking.
+ * Evaluated in the page; takes the host selector so it carries no closure.
+ * @param {string} selector
+ */
+function ageGatePageState(selector) {
+  const host = document.querySelector(selector);
+  if (!host) return { present: false, blocking: false, focusOnGate: false, inertSiblings: 0 };
+  const inertSiblings = Array.from(document.body.children)
+    .filter((el) => el !== host && el.hasAttribute("inert")).length;
+  const focusOnGate = document.activeElement === host;
+  return { present: true, blocking: focusOnGate || inertSiblings > 0, focusOnGate, inertSiblings };
 }
 
 async function settle(page) {
@@ -371,10 +445,15 @@ async function capturePage(browser, pageUrl, screenshotPath) {
           : null,
       };
     });
+    // The first affirmed load of the run doubles as the proof that the affirmation took: a gate
+    // still blocking here means every scored pass after it measured the gate, not the page.
+    const ageGate = await page.evaluate(ageGatePageState, AGE_GATE_HOST_SELECTOR)
+      .catch(() => null);
     return {
       http: response?.status() ?? 0,
       screenshot: screenshotPath,
       computed,
+      ageGate,
       consoleErrors,
       consoleMessages,
       failedResponses,
@@ -1100,8 +1179,7 @@ function extractContrastNodes(violations) {
 }
 
 async function runA11y(browser, pageUrl, artifactPath) {
-  const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
-  const page = await context.newPage();
+  const { context, page } = await newContextPageWithPreview(browser, { viewport: { width: 1365, height: 900 } });
   try {
     await page.goto(pageUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
     await settle(page);
@@ -1164,16 +1242,65 @@ async function runA11y(browser, pageUrl, artifactPath) {
   }
 }
 
-async function runLighthouseProfile(pageUrl, artifactPath, profile, provider) {
+/**
+ * Seed the age-gate affirmation into the browser Lighthouse is about to drive.
+ *
+ * Lighthouse opens its own tab in the browser's DEFAULT context, so an init script on a
+ * Playwright page never reaches it; the affirmation has to be in that context's localStorage
+ * before the run. A Playwright connection over the debugging port exposes the default context.
+ * The seed page is fulfilled locally at the page's origin — it never touches the network, so it
+ * warms no cache and Lighthouse still measures a cold load — and the value is read back, so a
+ * seed that did not take reports false instead of passing silently.
+ *
+ * Measured on a fixture serving the real gate component: accessibility 93 with the gate open
+ * (storage reset on or off), 100 once seeded.
+ * @param {number} port
+ * @returns {Promise<boolean>}
+ */
+async function seedLighthouseAgeGate(port) {
+  if (!ageGateAffirmation) return false;
+  const { origin, keys } = ageGateAffirmation;
+  let remote = null;
+  try {
+    remote = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
+    const context = remote.contexts()[0];
+    if (!context) return false;
+    const page = await context.newPage();
+    try {
+      const seedUrl = `${origin}/__tot-harness-age-gate-seed`;
+      await page.route(seedUrl, (route) => route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: "<!doctype html><title>age gate seed</title>",
+      }));
+      await page.goto(seedUrl, { timeout: 15000 });
+      return await page.evaluate(({ keys: seedKeys, value }) => {
+        for (const key of seedKeys) localStorage.setItem(key, value);
+        return seedKeys.every((key) => localStorage.getItem(key) === value);
+      }, { keys, value: AGE_GATE_AFFIRMED_VALUE });
+    } finally {
+      await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => undefined);
+      await page.close().catch(() => undefined);
+    }
+  } catch {
+    return false;
+  } finally {
+    // Disconnects this client only; the browser stays up for Lighthouse.
+    await remote?.close().catch(() => undefined);
+  }
+}
+
+/**
+ * Launch a browser for Lighthouse to drive, carrying the run's preview channel and, unless
+ * `affirmAgeGate` is false, the age-gate affirmation.
+ * @param {{affirmAgeGate: boolean}} opts
+ */
+async function launchLighthouseBrowser({ affirmAgeGate }) {
   const port = await freePort();
   const browser = await launchBrowser({
     args: [`--remote-debugging-port=${port}`, "--disable-dev-shm-usage"],
   });
   try {
-    const lighthouseModule = await loadModule("lighthouse");
-    const lighthouse = lighthouseModule.default ?? lighthouseModule;
-    const mobile = profile === "mobile";
-
     // Lighthouse drives its OWN browser, so newPageWithPreview's cookies never reach
     // it. `?__preview=` moves the PAGE only; a tenant's assets are served
     // version-scoped from R2 behind the `tot_preview_version` + `tot_preview` cookie
@@ -1207,6 +1334,32 @@ async function runLighthouseProfile(pageUrl, artifactPath, profile, provider) {
         }).catch(() => undefined);
       }
     }
+    // `open` when the page has a gate the harness could not seed past: that run scores the gate.
+    const ageGateState = !ageGateAffirmation
+      ? "absent"
+      : affirmAgeGate && await seedLighthouseAgeGate(port)
+        ? "affirmed"
+        : "open";
+    return {
+      browser,
+      port,
+      ageGateState,
+      // Keep what was seeded — cookies and the affirmation alike; see the note above.
+      disableStorageReset: Boolean(previewAssetChannel) || ageGateState === "affirmed",
+    };
+  } catch (err) {
+    await browser.close().catch(() => undefined);
+    throw err;
+  }
+}
+
+async function runLighthouseProfile(pageUrl, artifactPath, profile, provider) {
+  const { browser, port, ageGateState, disableStorageReset } =
+    await launchLighthouseBrowser({ affirmAgeGate: true });
+  try {
+    const lighthouseModule = await loadModule("lighthouse");
+    const lighthouse = lighthouseModule.default ?? lighthouseModule;
+    const mobile = profile === "mobile";
 
     const result = await lighthouse(pageUrl, {
       port,
@@ -1214,8 +1367,7 @@ async function runLighthouseProfile(pageUrl, artifactPath, profile, provider) {
       output: "json",
       onlyCategories: LIGHTHOUSE_CATEGORIES,
       formFactor: profile,
-      // Keep the seeded preview cookies; see the note above.
-      disableStorageReset: Boolean(previewAssetChannel),
+      disableStorageReset,
       screenEmulation: {
         mobile,
         width: mobile ? 390 : 1350,
@@ -1415,9 +1567,26 @@ async function runLighthouseProfile(pageUrl, artifactPath, profile, provider) {
         `(+${parity.dimensions[key].delta}) — delivered above parity. Add-on value, not a defect.`,
       urls: [],
     })));
+    // Say which state of the page these scores describe. Affirming is a harness adjustment like
+    // any exemption above, so it is recorded on the run rather than left for a reader to guess.
+    if (ageGateState === "affirmed") {
+      const affirmedFinding = {
+        id: "lighthouse-age-gate-affirmed",
+        owner: "platform",
+        kind: "lighthouse-age-gate-affirmed",
+        categories: [],
+        title:
+          "This page opens behind the platform age gate. Lighthouse ran with the gate already" +
+          " affirmed, so these scores describe the page an affirmed visitor sees; the gated state" +
+          " is recorded separately under the `ageGate` gate.",
+        urls: [],
+      };
+      findings.push(affirmedFinding);
+    }
 
     return {
       profile,
+      ageGateState,
       channelExemptions,
       pass: parity.pass && runWarnings.length === 0,
       parity: {
@@ -1501,7 +1670,14 @@ async function runLighthouse(pageUrl, artifactPath, requestedProfile, provider) 
 }
 
 async function runCsp(browser, pageUrl, artifactPath) {
-  const page = await newPageWithPreview(browser,{ viewport: { width: 1365, height: 900 } });
+  // Loaded as a first-time visitor: the platform age gate's own markup renders only while it is
+  // open, so this is the one load that puts it inside the policy check. Everything behind the
+  // gate loads either way.
+  const page = await newPageWithPreview(
+    browser,
+    { viewport: { width: 1365, height: 900 } },
+    { affirmAgeGate: false },
+  );
   const consoleViolations = [];
   let sourceMode = "none";
   let enforced = false;
@@ -1596,6 +1772,202 @@ async function runCsp(browser, pageUrl, artifactPath) {
   }
 }
 
+/**
+ * Lighthouse accessibility of the GATED page, desktop, one run: the number a fresh visitor's
+ * first screen scores, reported beside the affirmed one rather than in place of it.
+ * @param {string} pageUrl
+ */
+async function runLighthouseGatedAccessibility(pageUrl) {
+  const { browser, port, disableStorageReset } = await launchLighthouseBrowser({ affirmAgeGate: false });
+  try {
+    const lighthouseModule = await loadModule("lighthouse");
+    const lighthouse = lighthouseModule.default ?? lighthouseModule;
+    const result = await lighthouse(pageUrl, {
+      port,
+      logLevel: "error",
+      output: "json",
+      onlyCategories: ["accessibility"],
+      formFactor: "desktop",
+      disableStorageReset,
+      screenEmulation: { mobile: false, width: 1350, height: 940, deviceScaleFactor: 1, disabled: false },
+    });
+    const score = result.lhr.categories?.accessibility?.score;
+    return {
+      profile: "desktop",
+      score: typeof score === "number" ? Math.round(score * 100) : null,
+      failingAudits: Object.values(result.lhr.audits ?? {})
+        .filter((item) => typeof item?.score === "number" && item.score < 1
+          && (result.lhr.categories?.accessibility?.auditRefs ?? []).some((ref) => ref.id === item.id && ref.weight > 0))
+        .map((item) => item.id),
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
+ * The `ageGate` record: the page as a first-time visitor meets it, with the platform age gate
+ * open. Loaded fresh and never affirmed.
+ *
+ * It does two jobs. It learns the gate's affirmation key by watching the gate read it, which is
+ * what arms every later pass to measure the affirmed page. And it judges the gated state on its
+ * own terms (lib/age-gate.mjs judgeAgeGate): one named modal dialog, focus held inside it, nothing
+ * behind it reachable, the page's <main> still exposed, and axe on what a screen reader meets.
+ *
+ * The dialog itself sits in a closed shadow root, which no DOM query and no axe pass can enter;
+ * Chrome's accessibility tree can, so the dialog and focus checks read that tree over CDP.
+ *
+ * @returns {Promise<{record: Record<string, any>, present: boolean, keys: string[]}>}
+ */
+async function runAgeGate(browser, pageUrl, artifactPath, { lighthouse = true } = {}) {
+  const { context, page } = await newContextPageWithPreview(
+    browser,
+    { viewport: { width: 1365, height: 900 } },
+    { affirmAgeGate: false },
+  );
+  try {
+    // Record only the gate's own keys: a page's other storage keys are none of this record's
+    // business and never enter its evidence.
+    await page.addInitScript((prefix) => {
+      const w = /** @type {any} */ (window);
+      w.__smAgeGateLookups = [];
+      const read = Storage.prototype.getItem;
+      Storage.prototype.getItem = function getItem(key) {
+        const name = String(key);
+        if (name.startsWith(prefix)) w.__smAgeGateLookups.push(name);
+        return read.call(this, key);
+      };
+    }, AGE_GATE_AFFIRMATION_PREFIX);
+    const response = await page.goto(pageUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await settle(page);
+    const http = response?.status() ?? 0;
+    const state = await page.evaluate(ageGatePageState, AGE_GATE_HOST_SELECTOR);
+    const lookups = await page.evaluate(() => /** @type {any} */ (window).__smAgeGateLookups ?? [])
+      .catch(() => []);
+    const keys = affirmationKeysFromLookups(lookups);
+
+    if (http !== 200 || !state.present) {
+      const record = {
+        url: pageUrl,
+        http,
+        present: false,
+        pass: true,
+        reason: http !== 200 ? `page returned HTTP ${http}` : "no platform age gate on this page",
+        artifact: artifactPath,
+      };
+      await writeGateArtifact(artifactPath, record);
+      return { record, present: false, keys: [] };
+    }
+
+    const { AxeBuilder } = await loadModule("@axe-core/playwright");
+    const axeResults = await new AxeBuilder({ page }).analyze();
+    const impacts = { critical: 0, serious: 0, moderate: 0, minor: 0 };
+    for (const violation of axeResults.violations) {
+      impacts[violation.impact ?? "minor"] += violation.nodes.length;
+    }
+
+    const cdp = await page.context().newCDPSession(page);
+    const axTree = async () => (await cdp.send("Accessibility.getFullAXTree")).nodes ?? [];
+    const exposed = (node) => node && !node.ignored;
+    const prop = (node, name) => node?.properties?.find((p) => p.name === name)?.value?.value;
+    const nodes = await axTree();
+    const dialogs = nodes.filter((node) => exposed(node) && ["dialog", "alertdialog"].includes(node.role?.value));
+    const focusedNode = nodes.find((node) => exposed(node) && prop(node, "focused") === true && node.role?.value !== "RootWebArea");
+
+    const background = await page.evaluate((selector) => {
+      const host = document.querySelector(selector);
+      const visible = (el) => {
+        const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+        return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+      };
+      const focusable = Array.from(document.querySelectorAll(
+        "a[href], button, input, select, textarea, summary, iframe, [contenteditable=''], [contenteditable='true'], [tabindex]:not([tabindex='-1'])",
+      )).filter((el) => el !== host
+        && !host?.contains(el)
+        && !el.closest("[inert]")
+        && !(/** @type {any} */ (el).disabled)
+        && visible(el));
+      return {
+        focusable: focusable.length,
+        focusableSamples: focusable.slice(0, 5).map((el) =>
+          `${el.tagName.toLowerCase()}: ${(el.textContent || el.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim().slice(0, 40)}`),
+        mainPresent: Boolean(document.querySelector("main, [role='main']")),
+      };
+    }, AGE_GATE_HOST_SELECTOR);
+    const mainExposed = nodes.some((node) => exposed(node) && node.role?.value === "main");
+
+    // Keyboard: forward past every control the gate could hold, then back. Focus inside a shadow
+    // root retargets to its host, so "still on the host" is "still inside the gate".
+    const presses = ["Tab", "Tab", "Tab", "Tab", "Tab", "Shift+Tab", "Shift+Tab"];
+    let contained = 0;
+    const escapedTo = [];
+    for (const key of presses) {
+      await page.keyboard.press(key);
+      const where = await page.evaluate((selector) => {
+        const el = document.activeElement;
+        if (el && el === document.querySelector(selector)) return null;
+        if (!el || el === document.body) return "body";
+        return `${el.tagName.toLowerCase()}: ${(el.textContent || el.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim().slice(0, 40)}`;
+      }, AGE_GATE_HOST_SELECTOR);
+      if (where === null) contained += 1;
+      else if (!escapedTo.includes(where)) escapedTo.push(where);
+    }
+
+    const observation = {
+      present: true,
+      blocking: state.blocking,
+      dialog: {
+        count: dialogs.length,
+        name: String(dialogs[0]?.name?.value ?? ""),
+        modal: prop(dialogs[0], "modal") === true,
+      },
+      focus: {
+        presses: presses.length,
+        contained,
+        escapedTo,
+        initial: focusedNode ? `${focusedNode.role?.value}: ${String(focusedNode.name?.value ?? "").slice(0, 60)}` : null,
+      },
+      background: { ...background, mainExposed },
+      axe: impacts,
+    };
+    const verdict = judgeAgeGate(observation);
+    const gatedLighthouse = lighthouse
+      ? await runLighthouseGatedAccessibility(pageUrl).catch((err) => ({ error: compactErrorMessage(err) }))
+      : { skipped: true, reason: "--no-lighthouse fast browser mode" };
+    const record = {
+      ...observation,
+      url: pageUrl,
+      http,
+      measuredState: "gated",
+      pass: verdict.pass,
+      checks: verdict.checks,
+      failedChecks: verdict.failedChecks,
+      findings: verdict.findings,
+      axe: {
+        impacts,
+        violations: axeResults.violations.length,
+        top: axeResults.violations.slice(0, 5).map((violation) => ({
+          id: violation.id,
+          impact: violation.impact,
+          nodes: violation.nodes.length,
+          help: violation.help,
+        })),
+        scope:
+          "axe cannot enter the gate's closed shadow root; it scores what the open gate leaves" +
+          " exposed. The dialog and focus checks read Chrome's accessibility tree instead.",
+      },
+      lighthouseAccessibility: gatedLighthouse,
+      affirmationKeys: keys,
+      artifact: artifactPath,
+    };
+    await writeGateArtifact(artifactPath, record);
+    return { record, present: true, keys };
+  } finally {
+    await context.close();
+  }
+}
+
 async function main() {
   await mkdir(artifactDir, { recursive: true });
   const artifacts = {
@@ -1607,13 +1979,25 @@ async function main() {
     ux: join(artifactDir, `${safeName}.ux.json`),
     ecommerceStyleGuide: join(artifactDir, `${safeName}.ecommerce-style-guide.json`),
     csp: join(artifactDir, `${safeName}.csp.json`),
+    ageGate: join(artifactDir, `${safeName}.age-gate.json`),
   };
 
   const browser = await launchBrowser();
   try {
     const skipLighthouse = cli.noLighthouse;
     const lighthouseSkipReason = "--no-lighthouse fast browser mode";
+    // The gated state first: it is the load that learns the gate's affirmation key, and every
+    // pass after it measures the affirmed page.
+    const ageGate = await runAgeGate(browser, url, artifacts.ageGate, { lighthouse: !skipLighthouse });
+    if (ageGate.present && ageGate.keys.length > 0) {
+      ageGateAffirmation = { origin: new URL(url).origin, keys: ageGate.keys };
+    }
     const target = await capturePage(browser, url, artifacts.targetScreenshot);
+    const affirmation = describeAffirmation({
+      present: ageGate.present,
+      keys: ageGate.keys,
+      verified: ageGate.present && ageGate.keys.length > 0 ? target.ageGate?.blocking === false : null,
+    });
     if (target.http !== 200) {
       const gates = {
         render: gateMeta(
@@ -1658,7 +2042,7 @@ async function main() {
       runA11y(browser, url, artifacts.axe),
       runCsp(browser, url, artifacts.csp),
     ]);
-    const perf = skipLighthouse
+    const measuredPerf = skipLighthouse
       ? await writeGateArtifact(artifacts.lighthouse, {
           url: evidenceUrl,
           pass: true,
@@ -1672,6 +2056,7 @@ async function main() {
           artifact: artifacts.lighthouse,
         })
       : await runLighthouse(url, artifacts.lighthouse, cli.lighthouseProfile, cli.provider);
+    const perf = gatedLighthouseUnmeasured(measuredPerf, affirmation);
     const [mobile, ux, ecommerceStyleGuide] = await Promise.all([
       runMobile(browser, url, perf, artifacts.mobile),
       runUx(browser, url, artifacts.ux),
@@ -1692,6 +2077,15 @@ async function main() {
           : "advisory for preview-only style-guide routes; static style audit owns approval",
       }),
       csp: gateMeta(csp, { required: true, applicable: true }),
+      // The platform's own gate, measured open. Advisory to this page by construction: a tenant
+      // cannot change it, so it never decides the page's pass or its parity verdict.
+      ageGate: gateMeta(ageGate.record, {
+        required: false,
+        applicable: ageGate.present,
+        reason: ageGate.present
+          ? "the platform age gate as a first-time visitor meets it; reported on its own and never part of this page's verdict or its Lighthouse parity"
+          : "no platform age gate on this page",
+      }),
     };
     const requiredGates = Object.entries(gates)
       .filter(([, gate]) => gate.required !== false && gate.applicable !== false)
@@ -1709,6 +2103,7 @@ async function main() {
         : "full-browser",
       previewOnly: cli.previewOnly,
       noLighthouse: cli.noLighthouse,
+      ageGate: affirmation,
       requiredGates,
       gates,
       ok,

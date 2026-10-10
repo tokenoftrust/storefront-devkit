@@ -21,6 +21,27 @@ npm test
 standard location. To use browser dependencies installed elsewhere, set `TOT_TOOLS_DEPS_FROM` to
 that package's directory.
 
+## Pages behind the age gate
+
+A regulated store opens every page behind the platform age gate on a fresh visit. The browser
+check measures the two states separately:
+
+- **The page.** The screenshot, axe, keyboard, mobile, UX and Lighthouse passes run with the gate
+  already affirmed, so their scores describe what an affirmed visitor sees. The check learns the
+  gate's own affirmation key on a first, fresh load and confirms the next load is no longer
+  blocked. The top-level `ageGate` field says which state was measured, in words. If the gate
+  cannot be affirmed, Lighthouse parity is reported as unmeasured (`age-gate-open`) rather than as
+  a regression.
+- **The gate.** `gates.ageGate` loads the page fresh with the gate open and records whether the
+  gate is a single named modal dialog, keeps keyboard focus inside itself, leaves nothing behind
+  it focusable, and still exposes the page's `<main>` landmark. It also records axe and Lighthouse
+  accessibility for the gated state. The gate belongs to the platform, so this record is advisory:
+  it never decides the page's pass or its Lighthouse parity.
+
+The CSP pass also loads the page with the gate open, so the gate's own markup is covered by the
+policy check. A page without the gate is measured exactly as served, and `gates.ageGate` is marked
+not applicable.
+
 ## A store's own readiness report
 
 Save each page's JSON into one directory, then run `tot report go-live --pages <dir>` from your
