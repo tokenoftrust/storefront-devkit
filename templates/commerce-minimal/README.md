@@ -22,8 +22,10 @@ public/                 drop logos, hero images, fonts here
 cp -R templates/commerce-minimal ../my-store && cd ../my-store
 # rebrand: edit theme.json (see snippets/theme-presets for ready palettes)
 # merchandise: edit content/home.json (see snippets/product-sources for options)
-tot dev            # http://localhost:<port>/<tenant>/
-tot validate       # before you publish
+# http://localhost:<port>/<tenant>/
+tot dev
+# before you publish
+tot validate
 ```
 
 ## Rebranding checklist

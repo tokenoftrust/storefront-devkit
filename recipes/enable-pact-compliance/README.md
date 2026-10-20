@@ -33,8 +33,10 @@ platform.
 
 3. Run the loop:
    ```bash
-   tot dev        # confirm the notices render (nicotine warning, PACT, footer restriction)
-   tot validate   # confirms the compliance floor is intact
+   # confirm the notices render (nicotine warning, PACT, footer restriction)
+   tot dev
+   # confirms the compliance floor is intact
+   tot validate
    ```
 
 ## What you must NOT do
