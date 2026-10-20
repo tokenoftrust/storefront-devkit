@@ -30,7 +30,8 @@ cd ../my-client-store
 #    (already wired in .vscode/settings.json — copy it into your project)
 
 # 4. Edit theme.json / content/*.json, then run the local loop:
-tot dev            # http://localhost:<port>/<tenant>/  — save → live-reload
+# http://localhost:<port>/<tenant>/  — save → live-reload
+tot dev
 
 # 5. Validate against the contract before you publish:
 tot validate
