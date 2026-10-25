@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  devServerOwnsViolation,
   evidenceRouteIdentity,
   findingId,
+  gateRequiredOnRoute,
+  isLoopbackBase,
   providerOwnsAllEvidenceUrls,
   providerOwnsEvidence,
   sanitizeEvidenceText,
@@ -73,4 +76,43 @@ test("sanitizeEvidenceText sanitizes embedded URLs and finding ids are stable", 
   const text = sanitizeEvidenceText("failed https://example.com/a?token=secret and retry");
   assert.equal(text, "failed https://example.com/a and retry");
   assert.equal(findingId("warning", text), findingId("warning", text));
+});
+
+test("isLoopbackBase admits only a page served on this machine", () => {
+  for (const base of ["http://localhost:4321", "http://127.0.0.1:8080/", "http://[::1]:3000", "http://shop.localhost:4321"]) {
+    assert.equal(isLoopbackBase(base), true, base);
+  }
+  for (const base of ["https://shop.example.com", "http://10.0.0.5:4321", "http://localhost.example.com", "not a url"]) {
+    assert.equal(isLoopbackBase(base), false, base);
+  }
+});
+
+test("devServerOwnsViolation attributes the dev server's injected styles, never the page's", () => {
+  for (const sourceFile of [
+    "http://localhost:4321/node_modules/.vite/deps/ui-library-BvJ.js",
+    "http://localhost:4321/@vite/client",
+    "http://localhost:4321/@id/astro/runtime/client/dev-toolbar/entrypoint.js",
+    "http://localhost:4321/node_modules/astro/dist/runtime/client/dev-toolbar/x.js",
+  ]) {
+    assert.equal(devServerOwnsViolation({ sourceFile }), true, sourceFile);
+  }
+  for (const violation of [
+    { sourceFile: "http://localhost:4321/_style-guide/shop/acme/" },
+    { sourceFile: "http://localhost:4321/_astro/page.js" },
+    { sourceFile: "", blockedURI: "inline" },
+    {},
+  ]) {
+    assert.equal(devServerOwnsViolation(violation), false, JSON.stringify(violation));
+  }
+});
+
+test("gateRequiredOnRoute: a style-guide route is gated on accessibility and mobile only", () => {
+  for (const gate of ["a11y", "mobile"]) assert.equal(gateRequiredOnRoute(gate, { previewOnly: true }), true, gate);
+  for (const gate of ["pixel", "console", "ux", "perf", "csp", "ecommerceStyleGuide"]) {
+    assert.equal(gateRequiredOnRoute(gate, { previewOnly: true }), false, gate);
+  }
+  for (const gate of ["pixel", "console", "ux", "a11y", "mobile", "perf", "csp"]) {
+    assert.equal(gateRequiredOnRoute(gate, { previewOnly: false }), true, gate);
+  }
+  assert.equal(gateRequiredOnRoute("ecommerceStyleGuide", { previewOnly: false }), false);
 });

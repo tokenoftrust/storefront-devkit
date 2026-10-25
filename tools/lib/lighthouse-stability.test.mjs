@@ -265,6 +265,17 @@ const parityRun = (performance, extra = {}) => run(performance, {
   ...extra,
 });
 
+test('withoutScoreVerdict voids every category when the age gate stayed open', () => {
+  const stripped = withoutScoreVerdict(parityRun(75), 'age-gate-open');
+  assert.equal(stripped.unmeasured, 'age-gate-open');
+  assert.equal(stripped.unmeasuredText, UNMEASURED_REASONS['age-gate-open']);
+  assert.deepEqual(stripped.parity.regressions, []);
+  assert.deepEqual(stripped.parity.giveaways, []);
+  assert.deepEqual([...stripped.parity.unmeasured].sort(), ['performance', 'seo']);
+  assert.equal(stripped.parity.dimensions.seo.verdict, 'unmeasured');
+  assert.equal(stripped.parity.dimensions.performance.verdict, 'unmeasured');
+});
+
 test('withoutScoreVerdict withdraws the regression claim the scores cannot support', () => {
   // ONLY the CLS-weighted categories lose their verdict. A discarded layout-shift run says
   // nothing about canonical tags, so voiding the SEO judgement too would discard a measurement
