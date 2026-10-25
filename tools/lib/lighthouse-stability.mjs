@@ -198,7 +198,22 @@ export const UNMEASURED_REASONS = {
     "every Lighthouse run was driven by layout shifts Chrome itself excluded (had_recent_input)",
   "unstable-spread":
     `Lighthouse moved at least ${UNSTABLE_SPREAD_POINTS} points across repeat runs of this same url`,
+  "age-gate-open":
+    "the platform age gate could not be affirmed, so Lighthouse scored the gate over an inert page" +
+    " rather than the page an affirmed visitor sees",
 };
+
+/**
+ * Which parity dimensions each reason taints. A CLS artifact or an unstable spread taints only
+ * the categories that weight layout shift; an open age gate replaces the whole page under
+ * measurement, so it taints every category.
+ * @param {string} reason
+ * @param {string} key
+ */
+function reasonTaints(reason, key) {
+  if (reason === "age-gate-open") return true;
+  return CLS_WEIGHTED_CATEGORIES.has(key);
+}
 
 /**
  * Is this fold's score a property of the page, or of the harness measuring it?
@@ -251,7 +266,7 @@ export function withoutScoreVerdict(run, reason) {
     // with NO measurement, which is what made pages permanently unmeasurable and the gate
     // unwinnable. Performance and agentic-browsing both weight cumulative-layout-shift, so they
     // are the two that lose their verdict; the rest keep the judgement they honestly earned.
-    const tainted = CLS_WEIGHTED_CATEGORIES;
+    const tainted = { has: (/** @type {string} */ key) => reasonTaints(reason, key) };
     const dimensions = {};
     for (const [key, judged] of Object.entries(parity.dimensions ?? {})) {
       dimensions[key] = tainted.has(key)

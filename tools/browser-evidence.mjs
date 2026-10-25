@@ -87,6 +87,47 @@ export function evidenceRouteIdentity(slug) {
   };
 }
 
+/** Serving providers a page can be validated against; `local` is the dev loop on this machine. */
+export const PROVIDERS = ["cloudflare", "cloudfront", "local"];
+
+/** True when the page base is served on this machine — the only place `--provider local` means anything. */
+export function isLoopbackBase(base) {
+  try {
+    const host = new URL(base).hostname.replace(/^\[|\]$/g, "");
+    return host === "localhost" || host.endsWith(".localhost") || host === "::1" || /^127\./.test(host);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A CSP violation the local dev server caused, not the page: Vite serves CSS as un-nonced inline
+ * `<style>` it injects at runtime, and the dev toolbar styles itself the same way. A built page
+ * links that CSS as external files, so none of it exists where visitors are. Only meaningful under
+ * `--provider local`; the violation's own source (`sourceFile`, else `blockedURI`) decides.
+ */
+export function devServerOwnsViolation(violation) {
+  const source = String(violation?.sourceFile || violation?.blockedURI || "");
+  let path = source;
+  try {
+    path = new URL(source).pathname;
+  } catch {
+    // A bare path, or nothing: judged as given.
+  }
+  return /^\/(?:@vite\/|@id\/|@fs\/|node_modules\/\.vite\/|node_modules\/astro\/)/.test(path);
+}
+
+/**
+ * Which gates a route's verdict requires. A preview-only style-guide route is gated on
+ * accessibility and mobile only (agency-kit/playbooks/style-concept.md, Step 2.75): it is a review
+ * surface full of `href="#"` samples and several sample headers, never served to visitors, so
+ * parity, console, UX, CSP and performance are reported there but advisory.
+ */
+export function gateRequiredOnRoute(gate, { previewOnly }) {
+  if (!previewOnly) return gate !== "ecommerceStyleGuide";
+  return gate === "a11y" || gate === "mobile";
+}
+
 export function providerOwnsEvidence(value, provider) {
   const text = String(value);
   if (provider === "cloudflare") return /\/cdn-cgi\/|\bcloudflare\b/i.test(text);
