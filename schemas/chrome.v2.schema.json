@@ -237,7 +237,11 @@
       "additionalProperties": false,
       "required": ["variant", "columns"],
       "properties": {
-        "variant": { "type": "string", "enum": ["default"] },
+        "variant": {
+          "type": "string",
+          "enum": ["default", "light-collapsible", "minimal"],
+          "description": "default is the full site footer. Per-page chrome assignments can select light-collapsible or minimal. The minimal presentation contains the copyright line and Legal navigation while platform compliance warnings and disclaimer content remain rendered."
+        },
         "brand": { "$ref": "#/definitions/footerBrand" },
         "columns": { "type": "array", "items": { "$ref": "#/definitions/footerColumn" } },
         "newsletter": { "$ref": "#/definitions/footerNewsletter" },

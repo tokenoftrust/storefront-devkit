@@ -32,6 +32,19 @@ The token contract gained a set of **optional, bridge-defaulted** semantic/inter
 ## 2. Chrome (content/chrome.json) — announcement + header nav (links/dropdowns/mega menus) + header CTAs + footer (columns, newsletter, social, legal). Nav item = plain link / single-column dropdown (children) / multi-column mega menu (columns); optional badge+flag; CTA variants primary|secondary|ghost.
 ### Chrome pitfalls — don't fabricate legal/compliance text in footer (regulated warnings are platform-rendered from compliance config; a brand line \"Products for adults 21+\" is fine, a paraphrased FDA/PACT warning is not); no broken links (zero-404 crawl flags them); don't overstuff mega menus.
 
+### Minimal footer on selected pages
+The site keeps the full footer by default. To use a compact footer on a specific raw-HTML page, add its exact path to `content/chrome-assignments.json`:
+
+```json
+{
+  "assignments": {
+    "/contact/thank-you": { "footerVariant": "minimal" }
+  }
+}
+```
+
+The path comes from `content/pages-html/contact/thank-you.html`; assignments match that page only and are never inferred from the URL, page title, or route pattern. Put legal links in a footer column titled `Legal`. The `minimal` presentation contains the copyright line and Legal navigation. Platform compliance warnings and disclaimer content remain rendered, consent behavior is unchanged, and no JavaScript is added. `light-collapsible` and `default` remain available as explicit footer variants.
+
 ## Shared page-pattern CSS (hybrid commerce tenants) (NEW — unit F5)
 Hybrid tenants (a marketing site + commerce) otherwise ship the same raw-page-body patterns as ~80%-identical inline `<style>` per page. A framework sheet `public/shared/commerce-marketing.css` extracts those patterns — page hero, prose, callouts, tier grids / comparison table, faq, cta-band, and CTA helpers — as one shared, token-driven stylesheet.
 - **Opt-in per tenant.** Set `TenantChrome.sharedMarketingCss: true` in chrome.json. It links the shared sheet **after** the tenant chrome sheet, so page-level variants still win.

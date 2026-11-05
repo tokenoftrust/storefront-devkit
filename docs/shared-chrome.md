@@ -22,6 +22,12 @@ chrome puts the header and footer in one place.
   (search, account and a cart link), nav dropdown and mega-menu, site footer (columns, newsletter,
   payment chips, compliance line).
 
+For `content/chrome.json` tenants, the full footer remains the default. A raw-HTML page can select
+`footerVariant: "minimal"` with an exact-path entry in `content/chrome-assignments.json`; legal
+links belong in the `Legal` footer column. Minimal keeps the copyright line and Legal navigation,
+while platform compliance warnings and disclaimer content remain rendered. Consent behavior is
+unchanged, no JavaScript is added, and assignments are not inferred from route names or patterns.
+
 All are skinned by CSS-variable theme tokens. Preview every state and permutation in the style
 guide at `/_style-guide/<store-id>/<theme>/`.
 
