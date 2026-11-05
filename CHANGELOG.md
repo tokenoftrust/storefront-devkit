@@ -5,6 +5,9 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Added
+- The v2 chrome and chrome-assignment schemas accept `light-collapsible` and `minimal` footer
+  variants. The chrome guide documents exact per-page assignments and the compliance-preserving
+  minimal presentation.
 - Agency Kit free tier: `tools/` (single-page checks — `validate-page.sh`,
   `validate-page-browser.mjs`, `perf-audit.mjs`, `style-concept-audit.mjs`, the style-concept
   manifest schema, Lighthouse helpers, and tests), `docs/dev-loop-reference.md`,

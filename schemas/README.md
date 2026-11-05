@@ -6,7 +6,9 @@ are ambiguous, the schema wins.
 | Schema | Describes | Notes |
 |---|---|---|
 | `theme.schema.json` | `theme.json` | Deep-partial override of the reference theme; AA contrast checked at publish |
-| `chrome.schema.json` | `content/chrome.json` | Header, nav/mega, footer, newsletter, announcement |
+| `chrome.schema.json` | Legacy `content/chrome.json` v1 | Top-level nav/footer shape; retained for existing content |
+| `chrome.v2.schema.json` | Current `content/chrome.json` v2 | Header/footer split with explicit variants and stable link ids |
+| `chrome-assignments.schema.json` | `content/chrome-assignments.json` | Exact-path per-page header/footer variant overrides for raw HTML; uses v2 variants |
 | `home.schema.json` | `content/home.json` | Block palette `block-palette@3` + product sources |
 | `pages.schema.json` | `content/pages/*.json` | Editorial/standalone pages; same `block-palette@3` format as home |
 | `scripts.schema.json` | `scripts.json` | Registered, sandboxed-by-default widget bundles |

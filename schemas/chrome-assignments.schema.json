@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://tokenoftrust.com/storefront-devkit/schemas/chrome-assignments.schema.json",
   "title": "ToT Storefront content/chrome-assignments.json",
-  "description": "Per-page header/footer variant overrides for raw-HTML pages (content/pages-html/**.html). Only pages that should differ from chrome.json's site-wide header.variant/footer.variant need an entry — everything else uses the site default. Requires chrome.v2.schema.json's header/footer variant contract.",
+  "description": "Explicit per-page header/footer variant overrides for raw-HTML pages (content/pages-html/**.html). Keys are exact page paths derived from those files; no route or page-name inference is used. Only pages that differ from chrome.json's site-wide variants need an entry — all other pages use the site default. Requires chrome.v2.schema.json's header/footer variant contract.",
   "type": "object",
   "additionalProperties": false,
   "required": ["assignments"],
@@ -24,7 +24,11 @@
       "description": "At least one of headerVariant/footerVariant must be set — an entry overriding neither overrides nothing.",
       "properties": {
         "headerVariant": { "type": "string", "enum": ["primary", "minimal"] },
-        "footerVariant": { "type": "string", "enum": ["default"] }
+        "footerVariant": {
+          "type": "string",
+          "enum": ["default", "light-collapsible", "minimal"],
+          "description": "Explicit footer presentation for this page. minimal contains the copyright line and Legal navigation; compliance warnings and disclaimer content remain rendered."
+        }
       }
     }
   }
