@@ -1,0 +1,12 @@
+{
+  "orderId": "ord_10482",
+  "version": 9,
+  "label": "purchased",
+  "handoff": "handed_off",
+  "purchaseId": "pur_EXAMPLE0001",
+  "carrier": "UPS",
+  "tracking": {
+    "number": "EXAMPLE000123456",
+    "url": "https://www.ups.com/track?tracknum=EXAMPLE000123456"
+  }
+}

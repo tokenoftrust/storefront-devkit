@@ -1,0 +1,12 @@
+{
+  "kind": "label-outcome",
+  "assignmentId": "asg_01J9Z4A8M1K2V3B4N5X6Y7Z8C9",
+  "purchaseId": "pur_EXAMPLE0001",
+  "outcome": "purchased",
+  "carrier": "UPS",
+  "service": "GROUND",
+  "trackingNumber": "EXAMPLE000123456",
+  "trackingUrl": "https://www.ups.com/track?tracknum=EXAMPLE000123456",
+  "adultSignature": "accepted",
+  "expectedVersion": 7
+}

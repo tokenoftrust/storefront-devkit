@@ -2,7 +2,7 @@ asyncapi: 2.6.0
 id: 'urn:com:tokenoftrust:storefront:private-apps:webhooks'
 info:
   title: Storefront Private Apps Webhook Spine
-  version: "1.0.0"
+  version: "1.1.0"
   license:
     name: Apache-2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
@@ -93,6 +93,31 @@ channels:
       message:
         $ref: '#/components/messages/AttributionFinalized'
 
+  fulfillment.assignment.created:
+    description: >
+      Emitted when an operator release assigns an order exclusively to this install as the
+      merchant-configured fulfillment processor for the order's stage. Requires scope
+      fulfillment:process. Delivered only to the assigned install. Carries no customer
+      identity; the processor pulls the ship-to recipient with GET
+      /fulfillment/orders/{orderId}/recipient. A notification, never an authorization:
+      every app read and write re-checks the active assignment.
+    subscribe:
+      operationId: onFulfillmentAssignmentCreated
+      message:
+        $ref: '#/components/messages/FulfillmentAssignmentCreated'
+
+  fulfillment.assignment.updated:
+    description: >
+      Emitted when this install's assignment changes state: held (operator hold or a pending
+      cancel or refund), active again (hold cleared, same install), or cancelled (a
+      source-confirmed cancel or refund). Requires scope fulfillment:process. Delivered only
+      to the assigned install. A release (processor switched or cleared, install suspended,
+      uninstalled or descoped) emits no event.
+    subscribe:
+      operationId: onFulfillmentAssignmentUpdated
+      message:
+        $ref: '#/components/messages/FulfillmentAssignmentUpdated'
+
 components:
   messageTraits:
     cloudEventEnvelope:
@@ -143,6 +168,8 @@ components:
             - com.tokenoftrust.storefront.order.fulfilled
             - com.tokenoftrust.storefront.customer.marketing_consent.updated
             - com.tokenoftrust.storefront.attribution.finalized
+            - com.tokenoftrust.storefront.fulfillment.assignment.created
+            - com.tokenoftrust.storefront.fulfillment.assignment.updated
         time:
           type: string
           format: date-time
@@ -237,6 +264,26 @@ components:
           properties:
             amount: { type: number }
             currency: { type: string }
+
+    FulfillmentAssignmentData:
+      type: object
+      additionalProperties: false
+      description: >
+        Exactly these six keys for both fulfillment.assignment.* topics. No customer identity,
+        no contact, no address, no line items: the processor reads line items from GET
+        /fulfillment/assignments and the recipient from GET
+        /fulfillment/orders/{orderId}/recipient.
+      required: [assignmentId, orderId, stage, state, eventVersion, occurredAt]
+      properties:
+        assignmentId: { type: string, description: Opaque assignment id; one per operator release. }
+        orderId: { type: string, description: Opaque platform order id. }
+        stage: { type: string, enum: [preview, publication] }
+        state:
+          type: string
+          enum: [active, held, cancelled]
+          description: Always active on fulfillment.assignment.created.
+        eventVersion: { type: integer, minimum: 0, description: The order event_version the transition committed at. }
+        occurredAt: { type: string, format: date-time }
 
   messages:
     AppInstalled:
@@ -356,3 +403,31 @@ components:
           - type: object
             properties:
               data: { $ref: '#/components/schemas/AttributionFinalizedData' }
+
+    FulfillmentAssignmentCreated:
+      name: fulfillmentAssignmentCreated
+      messageId: fulfillmentAssignmentCreated
+      title: fulfillment.assignment.created
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/FulfillmentAssignmentData' }
+
+    FulfillmentAssignmentUpdated:
+      name: fulfillmentAssignmentUpdated
+      messageId: fulfillmentAssignmentUpdated
+      title: fulfillment.assignment.updated
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/FulfillmentAssignmentData' }

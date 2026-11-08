@@ -1,0 +1,23 @@
+{
+  "assignments": [
+    {
+      "assignmentId": "asg_01J9Z4A8M1K2V3B4N5X6Y7Z8C9",
+      "orderId": "ord_10482",
+      "stage": "publication",
+      "eventVersion": 7,
+      "assignedAt": "2026-07-21T19:05:41.000Z",
+      "purchaseId": "pur_EXAMPLE0001",
+      "lineItems": [
+        {
+          "sku": "VAPE-KIT-STARTER",
+          "quantity": 1
+        },
+        {
+          "sku": "PODS-MENTHOL-4PK",
+          "quantity": 1
+        }
+      ]
+    }
+  ],
+  "nextCursor": "EXAMPLE-CURSOR"
+}

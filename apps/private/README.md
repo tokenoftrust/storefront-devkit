@@ -36,6 +36,11 @@ overrides this repository.
 | [`contract/asyncapi.yaml`](./contract/asyncapi.yaml) | AsyncAPI 2.6 definition for signed CloudEvents webhooks. |
 | [`contract/examples/affiliate.tot-app.json`](./contract/examples/affiliate.tot-app.json) | Safe sample manifest using example-owned identifiers and URLs. |
 | [`contract/examples/order.created.cloudevent.json`](./contract/examples/order.created.cloudevent.json) | Safe synthetic `order.created` CloudEvent fixture. |
+| [`contract/examples/fulfillment.assignment.created.cloudevent.json`](./contract/examples/fulfillment.assignment.created.cloudevent.json) | Synthetic release notification: `fulfillment.assignment.created`. |
+| [`contract/examples/fulfillment.assignments.response.json`](./contract/examples/fulfillment.assignments.response.json) | Synthetic reconciliation response for `GET /fulfillment/assignments`. |
+| [`contract/examples/fulfillment.recipient.response.json`](./contract/examples/fulfillment.recipient.response.json) | Synthetic placeholder recipient for `GET /fulfillment/orders/{orderId}/recipient`. |
+| [`contract/examples/fulfillment.shipment-evidence.label-outcome.request.json`](./contract/examples/fulfillment.shipment-evidence.label-outcome.request.json), [`...handoff.request.json`](./contract/examples/fulfillment.shipment-evidence.handoff.request.json), [`...response.json`](./contract/examples/fulfillment.shipment-evidence.response.json) | Synthetic shipment-evidence requests and the minimized response. |
+| [`contract/examples/fulfillment.refusal.response.json`](./contract/examples/fulfillment.refusal.response.json) | Synthetic refusal body carrying a stable `code`. |
 
 ## Safety boundary
 
@@ -51,7 +56,8 @@ or the synthetic examples here for local tests.
 
 ## Versioning
 
-This is contract major version 1. `contractVersion: "1"` in a manifest and
+This is contract major version 1 (currently 1.1: the fulfillment connector scopes, routes and
+topics were added as a compatible minor). `contractVersion: "1"` in a manifest and
 `dataschemaversion: "1"` in a CloudEvent pin that line. Additive compatible changes are minor;
 removing or narrowing a field or changing a scope meaning requires a new major line. Do not fork
 scope strings, event names, widget placements, or the forbidden-scope list.
