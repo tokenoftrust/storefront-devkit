@@ -2,11 +2,13 @@
 // connector's own provider does, and the connector reports the result.
 // Replace this module with your real provider client.
 //
-// The provider is idempotent by purchase id (a real provider takes a client
-// reference for the same reason), so asking twice never buys two labels.
-// `unknownOutcome: true` makes the first purchase answer "unknown" (think: a
-// timeout after the provider accepted the request); `lookup` then reveals the
-// label that was in fact created, which is how an unknown is reconciled.
+// The provider records every purchase by purchase id (a real provider takes a
+// client reference for the same reason), so asking twice never buys two labels
+// and `lookup` answers for any earlier attempt, voided ones included, without
+// needing the ship-to. `unknownOutcome: true` makes the first purchase answer
+// "unknown" (think: a timeout after the provider accepted the request);
+// `lookup` then reveals the label that was in fact created, which is how an
+// unknown is reconciled.
 import { createHash } from 'node:crypto';
 
 const SHIP_TO_REQUIRED = ['line1', 'city', 'country'];
@@ -25,11 +27,12 @@ export function createSimulatedLabelProvider({ unknownOutcome = false, carrier =
      * never stored, returned or logged by the provider.
      */
     async purchase({ purchaseId, shipTo, lineItems }) {
+      if (labels.has(purchaseId)) return { ...labels.get(purchaseId) };
       if (!SHIP_TO_REQUIRED.every((field) => typeof shipTo?.[field] === 'string' && shipTo[field] !== '')) {
-        return { outcome: 'voided', reason: 'ship-to-incomplete' };
-      }
-      if (!Array.isArray(lineItems) || lineItems.length === 0) return { outcome: 'voided', reason: 'no-items' };
-      if (!labels.has(purchaseId)) {
+        labels.set(purchaseId, { outcome: 'voided', reason: 'ship-to-incomplete' });
+      } else if (!Array.isArray(lineItems) || lineItems.length === 0) {
+        labels.set(purchaseId, { outcome: 'voided', reason: 'no-items' });
+      } else {
         const tracking = trackingFor(purchaseId);
         labels.set(purchaseId, {
           outcome: 'purchased',
@@ -44,15 +47,18 @@ export function createSimulatedLabelProvider({ unknownOutcome = false, carrier =
       return { ...labels.get(purchaseId) };
     },
 
-    /** Reconcile an earlier purchase without buying again. */
+    /**
+     * Reconcile without buying: the outcome of an earlier purchase under this
+     * id (`purchased`, `voided` or `unknown`), or null when none was attempted.
+     */
     async lookup(purchaseId) {
-      return labels.has(purchaseId) ? { ...labels.get(purchaseId) } : { outcome: 'unknown' };
+      return labels.has(purchaseId) ? { ...labels.get(purchaseId) } : null;
     },
 
     /** The carrier's acceptance scan for the parcel. */
     async handoff(purchaseId) {
       const label = labels.get(purchaseId);
-      return label ? { accepted: true, carrier: label.carrier } : { accepted: false };
+      return label?.outcome === 'purchased' ? { accepted: true, carrier: label.carrier } : { accepted: false };
     },
   };
 }

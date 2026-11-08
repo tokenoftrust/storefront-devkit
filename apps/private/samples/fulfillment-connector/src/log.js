@@ -17,6 +17,25 @@ function scrub(value, depth = 0) {
   return out;
 }
 
+/** An error whose code is fixed by this sample, so the code is safe to log. */
+export class ConnectorError extends Error {
+  constructor(code) {
+    super(code);
+    this.name = 'ConnectorError';
+    this.code = code;
+  }
+}
+
+/**
+ * Describe a caught error without its message. A message carries whatever the
+ * thrower put in it, and the label provider is handed the ship-to, so only the
+ * error class and a code this sample assigned are ever logged.
+ */
+export function errorFields(err) {
+  const errorClass = typeof err?.name === 'string' && /^[A-Za-z][A-Za-z0-9]{0,63}$/.test(err.name) ? err.name : 'Error';
+  return err instanceof ConnectorError ? { errorClass, errorCode: err.code } : { errorClass };
+}
+
 export function createLogger(sink = (line) => process.stdout.write(`${line}\n`)) {
   const write = (level, msg, fields = {}) =>
     sink(JSON.stringify({ time: new Date().toISOString(), level, msg, ...scrub(fields) }));

@@ -104,6 +104,28 @@ test('rejects a signature that does not cover the body digest', async () => {
   assert.equal(result.code, 'signature_coverage');
 });
 
+test('rejects an expired expires parameter, but accepts one still in the future', async () => {
+  const created = Math.floor(Date.now() / 1000);
+  const expired = signRaw(`("@method" "@target-uri" "content-digest");created=${created};expires=${created - 1};keyid="k1";alg="rsa-v1_5-sha256"`);
+  assert.equal((await verify(expired)).code, 'signature_expired');
+  const live = signRaw(`("@method" "@target-uri" "content-digest");created=${created};expires=${created + 60};keyid="k1";alg="rsa-v1_5-sha256"`);
+  assert.equal((await verify(live)).ok, true);
+});
+
+test('rejects duplicate covered components', async () => {
+  const created = Math.floor(Date.now() / 1000);
+  const result = await verify(signRaw(`("@method" "@method" "@target-uri" "content-digest");created=${created};keyid="k1";alg="rsa-v1_5-sha256"`));
+  assert.deepEqual([result.code, result.reason], ['signature_malformed', 'duplicate component']);
+});
+
+test('rejects a signature missing @method or @target-uri', async () => {
+  const created = Math.floor(Date.now() / 1000);
+  for (const components of ['"@target-uri" "content-digest"', '"@method" "content-digest"']) {
+    const headers = signRaw(`(${components});created=${created};keyid="k1";alg="rsa-v1_5-sha256"`);
+    assert.equal((await verify(headers)).code, 'signature_coverage', components);
+  }
+});
+
 test('Content-Digest: sha-256 is required; missing, other-only and malformed values are rejected', () => {
   const sha512 = `sha-512=:${createHash('sha512').update(body).digest('base64')}:`;
   assert.equal(verifyContentDigest(undefined, body).code, 'digest_missing');

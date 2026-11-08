@@ -4,10 +4,16 @@
 //
 // Local state is in memory and holds only opaque ids and states. The ship-to
 // recipient lives in one local variable for the duration of one label call.
+// The label provider, not local state, decides whether a label was already
+// attempted: every pass asks it first, so a restart never reads the recipient
+// again or buys a second label for a purchase id it already knows.
 import { isDeepStrictEqual } from 'node:util';
 import { idempotencyKeyFor } from './gateway-client.js';
+import { ConnectorError, errorFields } from './log.js';
 
 const ENDED_CODES = new Set(['assignment-ended', 'not-assigned']);
+// Refusals that repeating the same evidence cannot clear: stop retrying them.
+const TERMINAL_CODES = new Set(['conflict', 'label-regress', 'carrier-mismatch']);
 
 export function createConnector({ gateway, labelProvider, logger, simulate = {} }) {
   const assignments = new Map(); // assignmentId -> { orderId, state, label }
@@ -39,19 +45,36 @@ export function createConnector({ gateway, labelProvider, logger, simulate = {} 
   function stopOnRefusal(assignment, result) {
     if (ENDED_CODES.has(result.code)) record(assignment.assignmentId, assignment.orderId, { state: 'ended' });
     if (result.code === 'assignment-held') record(assignment.assignmentId, assignment.orderId, { state: 'held' });
+    if (TERMINAL_CODES.has(result.code)) record(assignment.assignmentId, assignment.orderId, { state: 'refused' });
     return { status: 'stopped', code: result.code };
   }
 
-  async function obtainLabel(assignment, local) {
-    if (local.label === 'unknown') {
-      logger.info('reconciling unknown label without buying again', { orderId: assignment.orderId, purchaseId: assignment.purchaseId });
-      return labelProvider.lookup(assignment.purchaseId);
+  /** Call the provider; a failure is logged and rethrown by class only, never by message. */
+  async function providerCall(op, assignment, fn) {
+    try {
+      return await fn();
+    } catch (err) {
+      logger.error('label provider call failed', { orderId: assignment.orderId, assignmentId: assignment.assignmentId, op, code: 'label_provider_failed', ...errorFields(err) });
+      throw new ConnectorError('label_provider_failed');
+    }
+  }
+
+  const lookup = (assignment) => providerCall('lookup', assignment, () => labelProvider.lookup(assignment.purchaseId));
+
+  async function obtainLabel(assignment) {
+    const attempted = await lookup(assignment);
+    if (attempted) {
+      logger.info('label already attempted; reconciling without buying again', { orderId: assignment.orderId, purchaseId: assignment.purchaseId, outcome: attempted.outcome });
+      return { label: attempted };
     }
     const recipient = await gateway.readRecipient(assignment.orderId);
     if (!recipient.ok) return { refused: recipient };
     let shipTo = recipient.body;
     try {
-      return await labelProvider.purchase({ purchaseId: assignment.purchaseId, shipTo, lineItems: assignment.lineItems });
+      const label = await providerCall('purchase', assignment, () =>
+        labelProvider.purchase({ purchaseId: assignment.purchaseId, shipTo, lineItems: assignment.lineItems }),
+      );
+      return { label };
     } finally {
       shipTo = null; // drop the only reference to the contact
       recipient.body = null;
@@ -81,19 +104,23 @@ export function createConnector({ gateway, labelProvider, logger, simulate = {} 
     let labelPostKey;
 
     if (local.label !== 'purchased') {
-      let label = await obtainLabel(assignment, local);
-      if (label.refused) {
-        logger.warn('recipient read refused', { orderId, assignmentId, status: label.refused.status, code: label.refused.code });
-        return stopOnRefusal(assignment, label.refused);
+      const obtained = await obtainLabel(assignment);
+      if (obtained.refused) {
+        logger.warn('recipient read refused', { orderId, assignmentId, status: obtained.refused.status, code: obtained.refused.code });
+        return stopOnRefusal(assignment, obtained.refused);
       }
-      if (label.outcome === 'unknown' && local.label !== 'unknown') {
-        const result = await post(assignment, labelEvidence(assignment, label, version), { traceparent });
-        if (!result.ok) return stopOnRefusal(assignment, result);
-        version = result.body.version;
-        local = record(assignmentId, orderId, { label: 'unknown' });
-        label = await labelProvider.lookup(assignment.purchaseId);
+      let label = obtained.label;
+      if (label.outcome === 'unknown') {
+        if (local.label !== 'unknown') {
+          const result = await post(assignment, labelEvidence(assignment, label, version), { traceparent });
+          if (result.ok) version = result.body.version;
+          else if (result.code === 'label-regress') logger.info('the gateway already holds this label outcome; reconciling', { orderId, assignmentId });
+          else return stopOnRefusal(assignment, result);
+          local = record(assignmentId, orderId, { label: 'unknown' });
+        }
+        label = await lookup(assignment);
+        if (!label || label.outcome === 'unknown') return { status: 'pending', label: 'unknown' };
       }
-      if (label.outcome === 'unknown') return { status: 'pending', label: 'unknown' };
       const evidence = labelEvidence(assignment, label, version);
       labelPostKey = idempotencyKeyFor(orderId, evidence);
       const result = await post(assignment, evidence, { traceparent, key: labelPostKey });

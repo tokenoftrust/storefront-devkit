@@ -3,6 +3,7 @@
 // CloudEvents id, then a 2xx once the event is safely accepted. The event is a
 // notification only: the connector reconciles through the API before acting.
 import { verifyContentDigest, verifyMessageSignature } from './http-signature.js';
+import { errorFields } from './log.js';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 const TYPE_PREFIX = 'com.tokenoftrust.storefront.';
@@ -85,7 +86,7 @@ export function createWebhookHandler({ targetUri, resolveSigningKey, eventIds, c
     }
     logger.info('delivery accepted', { eventId: event.id, type: event.type, orderId: event.data.orderId, state: event.data.state, keyid: signature.keyid });
     const work = connector.onAssignmentEvent(event).catch((err) => {
-      logger.error('processing failed; the reconciliation pass will retry', { eventId: event.id, error: err.message });
+      logger.error('processing failed; the reconciliation pass will retry', { eventId: event.id, ...errorFields(err) });
       return { status: 'error' };
     });
     return { status: 202, body: { accepted: true }, work };
@@ -115,7 +116,7 @@ export function nodeRequestListener(handleDelivery, logger) {
         res.end(JSON.stringify(result.body));
         await result.work;
       } catch (err) {
-        logger.error('webhook handler error', { error: err.message });
+        logger.error('webhook handler error', errorFields(err));
         if (!res.headersSent) res.writeHead(500).end();
       }
     });

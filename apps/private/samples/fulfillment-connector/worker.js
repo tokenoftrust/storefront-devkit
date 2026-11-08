@@ -10,7 +10,7 @@
 import { Buffer } from 'node:buffer';
 import { createConnectorApp } from './src/app.js';
 import { readConfig } from './src/config.js';
-import { createLogger } from './src/log.js';
+import { createLogger, errorFields } from './src/log.js';
 import { MAX_BODY_BYTES } from './src/webhook.js';
 
 const json = (status, body) =>
@@ -41,7 +41,7 @@ export function createWorker(options = {}) {
         if (result.work) ctx.waitUntil(result.work);
         return json(result.status, result.body);
       } catch (err) {
-        logger.error('webhook handler error', { error: err.message });
+        logger.error('webhook handler error', errorFields(err));
         return json(500, { code: 'internal_error' });
       }
     },
@@ -49,7 +49,7 @@ export function createWorker(options = {}) {
     async scheduled(controller, env, ctx) {
       const { connector } = appFor(env);
       ctx.waitUntil(
-        connector.reconcileAll().catch((err) => logger.error('reconciliation pass failed', { error: err.message })),
+        connector.reconcileAll().catch((err) => logger.error('reconciliation pass failed', errorFields(err))),
       );
     },
   };

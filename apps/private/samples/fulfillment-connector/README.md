@@ -29,14 +29,20 @@ Worker (`worker.js`), with no dependencies: Node built-ins and Web Crypto only.
    `Idempotency-Key` derived from the order id and the canonical evidence body, so a retry re-sends
    identical bytes under the identical key and a different fact always gets a different key.
 
-An `unknown` label outcome is reported as such and then reconciled with the provider under the same
-`purchaseId`; the connector never buys a second label. Refusals are handled by their stable `code`
+Every pass asks the provider about the `purchaseId` first (`lookup`), before it reads the
+recipient, and buys only when the provider has no attempt on record. So an `unknown` label outcome
+is reported once and then reconciled with the provider under the same `purchaseId` on later passes,
+and the connector never buys a second label or reads the recipient again, even after a restart has
+lost its memory. A `409 label-regress` on a repeated `unknown` report means the gateway already
+holds it, and reconciliation continues. Refusals are handled by their stable `code`
 (`assignment-ended`, `assignment-held`, `not-assigned`, consent codes and so on), never by text.
 
 ## Contact data
 
 The ship-to recipient exists in one local variable for the duration of one label call. It is never
-logged, persisted, placed in evidence, or returned. The logger additionally drops any field named
+logged, persisted, placed in evidence, or returned. A caught error is logged by its class and a
+fixed code (`label_provider_failed`), never by its message, because a provider exception could
+quote the ship-to it was handed. The logger additionally drops any field named
 like a recipient or credential. `test/no-contact-in-logs.test.js` captures the logger output and the
 process's stdout and stderr across every flow and fails if any recipient value appears.
 
@@ -120,7 +126,8 @@ is a real credential, tenant or address.
 ## Before production
 
 - Replace `src/label-provider.js` with your real provider client, keeping its contract: idempotent
-  by `purchaseId`, a `lookup` that reconciles an `unknown` without buying again, ship-to used for
+  by `purchaseId`, a `lookup` that answers for any earlier attempt (`null` when there was none)
+  without the ship-to, so an `unknown` is reconciled without buying again, ship-to used for
   the call only.
 - Persist the seen event ids and the per-assignment state (opaque ids and states only) instead of
   holding them in memory (per process on Node, per isolate on Workers).

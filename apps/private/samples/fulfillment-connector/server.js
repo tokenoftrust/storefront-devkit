@@ -4,6 +4,7 @@
 // a timer as the recovery path for late or lost deliveries.
 import { createServer } from 'node:http';
 import { createConnectorApp } from './src/app.js';
+import { errorFields } from './src/log.js';
 import { parseSimulationFlags, readConfig } from './src/config.js';
 import { nodeRequestListener } from './src/webhook.js';
 
@@ -12,7 +13,7 @@ const simulate = parseSimulationFlags();
 const { handleDelivery, connector, logger } = createConnectorApp({ ...config, simulate });
 
 const reconcile = () =>
-  connector.reconcileAll().catch((err) => logger.error('reconciliation pass failed', { error: err.message }));
+  connector.reconcileAll().catch((err) => logger.error('reconciliation pass failed', errorFields(err)));
 
 createServer(nodeRequestListener(handleDelivery, logger)).listen(config.port, () => {
   logger.info('fulfillment connector listening', { port: config.port, simulate });

@@ -2,6 +2,7 @@
 // /fulfillment routes under /api/apps/v1. Refusals come back as
 // { ok: false, status, code } so callers branch on `code`, never on text.
 import { createHash } from 'node:crypto';
+import { errorFields } from './log.js';
 
 const API_PREFIX = '/api/apps/v1';
 const TOKEN_REFRESH_MARGIN_MS = 30_000;
@@ -65,7 +66,7 @@ export function createGatewayClient({
         result = await fn();
       } catch (err) {
         if (attempt >= maxAttempts) throw err;
-        logger.warn('request failed, retrying', { op: label, attempt, error: err.message });
+        logger.warn('request failed, retrying', { op: label, attempt, ...errorFields(err) });
         await sleep(2 ** attempt * 100);
         continue;
       }
