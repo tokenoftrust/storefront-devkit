@@ -1,6 +1,8 @@
 # The reference fulfillment connector as its own Worker on workers.dev.
-# No account id and no secrets live here. Configuration is four Worker
-# secrets (see README.md, "Host it on Cloudflare Workers").
+# No account id and no secrets live here. Configuration is five Worker
+# secrets (see README.md, "Host it on Cloudflare Workers"). LABEL_PROVIDER is
+# deliberately unset: without it the Worker answers 503 instead of reporting
+# simulated labels.
 name = "tot-fulfillment-connector-sample"
 main = "worker.js"
 compatibility_date = "2026-06-01"

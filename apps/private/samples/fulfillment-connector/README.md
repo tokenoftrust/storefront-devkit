@@ -21,9 +21,10 @@ Worker (`worker.js`), with no dependencies: Node built-ins and Web Crypto only.
    timer (a cron trigger on Workers) as the recovery path for late or lost deliveries.
 3. **Reads the recipient** of the assigned order only (`GET /fulfillment/orders/{orderId}/recipient`)
    and hands it, in memory, to one label call.
-4. **Buys the label** through a simulated external label provider built into the sample
+4. **Buys the label** through your external label provider
    ([`src/label-provider.js`](./src/label-provider.js)). Storefront never buys labels; your provider
-   does, and the connector reports the result.
+   does, and the connector reports the result. The sample ships only a simulated provider; see
+   [Label provider](#label-provider).
 5. **Reports evidence** with `POST /fulfillment/orders/{orderId}/shipment-evidence`: `label-outcome`
    first, then `handoff` once the carrier has accepted the parcel. Every post carries a stable
    `Idempotency-Key` derived from the order id and the canonical evidence body, so a retry re-sends
@@ -32,10 +33,36 @@ Worker (`worker.js`), with no dependencies: Node built-ins and Web Crypto only.
 Every pass asks the provider about the `purchaseId` first (`lookup`), before it reads the
 recipient, and buys only when the provider has no attempt on record. So an `unknown` label outcome
 is reported once and then reconciled with the provider under the same `purchaseId` on later passes,
-and the connector never buys a second label or reads the recipient again, even after a restart has
-lost its memory. A `409 label-regress` on a repeated `unknown` report means the gateway already
+and the connector never buys a second label or reads the recipient again. That holds across a
+restart only when the provider's records survive it: a real provider persists them (or asks the
+carrier by client reference). The simulator keeps them in memory, so after a restart its `lookup`
+answers `null` and the connector reads the recipient and buys again under the same `purchaseId`.
+A `409 label-regress` on a repeated `unknown` report means the gateway already
 holds it, and reconciliation continues. Refusals are handled by their stable `code`
 (`assignment-ended`, `assignment-held`, `not-assigned`, consent codes and so on), never by text.
+
+## Label provider
+
+`server.js` and `worker.js` take their provider from `LABEL_PROVIDER`, and refuse to run without
+one. There is no default: an unset or unrecognized value stops `server.js` with exit 1, makes the
+Worker answer every request `503 label_provider_not_configured`, and makes its cron log the refusal
+and do nothing.
+
+| `LABEL_PROVIDER` | Provider |
+|---|---|
+| `carrier` | Your real provider, returned by `createCarrierLabelProvider(env)` in [`src/label-provider.js`](./src/label-provider.js). The sample ships it as a stub that throws `not implemented`, so this value refuses until you write it. |
+| `simulated` | The built-in simulator. Labels and tracking numbers are fabricated and nothing ships, yet the connector reports them as purchased and the platform treats the order as fulfilled. Every log line carries `simulatedLabels` saying so. Use it only against a test tenant. |
+
+A real provider is an object with three methods, the same shapes the simulator returns:
+
+- `purchase({ purchaseId, shipTo, lineItems })` buys at most one label per `purchaseId` and answers
+  `purchased`, `voided` or `unknown`. `shipTo` is for that call only: never store, return or log it.
+- `lookup(purchaseId)` answers for any earlier attempt under that id, or `null` when none was made,
+  without the ship-to. It must answer after a restart, so persist the attempts by `purchaseId`.
+- `handoff(purchaseId)` answers `{ accepted: true, carrier }` only after the carrier's real
+  acceptance scan.
+
+`demo.js` and the tests use the simulator directly; nothing else reaches it.
 
 ## Contact data
 
@@ -64,7 +91,8 @@ together:
 | `--force-retry` | Every evidence post is sent a second time with the same key and identical body; the connector checks that the original response is replayed. |
 | `--conflicting-key-reuse` | The handoff body is first sent under the label-outcome key; the connector expects `409 idempotency-conflict`, then posts under the correct key. |
 
-The same flags work on `server.js`. The Worker takes none: simulation is a command-line switch so a
+The same flags work on `server.js` (`--label-outcome=unknown` only with `LABEL_PROVIDER=simulated`).
+The Worker takes none: simulation is a command-line switch so a
 deploy configuration can never leave it on. The local simulator ([`sim/local-gateway.js`](./sim/local-gateway.js))
 is a test double built from the published contract and seeded with its synthetic examples; it is not
 a description of how the platform is built.
@@ -74,7 +102,7 @@ a description of how the platform is built.
 The sample deploys as its own Worker, `tot-fulfillment-connector-sample`, on your `workers.dev`
 subdomain. It is separate from any storefront Worker and shares nothing with one.
 [`wrangler.toml`](./wrangler.toml) holds no account id and no secrets: `wrangler` uses the account
-you are logged in to, and all four settings are Worker secrets.
+you are logged in to, and all five settings are Worker secrets.
 
 ```sh
 npx wrangler login
@@ -82,6 +110,7 @@ npx wrangler secret put TOT_APP_CLIENT_ID
 npx wrangler secret put TOT_APP_CLIENT_SECRET
 npx wrangler secret put TOT_STOREFRONT_BASE_URL   # https://<tenant>.tokenoftrust.store
 npx wrangler secret put WEBHOOK_PUBLIC_URL        # https://tot-fulfillment-connector-sample.<subdomain>.workers.dev/webhooks/tot
+npx wrangler secret put LABEL_PROVIDER            # carrier (your provider) or simulated (nothing ships)
 npx wrangler deploy
 npx wrangler tail                                 # JSON log lines; no contact is ever logged
 ```
@@ -90,6 +119,13 @@ Register the same `WEBHOOK_PUBLIC_URL` as `webhooks.endpoint` in [`tot-app.json`
 The Worker answers `POST` on that URL's path and `404` elsewhere. The cron trigger
 (`*/5 * * * *`) runs the reconciliation pass. `nodejs_compat` is on because the code imports
 `node:crypto` (hashing), `node:buffer` and `node:util`; signature verification itself is Web Crypto.
+
+`LABEL_PROVIDER` can instead be a plain variable, as a `[vars]` entry in your own copy of
+`wrangler.toml` (`LABEL_PROVIDER = "carrier"`); the sample's `wrangler.toml` sets none, so a deploy
+that forgets it answers `503` rather than reporting fabricated labels. With `simulated`, the Worker
+serves the whole flow, every `wrangler tail` line carries `simulatedLabels`, and with the simulator's
+purchases held in isolate memory, an evicted isolate can buy a second simulated label for the same
+`purchaseId`.
 
 **Sample limitation: state is per isolate.** The seen-event-id set and the per-assignment state
 live in the memory of the isolate that handled the request. Cloudflare runs many isolates and evicts
@@ -106,6 +142,7 @@ only), for example in a Durable Object, D1 or KV.
 TOT_APP_CLIENT_ID=... TOT_APP_CLIENT_SECRET=... \
 TOT_STOREFRONT_BASE_URL=https://<tenant>.tokenoftrust.store \
 WEBHOOK_PUBLIC_URL=https://<your-host>/webhooks/tot \
+LABEL_PROVIDER=carrier \
 node server.js
 ```
 
@@ -114,6 +151,7 @@ node server.js
 | `TOT_APP_CLIENT_ID`, `TOT_APP_CLIENT_SECRET` | yes | Installation credentials from the approved setup flow. Server-side only. |
 | `TOT_STOREFRONT_BASE_URL` | yes | The tenant's storefront origin (https). The API is `/api/apps/v1`; the token endpoint and the webhook signing keys are discovered from `/.well-known/tot-app-authorization-metadata`. |
 | `WEBHOOK_PUBLIC_URL` | yes | The exact HTTPS URL registered as `webhooks.endpoint` in [`tot-app.json`](./tot-app.json). It is the signed `@target-uri`, so it must match byte for byte. |
+| `LABEL_PROVIDER` | yes | `carrier` (your provider) or `simulated` (fabricated labels, nothing ships). See [Label provider](#label-provider). |
 | `PORT` | no | Local listen port, default 8787. Terminate TLS in front of it. |
 | `RECONCILE_INTERVAL_SECONDS` | no | Reconciliation timer, default 300. |
 
@@ -125,10 +163,11 @@ is a real credential, tenant or address.
 
 ## Before production
 
-- Replace `src/label-provider.js` with your real provider client, keeping its contract: idempotent
-  by `purchaseId`, a `lookup` that answers for any earlier attempt (`null` when there was none)
-  without the ship-to, so an `unknown` is reconciled without buying again, ship-to used for
-  the call only.
+- Implement `createCarrierLabelProvider` in `src/label-provider.js` and run with
+  `LABEL_PROVIDER=carrier`, keeping the [provider contract](#label-provider): idempotent by
+  `purchaseId`, a persisted `lookup` that answers for any earlier attempt (`null` when there was
+  none) without the ship-to, so an `unknown` is reconciled without buying again, even after a
+  restart; ship-to used for the call only.
 - Persist the seen event ids and the per-assignment state (opaque ids and states only) instead of
   holding them in memory (per process on Node, per isolate on Workers).
 - Wait for the carrier's real acceptance scan before reporting `handoff`; the simulator accepts at
@@ -148,7 +187,7 @@ is a real credential, tenant or address.
 | `src/gateway-client.js` | Client-credentials token, the three `/fulfillment` routes, stable idempotency keys, retries. |
 | `src/connector.js` | Reconcile, recipient, label, evidence. |
 | `src/webhook.js` | Delivery handler and the `node:http` adapter. |
-| `src/label-provider.js` | Simulated external label provider. |
+| `src/label-provider.js` | Provider selection (`LABEL_PROVIDER`), the `createCarrierLabelProvider` stub you implement, and the simulator. |
 | `sim/local-gateway.js` | In-memory gateway double used by the demo and tests. |
 | `tot-app.json` | Manifest with exactly the two fulfillment scopes and topics. |
 | `test/` | `node:test` suites. |

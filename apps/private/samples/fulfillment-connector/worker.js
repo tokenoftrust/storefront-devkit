@@ -7,9 +7,14 @@
 // eviction, so dedupe and in-flight state are per isolate. The gateway's
 // Idempotency-Key replay keeps a re-run harmless; a production connector
 // persists both (they carry no contact).
+//
+// Without a label provider it serves nothing: `fetch` answers 503 and
+// `scheduled` logs and does no work, until LABEL_PROVIDER is "carrier" (your
+// real provider) or "simulated" (fabricated labels, nothing ships).
 import { Buffer } from 'node:buffer';
-import { createConnectorApp } from './src/app.js';
+import { createDeployedApp } from './src/app.js';
 import { readConfig } from './src/config.js';
+import { LABEL_PROVIDER_HINT, LabelProviderNotConfigured } from './src/label-provider.js';
 import { createLogger, errorFields } from './src/log.js';
 import { MAX_BODY_BYTES } from './src/webhook.js';
 
@@ -17,18 +22,32 @@ const json = (status, body) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
 /** Build a Worker. Options are injection points for tests; a deploy uses the defaults. */
-export function createWorker(options = {}) {
+export function createWorker({ logger: injectedLogger, ...options } = {}) {
   let app = null;
-  const logger = options.logger ?? createLogger((line) => console.log(line));
+  const baseLogger = injectedLogger ?? createLogger((line) => console.log(line));
 
+  /** The app, or null (logged) when no label provider is configured. */
   function appFor(env) {
-    if (!app) app = createConnectorApp({ ...readConfig(env), logger, ...options });
+    if (app) return app;
+    try {
+      app = createDeployedApp({ env, logger: baseLogger, ...options });
+    } catch (err) {
+      if (!(err instanceof LabelProviderNotConfigured)) throw err;
+      baseLogger.error('label provider not configured; refusing to serve', {
+        code: 'label_provider_not_configured',
+        reason: err.reason,
+        hint: LABEL_PROVIDER_HINT,
+      });
+      return null;
+    }
     return app;
   }
 
   return {
     async fetch(request, env, ctx) {
-      const { handleDelivery } = appFor(env);
+      const configured = appFor(env);
+      if (!configured) return json(503, { code: 'label_provider_not_configured' });
+      const { handleDelivery, logger } = configured;
       const webhookPath = new URL(readConfig(env).webhookUrl).pathname;
       if (new URL(request.url).pathname !== webhookPath) return json(404, { code: 'not_found' });
       if (Number(request.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) return json(413, { code: 'body_too_large' });
@@ -47,7 +66,9 @@ export function createWorker(options = {}) {
     },
 
     async scheduled(controller, env, ctx) {
-      const { connector } = appFor(env);
+      const configured = appFor(env);
+      if (!configured) return;
+      const { connector, logger } = configured;
       ctx.waitUntil(
         connector.reconcileAll().catch((err) => logger.error('reconciliation pass failed', errorFields(err))),
       );

@@ -1,4 +1,5 @@
 import { createConnectorApp } from '../src/app.js';
+import { createSimulatedLabelProvider } from '../src/label-provider.js';
 import { createLogger } from '../src/log.js';
 import { createLocalGateway, SIM_BASE_URL, SIM_CLIENT_ID, SIM_CLIENT_SECRET, SIM_WEBHOOK_URL } from '../sim/local-gateway.js';
 
@@ -14,6 +15,7 @@ export function setup({ simulate = {}, gatewayOptions, now } = {}) {
     simulate,
     fetchImpl: gateway.fetch,
     logger: createLogger((line) => lines.push(line)),
+    labelProvider: createSimulatedLabelProvider({ unknownOutcome: simulate.unknownLabelOutcome }),
     sleep: async () => {},
     ...(now ? { now } : {}),
   });

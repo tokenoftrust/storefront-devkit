@@ -36,6 +36,15 @@ export function errorFields(err) {
   return err instanceof ConnectorError ? { errorClass, errorCode: err.code } : { errorClass };
 }
 
+/** A logger that adds `fields` to every line; callers cannot override them. */
+export function withFields(logger, fields) {
+  return {
+    info: (msg, extra) => logger.info(msg, { ...extra, ...fields }),
+    warn: (msg, extra) => logger.warn(msg, { ...extra, ...fields }),
+    error: (msg, extra) => logger.error(msg, { ...extra, ...fields }),
+  };
+}
+
 export function createLogger(sink = (line) => process.stdout.write(`${line}\n`)) {
   const write = (level, msg, fields = {}) =>
     sink(JSON.stringify({ time: new Date().toISOString(), level, msg, ...scrub(fields) }));
