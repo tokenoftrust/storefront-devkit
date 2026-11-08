@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "contractVersion": "1",
-  "description": "Machine-readable V1 scope catalog for Storefront Private Apps. Every scope is least-privilege and mostly READ. The only write scopes are narrow, app-owned surfaces (attribution) and a UI-launch capability (widgets:launch) that grants no data access. No scope in this catalog can reach a compliance-floor surface; see forbidden-scopes.json.",
+  "description": "Machine-readable V1 scope catalog for Storefront Private Apps. Every scope is least-privilege and mostly READ. The write scopes are attribution:write, into the app's own namespace; fulfillment:process, which writes whole-order label-outcome and handoff facts (including the install-attested adult-signature result that fulfillment readiness reads) into platform fulfillment state, only for an order whose active assignment names the install and only after the merchant configured that install as processor and an operator released the order; and widgets:launch, a UI-launch capability that grants no data access. orders:read:recipient is the one elevated-PII read, consent-gated and audited. No scope in this catalog can reach a compliance-floor surface; see forbidden-scopes.json.",
   "scopes": [
     {
       "id": "catalog:read",
@@ -59,6 +59,20 @@
       "dataMinimization": "Launch token carries tenant, env, slot, route, optional product handle, locale, theme hints, trace id — never secrets or customer PII.",
       "pii": "none",
       "verification": "The token's aud/sub are the app INSTALL id (not the tenant) — an app verifying a launch token MUST check aud/sub match its own install id, so a token leaked to one install can't be replayed against a sibling install on the same tenant."
+    },
+    {
+      "id": "fulfillment:process",
+      "grants": "Act as the merchant-configured fulfillment processor for orders assigned to this install: receive fulfillment.assignment.created and fulfillment.assignment.updated, read the install's active assignments (GET /fulfillment/assignments), and report label outcome and confirmed handoff for an assigned order (POST /fulfillment/orders/{orderId}/shipment-evidence).",
+      "access": "read + write (assigned orders only)",
+      "dataMinimization": "Assignment id, opaque order id, stage, assignment state, event version, timestamps, the platform purchase id, and line SKUs/quantities. Writes are whole-order label-outcome and handoff facts (purchase id, carrier and service codes, tracking number and URL, adult-signature result) for an order whose active assignment names this install. Granting the scope assigns nothing: only the merchant's processor configuration and an operator release do. Cannot buy labels, quote rates, split an order, create returns, or alter payment, tax, price or checkout.",
+      "pii": "none — no customer identity field in any event, read or write."
+    },
+    {
+      "id": "orders:read:recipient",
+      "grants": "Read the ship-to recipient of one order assigned to this install (GET /fulfillment/orders/{orderId}/recipient), only while the merchant owner's consent for this install, stage and the fulfillment-shipping purpose is live.",
+      "access": "read (assigned orders only, consent-gated, audited)",
+      "dataMinimization": "Ship-to name, company, address lines, city, region, postal code and country of one order per request. No email, no phone, no bill-to, no customer identity group, no list, search or bulk export. Every admitted read is recorded in an append-only audit before anything is decrypted, under a per-install hourly quota.",
+      "pii": "elevated and named — decrypted ship-to address, pull-only over the server-to-server API, never in a webhook, delivery record, log or error body. Requires the separate owner consent record; the scope alone admits nothing."
     }
   ]
 }

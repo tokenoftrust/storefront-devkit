@@ -73,7 +73,9 @@
           "inventory:read",
           "reports:read",
           "attribution:write",
-          "widgets:launch"
+          "widgets:launch",
+          "fulfillment:process",
+          "orders:read:recipient"
         ]
       }
     },
@@ -103,7 +105,9 @@
               "order.created",
               "order.fulfilled",
               "customer.marketing_consent.updated",
-              "attribution.finalized"
+              "attribution.finalized",
+              "fulfillment.assignment.created",
+              "fulfillment.assignment.updated"
             ]
           }
         },

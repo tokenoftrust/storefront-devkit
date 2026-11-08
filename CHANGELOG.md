@@ -5,6 +5,14 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Added
+- Private Apps contract 1.1 (minor, compatible): the fulfillment connector. New scopes
+  `fulfillment:process` and `orders:read:recipient`; topics `fulfillment.assignment.created` and
+  `fulfillment.assignment.updated`; routes `GET /fulfillment/assignments`,
+  `GET /fulfillment/orders/{orderId}/recipient` and
+  `POST /fulfillment/orders/{orderId}/shipment-evidence` with closed schemas and the
+  `FulfillmentRefusal` code list; both scopes and both topics added to `tot-app.schema.json`.
+  New synthetic examples under `apps/private/contract/examples/` and a fulfillment section in
+  `apps/private/webhooks-and-api.md`.
 - The v2 chrome and chrome-assignment schemas accept `light-collapsible` and `minimal` footer
   variants. The chrome guide documents exact per-page assignments and the compliance-preserving
   minimal presentation.

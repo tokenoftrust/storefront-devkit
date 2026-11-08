@@ -1,7 +1,10 @@
 openapi: 3.1.0
 info:
   title: Storefront Private Apps API
-  version: "1.0.0"
+  version: "1.1.0"
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
   x-contractVersion: "1"
   description: >
     Scoped, least-privilege API for installed Storefront Private Apps. All access is
@@ -14,9 +17,6 @@ info:
   contact:
     name: Token of Trust Storefront
     url: https://storefront.tokenoftrust.com
-  license:
-    name: Apache-2.0
-    url: https://www.apache.org/licenses/LICENSE-2.0
 servers:
   - url: https://{tenant}.tokenoftrust.store/api/apps/v1
     description: Live tenant gateway
@@ -41,6 +41,12 @@ tags:
     description: App-owned idempotent attribution writes.
   - name: webhooks
     description: Delivery health and app-owned replay.
+  - name: fulfillment
+    description: >
+      Merchant-configured fulfillment processor. An install acts only on orders whose active
+      assignment names it; assignment comes from the merchant's processor configuration and
+      an operator release, never from the app. Whole-order only. Refusal codes are listed on
+      `FulfillmentRefusal.code`.
 
 security:
   - appJwt: []
@@ -369,6 +375,131 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /fulfillment/assignments:
+    get:
+      tags: [fulfillment]
+      operationId: listFulfillmentAssignments
+      summary: Reconciliation read of this install's active fulfillment assignments
+      x-requiredScope: fulfillment:process
+      description: >
+        Requires scope `fulfillment:process` in both the install grant and the token. Returns
+        only assignments whose tenant is the host tenant, whose stage is the routed stage
+        (live is publication, test is preview), whose install is the calling install and
+        whose state is `active`, joined to the order at its current event version with
+        release eligibility recomputed live. An order that fails the recompute (not
+        releasable, or a release hold) is omitted
+        while its assignment stays `active`, and reappears when the hold clears; no event
+        fires for the omission. Held, cancelled, released, not-releasable, other-install,
+        other-stage, other-tenant and nonexistent orders are absent, indistinguishably. This
+        is the processor's recovery path when a `fulfillment.assignment.*` delivery is late
+        or lost. No customer identity. Response is `cache-control: no-store`. A `tenant`,
+        `tenantId` or `stage` query parameter answers 403 `denied`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor from a prior page's `nextCursor`. An unknown cursor returns no rows.
+          schema: { type: string, maxLength: 512 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: Active assignments for this install, oldest assignment first.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FulfillmentAssignmentList' }
+        '401': { $ref: '#/components/responses/FulfillmentRefused' }
+        '403': { $ref: '#/components/responses/FulfillmentRefused' }
+        '409': { $ref: '#/components/responses/FulfillmentRefused' }
+        '503': { $ref: '#/components/responses/FulfillmentRefused' }
+
+  /fulfillment/orders/{orderId}/recipient:
+    get:
+      tags: [fulfillment]
+      operationId: readFulfillmentRecipient
+      summary: Export the ship-to recipient of one order assigned to this install
+      x-requiredScope: orders:read:recipient
+      description: >
+        Requires scope `orders:read:recipient` in both the install grant and the token, a live
+        owner consent for (install, tenant, stage, purpose `fulfillment-shipping`), and an
+        active assignment of the order naming the calling install. One opaque order id in
+        the path, no body, no list or search. Admission is one guarded insert into the
+        append-only app contact-access audit (install active with the scope, active
+        assignment at the evaluated order version, live consent, fewer than
+        the per-install hourly quota of admitted reads);
+        nothing is decrypted before that row commits, and only the ship group is opened.
+        Contact state is classified only after admission, so an unassigned order reveals
+        nothing about its contact. Stage is the routed stage, and the stage the order's contact
+        is recorded under must equal it, else 409 `stage-unknown`. Emits no event. Success and every refusal carry
+        `cache-control: no-store`; error bodies never carry a contact value.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/FulfillmentOrderId'
+      responses:
+        '200':
+          description: The order's ship-to recipient.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FulfillmentRecipient' }
+        '401': { $ref: '#/components/responses/FulfillmentRefused' }
+        '403': { $ref: '#/components/responses/FulfillmentRefused' }
+        '404': { $ref: '#/components/responses/FulfillmentRefused' }
+        '409': { $ref: '#/components/responses/FulfillmentRefused' }
+        '410': { $ref: '#/components/responses/FulfillmentRefused' }
+        '429': { $ref: '#/components/responses/FulfillmentRefused' }
+        '503': { $ref: '#/components/responses/FulfillmentRefused' }
+
+  /fulfillment/orders/{orderId}/shipment-evidence:
+    post:
+      tags: [fulfillment]
+      operationId: recordFulfillmentShipmentEvidence
+      summary: Report a label outcome or a confirmed handoff for an assigned order (idempotent)
+      x-requiredScope: fulfillment:process
+      description: >
+        Requires scope `fulfillment:process` and an active assignment of the order naming the
+        calling install, bound by `assignmentId` in the body. Whole-order only. The body is
+        one of two closed facts: `label-outcome` (the external label provider's result under
+        the platform purchase id) or `handoff` (the carrier accepted the parcel). Storefront
+        never buys a label and never contacts a carrier. `Idempotency-Key` is REQUIRED and
+        scoped to the calling install; its hash covers the canonical body, the assignment id
+        and the order id. A same-key, same-body retry returns the original response; a
+        same-key retry with another body or assignment answers 409 `idempotency-conflict`.
+        `order.fulfilled` is emitted only by an accepted handoff. Response is always the
+        minimized `AppShipmentView`, `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/FulfillmentOrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShipmentEvidence' }
+      responses:
+        '200':
+          description: >
+            The fact is recorded, was already recorded identically (`outcome: done`), or this
+            is the replay of an earlier response under the same key.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppShipmentView' }
+        '400': { $ref: '#/components/responses/FulfillmentRefused' }
+        '401': { $ref: '#/components/responses/FulfillmentRefused' }
+        '403': { $ref: '#/components/responses/FulfillmentRefused' }
+        '404': { $ref: '#/components/responses/FulfillmentRefused' }
+        '409': { $ref: '#/components/responses/FulfillmentRefused' }
+        '503': { $ref: '#/components/responses/FulfillmentRefused' }
+
 components:
   securitySchemes:
     appJwt:
@@ -407,6 +538,12 @@ components:
         type: string
         minLength: 8
         maxLength: 128
+    FulfillmentOrderId:
+      name: orderId
+      in: path
+      required: true
+      description: Opaque platform order id, as carried by `fulfillment.assignment.*` and the reconciliation read.
+      schema: { type: string, minLength: 1, maxLength: 128 }
 
   headers:
     TotRequestId:
@@ -452,6 +589,16 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    FulfillmentRefused:
+      description: >
+        A refusal from a `/fulfillment/*` route. The status and `code` pairs are listed on
+        `FulfillmentRefusal.code`. Always `cache-control: no-store`; never carries a contact
+        value, a thrown message or detail that distinguishes another tenant's order.
+      headers:
+        tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/FulfillmentRefusal' }
 
   schemas:
     Error:
@@ -489,6 +636,8 @@ components:
               - reports:read
               - attribution:write
               - widgets:launch
+              - fulfillment:process
+              - orders:read:recipient
         widgetPlacements:
           type: array
           items:
@@ -686,6 +835,198 @@ components:
             currency: { type: string }
         recordedAt: { type: string, format: date-time }
 
+    FulfillmentRefusal:
+      type: object
+      additionalProperties: false
+      required: [code, error]
+      properties:
+        code:
+          type: string
+          description: >
+            Stable refusal code; the only field a client branches on. Every /fulfillment/*
+            route: 401 invalid_token (missing, invalid or expired token, another tenant's
+            install, a suspended or uninstalled install; byte-identical, no detail); 403
+            scope_denied; 403 denied (a tenant, tenantId or stage query parameter); 409
+            stage-unknown (unresolvable routed stage, or on the recipient read an order
+            stage that is unresolvable or differs from it; nothing read or written); 503
+            unconfigured (app gateway) or unavailable (storage).
+            Recipient and shipment-evidence: 404 not-assigned (no assignment of this order has
+            ever named the calling install, including nonexistent, other-tenant and
+            other-stage orders; one code, no oracle); 409 assignment-held (this install's
+            assignment is held; on the recipient read also an active assignment whose order is
+            not releasable at its current event version, with no `holds`); 409 assignment-ended (this install's assignment was cancelled
+            or released, or the body binds a superseded assignment). Recipient only: 403
+            consent-missing, consent-revoked, consent-expired (no live owner consent for this
+            install, stage and purpose); 429 quota; 410 contact-erased; 410 contact-expired;
+            404 contact-absent; 409 contact-unreadable; 503 audit-unavailable; 503
+            vault-key-unavailable. Shipment-evidence only: 400 malformed (body outside the
+            closed schema, unknown carrier, unsafe or over-long tracking URL, missing
+            Idempotency-Key); 409 idempotency-conflict; 409 label-regress; 409 conflict (a
+            differing carrier, service, tracking number or adult result under one purchase id,
+            or a purchase id other than the platform's); 409 carrier-prohibited; 409
+            carrier-mismatch; 409 with a readiness handoff-refusal code (a release hold such
+            as operator-hold or payment-not-captured, or adult-signature, label, reconcile,
+            fulfillment, evidence, payment, stock, ship-to) and `holds`.
+        error:
+          type: string
+          description: >
+            Human-readable text, never parsed. Equal to `code` on every refusal except the two
+            the shared app-gateway authorizer writes: 401 invalid_token carries `Unauthorized`
+            and 503 unconfigured carries `app gateway not configured`.
+        holds:
+          type: array
+          items: { type: string }
+          description: Present only on a handoff refusal; the release holds in force.
+
+    FulfillmentAssignmentList:
+      type: object
+      additionalProperties: false
+      required: [assignments]
+      properties:
+        assignments:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/FulfillmentAssignment' }
+        nextCursor: { type: string, description: Absent on the last page. }
+
+    FulfillmentAssignment:
+      type: object
+      description: >
+        One active assignment whose order is releasable at `eventVersion`. No customer
+        identity; the recipient is a separate, consent-gated read.
+      additionalProperties: false
+      required: [assignmentId, orderId, stage, eventVersion, assignedAt, purchaseId, lineItems]
+      properties:
+        assignmentId: { type: string }
+        orderId: { type: string }
+        stage: { type: string, enum: [preview, publication] }
+        eventVersion: { type: integer, minimum: 0, description: The order event version eligibility was recomputed at. }
+        assignedAt: { type: string, format: date-time }
+        purchaseId:
+          type: string
+          description: >
+            The platform purchase id for this order's whole-order label. The processor
+            reports every label outcome and the handoff under this id.
+        lineItems:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, quantity]
+            properties:
+              sku: { type: string }
+              quantity: { type: integer, minimum: 1 }
+
+    FulfillmentRecipient:
+      type: object
+      description: >
+        The ship-to recipient of one assigned order. No email, phone, bill-to or customer
+        identity group. Absent optional fields are omitted, never null.
+      additionalProperties: false
+      required: [orderId, line1, city, country]
+      properties:
+        orderId: { type: string }
+        name: { type: string, description: Omitted when the sealed ship-to has no name. }
+        company: { type: string }
+        line1: { type: string }
+        line2: { type: string }
+        city: { type: string }
+        region: { type: string }
+        postalCode: { type: string }
+        country: { type: string, description: ISO 3166-1 alpha-2. }
+
+    ShipmentEvidence:
+      oneOf:
+        - $ref: '#/components/schemas/LabelOutcomeEvidence'
+        - $ref: '#/components/schemas/HandoffEvidence'
+      discriminator:
+        propertyName: kind
+        mapping:
+          label-outcome: '#/components/schemas/LabelOutcomeEvidence'
+          handoff: '#/components/schemas/HandoffEvidence'
+
+    LabelOutcomeEvidence:
+      type: object
+      description: >
+        The external label provider's result for the whole-order label. Allowed label moves:
+        intent to purchased, unknown or voided; unknown to purchased or voided; purchased to
+        purchased only with identical facts. No move leaves voided. `unknown` is reconciled
+        under the same purchase id and never re-purchased. A voided or unresolved label is
+        finished by the merchant desk once the assignment is released. The adult-signature
+        result is attested by the install.
+      additionalProperties: false
+      required: [kind, assignmentId, purchaseId, outcome]
+      properties:
+        kind: { type: string, const: label-outcome }
+        assignmentId: { type: string }
+        purchaseId: { type: string }
+        outcome: { type: string, enum: [purchased, unknown, voided] }
+        carrier: { $ref: '#/components/schemas/CarrierCode' }
+        service: { type: string, pattern: '^[A-Z0-9_]{1,40}$' }
+        trackingNumber: { type: string, pattern: '^[A-Z0-9]{6,40}$' }
+        trackingUrl:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: >
+            https only, on the carrier's tracking host allowlist; no userinfo, port, fragment
+            or IP literal; path and query each at most 512 characters. Never fetched by the
+            platform. The path and query are free text the app supplies; the platform checks
+            only this shape, does not inspect them for contact, stores the URL in the order's
+            label-outcome audit and returns it in AppShipmentView.tracking.url.
+        adultSignature: { type: string, enum: [accepted, refused, absent] }
+        expectedVersion: { type: integer, minimum: 0 }
+      allOf:
+        - if:
+            properties: { outcome: { const: purchased } }
+          then:
+            required: [carrier, service, trackingNumber, trackingUrl, adultSignature]
+
+    HandoffEvidence:
+      type: object
+      description: >
+        The carrier accepted the whole-order parcel. Refused unless the label is purchased or
+        printed and every handoff gate holds; the carrier must equal the label carrier. An
+        accepted handoff emits order.fulfilled once.
+      additionalProperties: false
+      required: [kind, assignmentId, purchaseId, carrier]
+      properties:
+        kind: { type: string, const: handoff }
+        assignmentId: { type: string }
+        purchaseId: { type: string }
+        carrier: { $ref: '#/components/schemas/CarrierCode' }
+        expectedVersion: { type: integer, minimum: 0 }
+
+    CarrierCode:
+      type: string
+      description: >
+        Closed set of canonical uppercase carrier codes. Input is trimmed and uppercased
+        before comparison; any other value answers 400 malformed. A code in the tenant's
+        prohibited set (current policy or the order's label-intent snapshot) answers 409
+        carrier-prohibited.
+      enum: [UPS, FEDEX, USPS, DHL]
+
+    AppShipmentView:
+      type: object
+      description: Minimized shipment state of one assigned order. Never the merchant desk view.
+      additionalProperties: false
+      required: [orderId, version, label, handoff, purchaseId]
+      properties:
+        orderId: { type: string }
+        version: { type: integer, minimum: 0, description: The order event version after this command. }
+        label: { type: string, enum: [none, intent, purchased, printed, UNKNOWN, void_requested, voided] }
+        handoff: { type: string, enum: [none, handed_off, unknown] }
+        purchaseId: { type: string }
+        carrier: { $ref: '#/components/schemas/CarrierCode' }
+        tracking:
+          type: object
+          additionalProperties: false
+          required: [number, url]
+          properties:
+            number: { type: string }
+            url: { type: string, format: uri }
+
     DeliveryList:
       type: object
       additionalProperties: false
@@ -713,6 +1054,8 @@ components:
             - order.fulfilled
             - customer.marketing_consent.updated
             - attribution.finalized
+            - fulfillment.assignment.created
+            - fulfillment.assignment.updated
         state: { type: string, enum: [delivered, retrying, dead-lettered] }
         attempts: { type: integer, minimum: 0 }
         lastStatus: { type: integer }
