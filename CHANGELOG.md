@@ -5,6 +5,13 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Added
+- `apps/private/samples/fulfillment-connector/` — the first private-app reference sample: a
+  runnable, dependency-free Node connector for the fulfillment contract (Content-Digest and
+  RFC 9421 webhook verification, CloudEvents dedupe, reconciliation, recipient read, a simulated
+  label provider, and label-outcome and handoff evidence under stable `Idempotency-Key`s), with an
+  offline demo, simulation flags for an unknown label outcome, a forced retry and a conflicting key
+  reuse, and `node:test` suites including a no-contact-in-logs check. `CONTRIBUTING.md` and
+  `apps/private/README.md` now admit self-contained reference samples under `apps/private/samples/`.
 - Private Apps contract 1.1 (minor, compatible): the fulfillment connector. New scopes
   `fulfillment:process` and `orders:read:recipient`; topics `fulfillment.assignment.created` and
   `fulfillment.assignment.updated`; routes `GET /fulfillment/assignments`,

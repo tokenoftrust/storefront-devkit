@@ -1,0 +1,9 @@
+{
+  "id": "private-app-sample-fulfillment-connector",
+  "kind": "sample",
+  "title": "Fulfillment connector (private-app reference sample)",
+  "description": "Runnable, dependency-free reference connector for the Private Apps fulfillment contract: RFC 9421 and Content-Digest webhook verification, CloudEvents dedupe, reconciliation, recipient read, a simulated label provider, and idempotent label-outcome and handoff evidence.",
+  "tags": ["private-apps", "fulfillment", "webhooks", "http-message-signatures", "idempotency", "sample"],
+  "contract": "private-apps@1",
+  "requires": { "node": ">=20" }
+}

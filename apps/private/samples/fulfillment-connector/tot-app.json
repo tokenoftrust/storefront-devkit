@@ -1,0 +1,23 @@
+{
+  "contractVersion": "1",
+  "id": "com.example.fulfillment-connector",
+  "name": "Example Fulfillment Connector",
+  "version": "1.0.0",
+  "owner": {
+    "name": "Example Fulfillment Co",
+    "email": "apps@fulfillment.example",
+    "url": "https://fulfillment.example.com"
+  },
+  "description": "Reference whole-order fulfillment connector: reconciles assignments, buys labels through its own provider and reports label-outcome and handoff evidence.",
+  "installMode": "external",
+  "scopes": ["fulfillment:process", "orders:read:recipient"],
+  "webhooks": {
+    "endpoint": "https://fulfillment.example.com/webhooks/tot",
+    "topics": ["fulfillment.assignment.created", "fulfillment.assignment.updated"]
+  },
+  "telemetryMode": "errors-only",
+  "retention": {
+    "eventLogDays": 30,
+    "piiRedaction": "strict"
+  }
+}
