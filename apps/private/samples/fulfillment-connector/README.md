@@ -4,20 +4,21 @@ A runnable, dependency-free reference implementation of the
 [fulfillment connector](../../webhooks-and-api.md#fulfillment-connector) side of the Private Apps
 contract, written against the published files in [`../../contract/`](../../contract/) and nothing
 else. It is a sample to read, run and copy from. It is not a library, not a ToT-hosted service, and
-not part of the platform. Node 20 or later, Node built-ins only (`node:crypto`, `node:http`,
-`node:test`).
+not part of the platform. It runs on Node 20 or later (`node server.js`) or as its own Cloudflare
+Worker (`worker.js`), with no dependencies: Node built-ins and Web Crypto only.
 
 ## What it does
 
 1. **Receives** `fulfillment.assignment.created` / `.updated` deliveries and, in the order the guide
    gives, reads the raw body, recomputes `Content-Digest` (RFC 9530), verifies the RFC 9421
-   `Signature-Input` / `Signature` against the public key the gateway authorization metadata
-   publishes for the declared `keyid`, validates the CloudEvents envelope and the six-key `data`,
+   `sig1` signature (`rsa-v1_5-sha256` over `@method`, `@target-uri`, `content-digest`) against the
+   key `webhook_signing_keys` publishes for its `keyid`, exactly as
+   [Signature details](../../webhooks-and-api.md#signature-details) specifies, validates the CloudEvents envelope and the six-key `data`,
    and deduplicates on the CloudEvents `id`. A tampered body, a bad or stale signature, an unknown
    key or an unsupported algorithm is refused with a non-2xx status.
 2. **Reconciles** with `GET /fulfillment/assignments`. The delivery is a notification only: the
    connector acts on what the reconciliation read says is assigned, and the same read runs on a
-   timer as the recovery path for late or lost deliveries.
+   timer (a cron trigger on Workers) as the recovery path for late or lost deliveries.
 3. **Reads the recipient** of the assigned order only (`GET /fulfillment/orders/{orderId}/recipient`)
    and hands it, in memory, to one label call.
 4. **Buys the label** through a simulated external label provider built into the sample
@@ -57,11 +58,43 @@ together:
 | `--force-retry` | Every evidence post is sent a second time with the same key and identical body; the connector checks that the original response is replayed. |
 | `--conflicting-key-reuse` | The handoff body is first sent under the label-outcome key; the connector expects `409 idempotency-conflict`, then posts under the correct key. |
 
-The same flags work on `server.js`. The local simulator ([`sim/local-gateway.js`](./sim/local-gateway.js))
+The same flags work on `server.js`. The Worker takes none: simulation is a command-line switch so a
+deploy configuration can never leave it on. The local simulator ([`sim/local-gateway.js`](./sim/local-gateway.js))
 is a test double built from the published contract and seeded with its synthetic examples; it is not
 a description of how the platform is built.
 
-## Host it
+## Host it on Cloudflare Workers
+
+The sample deploys as its own Worker, `tot-fulfillment-connector-sample`, on your `workers.dev`
+subdomain. It is separate from any storefront Worker and shares nothing with one.
+[`wrangler.toml`](./wrangler.toml) holds no account id and no secrets: `wrangler` uses the account
+you are logged in to, and all four settings are Worker secrets.
+
+```sh
+npx wrangler login
+npx wrangler secret put TOT_APP_CLIENT_ID
+npx wrangler secret put TOT_APP_CLIENT_SECRET
+npx wrangler secret put TOT_STOREFRONT_BASE_URL   # https://<tenant>.tokenoftrust.store
+npx wrangler secret put WEBHOOK_PUBLIC_URL        # https://tot-fulfillment-connector-sample.<subdomain>.workers.dev/webhooks/tot
+npx wrangler deploy
+npx wrangler tail                                 # JSON log lines; no contact is ever logged
+```
+
+Register the same `WEBHOOK_PUBLIC_URL` as `webhooks.endpoint` in [`tot-app.json`](./tot-app.json).
+The Worker answers `POST` on that URL's path and `404` elsewhere. The cron trigger
+(`*/5 * * * *`) runs the reconciliation pass. `nodejs_compat` is on because the code imports
+`node:crypto` (hashing), `node:buffer` and `node:util`; signature verification itself is Web Crypto.
+
+**Sample limitation: state is per isolate.** The seen-event-id set and the per-assignment state
+live in the memory of the isolate that handled the request. Cloudflare runs many isolates and evicts
+them at will, so a redelivery that lands on another isolate, or after eviction, is not recognized as
+a duplicate, and a cron run starts with no memory of in-flight work. The gateway's Idempotency-Key
+replay keeps a repeat harmless (the same fact under the same key answers with the original
+response), and the reconciliation read decides what is still assigned, but the sample does not
+dedupe across isolates. A production connector persists both (they carry opaque ids and states
+only), for example in a Durable Object, D1 or KV.
+
+## Host it on Node
 
 ```sh
 TOT_APP_CLIENT_ID=... TOT_APP_CLIENT_SECRET=... \
@@ -90,7 +123,7 @@ is a real credential, tenant or address.
   by `purchaseId`, a `lookup` that reconciles an `unknown` without buying again, ship-to used for
   the call only.
 - Persist the seen event ids and the per-assignment state (opaque ids and states only) instead of
-  holding them in memory.
+  holding them in memory (per process on Node, per isolate on Workers).
 - Wait for the carrier's real acceptance scan before reporting `handoff`; the simulator accepts at
   once.
 - Keep the defaults that make verification strict: covered components `@method`, `@target-uri` and
@@ -100,7 +133,8 @@ is a real credential, tenant or address.
 
 | Path | Purpose |
 |---|---|
-| `server.js` | Production entry point: `node:http` listener plus the reconciliation timer. |
+| `server.js` | Node entry point: `node:http` listener plus the reconciliation timer. |
+| `worker.js`, `wrangler.toml` | Cloudflare Workers entry point: `fetch` for deliveries, `scheduled` for the reconciliation cron. |
 | `demo.js` | Offline walkthrough with the simulation flags. |
 | `src/http-signature.js`, `src/structured-fields.js` | Content-Digest and RFC 9421 verification. |
 | `src/gateway-metadata.js` | Authorization-metadata discovery and signing-key cache. |

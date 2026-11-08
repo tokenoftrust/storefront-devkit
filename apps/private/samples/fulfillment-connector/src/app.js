@@ -13,7 +13,7 @@ export function createConnectorApp({
   clientSecret,
   webhookUrl,
   simulate = {},
-  fetchImpl = fetch,
+  fetchImpl = (...args) => fetch(...args),
   logger = createLogger(),
   labelProvider = createSimulatedLabelProvider({ unknownOutcome: simulate.unknownLabelOutcome }),
   now = () => Date.now(),

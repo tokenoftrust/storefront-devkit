@@ -12,7 +12,8 @@ export function readConfig(env = process.env) {
     clientId: env.TOT_APP_CLIENT_ID,
     clientSecret: env.TOT_APP_CLIENT_SECRET,
     baseUrl: baseUrl.origin,
-    webhookUrl: webhookUrl.toString(),
+    // The signature covers @target-uri as the registered endpoint string, so it is kept verbatim.
+    webhookUrl: env.WEBHOOK_PUBLIC_URL,
     port: Number(env.PORT || 8787),
     reconcileIntervalSeconds: Number(env.RECONCILE_INTERVAL_SECONDS || 300),
   };

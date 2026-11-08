@@ -15,6 +15,7 @@ test('configuration comes from the environment and fails closed', () => {
   assert.equal(config.baseUrl, 'https://acme.tokenoftrust.store');
   assert.equal(config.webhookUrl, ENV.WEBHOOK_PUBLIC_URL);
   assert.equal(config.port, 8787);
+  assert.equal(readConfig({ ...ENV, WEBHOOK_PUBLIC_URL: 'https://Fulfillment.example.com' }).webhookUrl, 'https://Fulfillment.example.com');
   assert.throws(() => readConfig({ ...ENV, TOT_APP_CLIENT_SECRET: '' }), /TOT_APP_CLIENT_SECRET/);
   assert.throws(() => readConfig({ ...ENV, WEBHOOK_PUBLIC_URL: 'http://fulfillment.example.com/hook' }), /https/);
 });
