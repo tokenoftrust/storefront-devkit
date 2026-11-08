@@ -5,6 +5,23 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Added
+- `apps/private/samples/fulfillment-connector/` — the first private-app reference sample: a
+  runnable, dependency-free Node connector for the fulfillment contract (Content-Digest and
+  RFC 9421 webhook verification, CloudEvents dedupe, reconciliation, recipient read, a simulated
+  label provider, and label-outcome and handoff evidence under stable `Idempotency-Key`s), with an
+  offline demo, simulation flags for an unknown label outcome, a forced retry and a conflicting key
+  reuse, and `node:test` suites including a no-contact-in-logs check. `CONTRIBUTING.md` and
+  `apps/private/README.md` now admit self-contained reference samples under `apps/private/samples/`.
+- The fulfillment connector sample also runs as its own Cloudflare Worker,
+  `tot-fulfillment-connector-sample` on `workers.dev`: `worker.js` (a `fetch` handler for
+  deliveries and a `scheduled` handler for the reconciliation cron), a `wrangler.toml` with no
+  account id or secrets, credentials as Worker secrets, and tests that drive both handlers without
+  a socket. The README states that its dedupe and assignment state are per isolate.
+- `apps/private/webhooks-and-api.md` "Signature details": the exact webhook signature the platform
+  sends (label `sig1`, alg `rsa-v1_5-sha256`, covered components `@method`, `@target-uri`,
+  `content-digest`, `created`/`keyid`/`alg` parameters, a `sha-256` Content-Digest), the
+  authorization-metadata fields `webhook_signing_keys` and `token_endpoint`, and what a verifier
+  MUST accept and reject. The sample's verifier now accepts exactly that.
 - Private Apps contract 1.1 (minor, compatible): the fulfillment connector. New scopes
   `fulfillment:process` and `orders:read:recipient`; topics `fulfillment.assignment.created` and
   `fulfillment.assignment.updated`; routes `GET /fulfillment/assignments`,

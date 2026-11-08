@@ -1,0 +1,15 @@
+# The reference fulfillment connector as its own Worker on workers.dev.
+# No account id and no secrets live here. Configuration is five Worker
+# secrets (see README.md, "Host it on Cloudflare Workers"). LABEL_PROVIDER is
+# deliberately unset: without it the Worker answers 503 instead of reporting
+# simulated labels.
+name = "tot-fulfillment-connector-sample"
+main = "worker.js"
+compatibility_date = "2026-06-01"
+# node:crypto (createHash, timingSafeEqual), node:buffer and node:util.
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# The reconciliation pass: recovers deliveries that were late or lost.
+[triggers]
+crons = ["*/5 * * * *"]

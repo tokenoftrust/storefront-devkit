@@ -1,0 +1,12 @@
+{
+  "name": "storefront-private-app-fulfillment-connector-sample",
+  "private": true,
+  "type": "module",
+  "description": "Reference fulfillment connector for the Storefront Private Apps contract. Node built-ins only.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "demo": "node demo.js",
+    "test": "node --test test/*.test.js"
+  }
+}

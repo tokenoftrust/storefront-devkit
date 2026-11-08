@@ -2,8 +2,9 @@
 
 This directory is the canonical, public, language-neutral contract for Storefront private apps.
 Use it to build a service that connects to one merchant tenant through scoped APIs and signed
-webhooks. It contains documentation and machine-readable specifications only—no platform runtime,
-credentials, tenant data, operator procedures, or application source code.
+webhooks. It contains documentation, machine-readable specifications and self-contained reference
+samples under [`samples/`](./samples/)—no platform runtime, credentials, tenant data or operator
+procedures.
 
 Private apps are available today. They are not public apps: do not infer a marketplace, a
 multi-tenant distribution model, a self-service installation flow, or any public-app API from
@@ -42,6 +43,18 @@ overrides this repository.
 | [`contract/examples/fulfillment.shipment-evidence.label-outcome.request.json`](./contract/examples/fulfillment.shipment-evidence.label-outcome.request.json), [`...handoff.request.json`](./contract/examples/fulfillment.shipment-evidence.handoff.request.json), [`...response.json`](./contract/examples/fulfillment.shipment-evidence.response.json) | Synthetic shipment-evidence requests and the minimized response. |
 | [`contract/examples/fulfillment.refusal.response.json`](./contract/examples/fulfillment.refusal.response.json) | Synthetic refusal body carrying a stable `code`. |
 
+## Reference samples
+
+Each directory under [`samples/`](./samples/) is one self-contained, runnable reference app with
+its own `README.md` and `meta.json`. A sample is built only on the published contract in this
+directory, uses no dependencies beyond its language's standard library, is configured by
+environment variables, and carries synthetic placeholder data only. It is code to read and copy,
+not a published library, not a ToT-hosted service, and never authoritative over the contract.
+
+| Sample | What it shows |
+|---|---|
+| [`samples/fulfillment-connector/`](./samples/fulfillment-connector/) | Webhook verification (Content-Digest, RFC 9421), CloudEvents dedupe, reconciliation, recipient read, a simulated label provider, and idempotent label-outcome and handoff evidence. |
+
 ## Safety boundary
 
 An app may read only granted, minimized data; receive its subscribed events; and write only to its
@@ -51,8 +64,9 @@ denylist is normative: if a requested capability is not in the scope catalog—o
 forbidden—do not try to recreate it through a widget, webhook response, or undocumented endpoint.
 
 Use the language and framework appropriate to your service. The devkit intentionally publishes no
-npm library or platform runtime. Keep installation credentials server-side and use the CLI fixtures
-or the synthetic examples here for local tests.
+npm library or platform runtime; the reference samples are copyable source, not packages. Keep
+installation credentials server-side and use the CLI fixtures or the synthetic examples here for
+local tests.
 
 ## Versioning
 

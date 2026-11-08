@@ -67,6 +67,50 @@ order, marketing-consent, and attribution topics. Subscribe only to topics permi
 granted scopes. A declared topic does not imply that a public-app product or an undocumented
 capability exists.
 
+### Signature details
+
+Discovery is `GET /.well-known/tot-app-authorization-metadata` on the storefront origin. It is
+public JSON, cacheable for the `max-age` its `Cache-Control` states (300 seconds). Two fields
+matter to a webhook receiver:
+
+| Field | Meaning |
+|---|---|
+| `webhook_signing_keys` | A JWK Set (`{"keys": [...]}`) of the public keys that sign webhook deliveries. Each key is `kty: "RSA"`, `alg: "RS256"`, `use: "sig"`, identified by `kid`. Absent when the storefront has no webhook signing key configured. |
+| `token_endpoint` | Where to exchange installation credentials for a bearer token: `POST`, `application/x-www-form-urlencoded`, `grant_type=client_credentials` with `client_id` and `client_secret` in the form body (`client_secret_post`). The response carries `access_token`, `token_type`, `expires_in` and `scope`. |
+
+`jwks_uri` in the same document publishes the keys of the bearer tokens the gateway issues. It is
+not the webhook key set; verify deliveries only against `webhook_signing_keys`.
+
+Every delivery is a `POST` with `Content-Type: application/cloudevents+json` and three signing
+headers:
+
+| Header | Value the platform sends |
+|---|---|
+| `Content-Digest` | `sha-256=:<base64 of SHA-256 over the exact body bytes>:` (RFC 9530). |
+| `Signature-Input` | `sig1=("@method" "@target-uri" "content-digest");created=<unix seconds>;keyid="<kid>";alg="rsa-v1_5-sha256"` |
+| `Signature` | `sig1=:<base64 signature>:` |
+
+The signature is RFC 9421 `rsa-v1_5-sha256` (RSASSA-PKCS1-v1_5 with SHA-256) under the label
+`sig1`. It covers exactly `@method` (`POST`), `@target-uri` (the app's registered
+`webhooks.endpoint`, character for character as registered) and `content-digest`, followed by
+the `@signature-params` line. Each delivery attempt, including a retry or replay, is signed
+afresh, so `created` is the time of that attempt.
+
+A verifier MUST accept a delivery that meets all of the following, and MUST reject any other:
+
+- `Content-Digest` carries a `sha-256` member equal to SHA-256 of the raw body. Other digest
+  members may be present and are ignored. A missing `sha-256` member is a rejection.
+- `Signature-Input` and `Signature` both carry a `sig1` member. Other labels are ignored.
+- The `sig1` covered components include `@method`, `@target-uri` and `content-digest`. The
+  signature base is rebuilt from the received `Signature-Input`, component by component, with
+  `@target-uri` set to the endpoint the app registered, never to a value read from the request.
+- `alg` is present and equals `rsa-v1_5-sha256`. Any other or missing `alg` is a rejection.
+- `keyid` names a key in `webhook_signing_keys`. On an unknown `keyid`, refetch the metadata
+  once (keys rotate), with a rate limit, before rejecting.
+- `created` is recent. Choose and document a window; the reference sample accepts five minutes
+  of age and one minute of clock skew.
+- The signature verifies against that key over the rebuilt base.
+
 ## Fulfillment connector
 
 A private app can act as a merchant's fulfillment processor for whole orders. The merchant

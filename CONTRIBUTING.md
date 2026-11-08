@@ -20,7 +20,7 @@ regenerate the manifest (`npm run manifest` — or add the entry to `manifest.js
 ```json
 {
   "id": "template-commerce-minimal",
-  "kind": "template | widget | recipe | snippet-set | schema | ci | migration | agent-kit",
+  "kind": "template | widget | recipe | snippet-set | schema | ci | migration | agent-kit | sample",
   "title": "Human title",
   "description": "One or two sentences.",
   "tags": ["commerce", "starter"],
@@ -51,8 +51,9 @@ strongly encouraged so consumers can pin compatibility.
 
 ## The hard boundary (what is NEVER accepted here)
 
-This repo is strictly **tenant-side** except for the public, documentation-only [`apps/`](./apps/)
-track and its source-safe private-app contract corpus. Do not add:
+This repo is strictly **tenant-side** except for the public [`apps/`](./apps/) track: its
+source-safe private-app contract corpus and the self-contained reference samples under
+[`apps/private/samples/`](./apps/private/samples/). Do not add:
 
 - Any reference to platform source paths, build internals, deploy/runner mechanics, or private
   APIs.
@@ -60,6 +61,12 @@ track and its source-safe private-app contract corpus. Do not add:
 - Platform runtime, npm package source, application source, generated build artifacts, or release
   automation. The Apps track remains language-neutral guidance and public contract material; its
   canonical documentation lives in this repository, while the ToT MCP recipe is a discovery index.
+  The one exception is a **reference sample**: one directory per sample under
+  `apps/private/samples/<name>/`, with its own `README.md` and `meta.json` (the one-asset-per-directory
+  rule), built only on the published contract in `apps/private/contract/`, using no dependencies
+  beyond its language's standard library, configured by environment variables, carrying synthetic
+  placeholder data only, and runnable with its own tests. A sample is copyable source: never
+  published as a package, never hosted by ToT, never authoritative over the contract.
 - Credentials, private keys, real tenant data, operator-only runbooks, order-forward/operations
   internals, or any document that instructs a developer to bypass the published app contract.
 - Any example that weakens the compliance floor (disabling age/ID verification or excise, hiding
