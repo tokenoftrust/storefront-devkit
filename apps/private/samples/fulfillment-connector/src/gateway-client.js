@@ -1,12 +1,38 @@
 // Pull API client: OAuth2 client-credentials token, then the three
 // /fulfillment routes under /api/apps/v1. Refusals come back as
 // { ok: false, status, code } so callers branch on `code`, never on text.
+//
+// A remote body is never trusted as text: `code` and `holds` are mapped onto
+// the fixed sets the contract publishes (anything else becomes `unexpected`),
+// `error` is never read, and a refused token request throws a fixed code. A
+// refusal the transport decided (TransportRefusal, including the storefront's
+// preview_context_refused) is never retried and never fetches a new token.
 import { createHash } from 'node:crypto';
-import { errorFields } from './log.js';
+import { ConnectorError, errorFields } from './log.js';
+import { TransportRefusal } from './preview-transport.js';
 
 const API_PREFIX = '/api/apps/v1';
 const TOKEN_REFRESH_MARGIN_MS = 30_000;
 const RETRYABLE_STATUS = new Set([502, 503, 504]);
+
+// FulfillmentRefusal.code in ../../contract/openapi.yaml.
+const HOLD_CODES = new Set([
+  'operator-hold', 'payment-not-captured', 'adult-signature', 'label', 'reconcile', 'fulfillment', 'evidence', 'payment', 'stock', 'ship-to',
+]);
+const REFUSAL_CODES = new Set([
+  'invalid_token', 'scope_denied', 'denied', 'stage-unknown', 'unconfigured', 'unavailable', 'not-assigned', 'assignment-held',
+  'assignment-ended', 'consent-missing', 'consent-revoked', 'consent-expired', 'quota', 'contact-erased', 'contact-expired',
+  'contact-absent', 'contact-unreadable', 'audit-unavailable', 'vault-key-unavailable', 'malformed', 'idempotency-conflict',
+  'label-regress', 'conflict', 'carrier-prohibited', 'carrier-mismatch', ...HOLD_CODES,
+]);
+const REQUEST_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** A remote refusal reduced to fixed values before anything logs or branches on it. */
+export function normalizeRefusal(body) {
+  const code = body && typeof body === 'object' && REFUSAL_CODES.has(body.code) ? body.code : 'unexpected';
+  const holds = Array.isArray(body?.holds) ? body.holds.map((h) => (HOLD_CODES.has(h) ? h : 'unexpected')) : undefined;
+  return { code, holds };
+}
 
 /** A stable Idempotency-Key: the same fact always yields the same key. */
 export function idempotencyKeyFor(orderId, evidence) {
@@ -36,9 +62,7 @@ export function createGatewayClient({
       body: form.toString(),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok || typeof body.access_token !== 'string') {
-      throw new Error(`token request refused (status ${res.status}, ${body.error ?? 'no error code'})`);
-    }
+    if (!res.ok || typeof body.access_token !== 'string') throw new ConnectorError('token_refused');
     token = { value: body.access_token, expiresAt: now() + Number(body.expires_in ?? 300) * 1000 };
     return token.value;
   }
@@ -53,9 +77,10 @@ export function createGatewayClient({
       });
       if (res.status === 401 && authAttempt === 0) continue;
       const json = await res.json().catch(() => ({}));
-      const requestId = res.headers.get('tot-request-id') ?? undefined;
+      const header = res.headers.get('tot-request-id');
+      const requestId = header !== null && REQUEST_ID.test(header) ? header : undefined;
       if (res.ok) return { ok: true, status: res.status, body: json, requestId };
-      return { ok: false, status: res.status, code: json.code ?? 'unexpected', holds: json.holds, requestId };
+      return { ok: false, status: res.status, ...normalizeRefusal(json), requestId };
     }
   }
 
@@ -65,7 +90,7 @@ export function createGatewayClient({
       try {
         result = await fn();
       } catch (err) {
-        if (attempt >= maxAttempts) throw err;
+        if (err instanceof TransportRefusal || attempt >= maxAttempts) throw err;
         logger.warn('request failed, retrying', { op: label, attempt, ...errorFields(err) });
         await sleep(2 ** attempt * 100);
         continue;

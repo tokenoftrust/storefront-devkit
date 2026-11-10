@@ -8,19 +8,28 @@ import { fileURLToPath } from 'node:url';
 import { createConnectorApp } from '../src/app.js';
 import { createCarrierLabelProvider, selectLabelProvider, SIMULATED_LABELS_FIELDS } from '../src/label-provider.js';
 import { createLogger } from '../src/log.js';
-import { createLocalGateway, example, SIM_BASE_URL, SIM_CLIENT_ID, SIM_CLIENT_SECRET, SIM_WEBHOOK_URL } from '../sim/local-gateway.js';
+import {
+  createLocalGateway,
+  example,
+  SIM_BASE_URL,
+  SIM_CLIENT_ID,
+  SIM_CLIENT_SECRET,
+  SIM_PREVIEW_BASE_URL,
+  SIM_PREVIEW_CAPABILITY,
+  SIM_WEBHOOK_URL,
+} from '../sim/local-gateway.js';
 import { createWorker } from '../worker.js';
 
 const CONFIG = {
   TOT_APP_CLIENT_ID: SIM_CLIENT_ID,
   TOT_APP_CLIENT_SECRET: SIM_CLIENT_SECRET,
-  TOT_STOREFRONT_BASE_URL: SIM_BASE_URL,
+  TOT_STOREFRONT_BASE_URL: SIM_PREVIEW_BASE_URL,
   WEBHOOK_PUBLIC_URL: SIM_WEBHOOK_URL,
 };
 const event = () => example('fulfillment.assignment.created.cloudevent.json');
 
 function setupWorker() {
-  const gateway = createLocalGateway();
+  const gateway = createLocalGateway({ previewCapability: SIM_PREVIEW_CAPABILITY });
   let gatewayCalls = 0;
   const fetchImpl = (...args) => {
     gatewayCalls += 1;
@@ -117,3 +126,26 @@ for (const [label, extraEnv, reason] of [
     assert.doesNotMatch(run.stdout, /listening/);
   });
 }
+
+// server.js shares createDeployedApp, so it is preview-bound by the same
+// default: no flag, NODE_ENV or label provider turns the preview transport off.
+for (const [label, base] of [
+  ['no preview capability', SIM_BASE_URL],
+  ['a non-test env claim', `${SIM_BASE_URL}/?__preview=${Buffer.from(JSON.stringify({ tenantId: 'SENTINELsrv', env: 'live', exp: 4102444800 })).toString('base64url')}.SENTINELsrv`],
+]) {
+  test(`server.js with ${label} in TOT_STOREFRONT_BASE_URL refuses to start, echoing nothing`, () => {
+    const run = runServer({ TOT_STOREFRONT_BASE_URL: base, LABEL_PROVIDER: 'simulated', NODE_ENV: 'development' });
+    assert.equal(run.signal, null, 'server.js kept running instead of refusing');
+    assert.equal(run.status, 1);
+    const refusal = JSON.parse(run.stderr.trim().split('\n').pop());
+    assert.deepEqual([refusal.code, refusal.variable], ['config_invalid', 'TOT_STOREFRONT_BASE_URL']);
+    assert.doesNotMatch(run.stdout + run.stderr, /SENTINELsrv|listening|__preview/);
+  });
+}
+
+test('server.js with a valid preview capability passes configuration (then needs a label provider)', () => {
+  const run = runServer({ TOT_STOREFRONT_BASE_URL: SIM_PREVIEW_BASE_URL });
+  assert.equal(run.status, 1);
+  assert.equal(JSON.parse(run.stderr.trim().split('\n').pop()).code, 'label_provider_not_configured');
+  assert.ok(!(run.stdout + run.stderr).includes(SIM_PREVIEW_CAPABILITY));
+});

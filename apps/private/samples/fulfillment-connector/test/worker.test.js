@@ -5,19 +5,27 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createLogger } from '../src/log.js';
-import { createLocalGateway, example, SIM_BASE_URL, SIM_CLIENT_ID, SIM_CLIENT_SECRET, SIM_WEBHOOK_URL } from '../sim/local-gateway.js';
+import {
+  createLocalGateway,
+  example,
+  SIM_CLIENT_ID,
+  SIM_CLIENT_SECRET,
+  SIM_PREVIEW_BASE_URL,
+  SIM_PREVIEW_CAPABILITY,
+  SIM_WEBHOOK_URL,
+} from '../sim/local-gateway.js';
 import { createWorker } from '../worker.js';
 
 const env = {
   TOT_APP_CLIENT_ID: SIM_CLIENT_ID,
   TOT_APP_CLIENT_SECRET: SIM_CLIENT_SECRET,
-  TOT_STOREFRONT_BASE_URL: SIM_BASE_URL,
+  TOT_STOREFRONT_BASE_URL: SIM_PREVIEW_BASE_URL,
   WEBHOOK_PUBLIC_URL: SIM_WEBHOOK_URL,
   LABEL_PROVIDER: 'simulated',
 };
 
 function setupWorker() {
-  const gateway = createLocalGateway();
+  const gateway = createLocalGateway({ previewCapability: SIM_PREVIEW_CAPABILITY });
   const lines = [];
   const worker = createWorker({ fetchImpl: gateway.fetch, logger: createLogger((l) => lines.push(l)), sleep: async () => {} });
   return { gateway, worker, lines };
@@ -101,10 +109,15 @@ test('scheduled and fetch log no contact', async () => {
   for (const value of values) assert.ok(!logged.includes(value), 'a recipient value reached the log');
 });
 
-test('missing configuration fails loudly instead of serving', async () => {
-  const { worker } = setupWorker();
-  const { ctx } = context();
-  await assert.rejects(worker.fetch(new Request(SIM_WEBHOOK_URL, { method: 'POST', body: '{}' }), {}, ctx), /missing environment variables/);
+test('missing configuration is a fixed 503 and nothing runs', async () => {
+  const { gateway, worker, lines } = setupWorker();
+  const { pending, ctx } = context();
+  const res = await worker.fetch(new Request(SIM_WEBHOOK_URL, { method: 'POST', body: '{}' }), {}, ctx);
+  assert.equal(res.status, 503);
+  assert.deepEqual(await res.json(), { code: 'config_invalid' });
+  assert.equal(pending.length, 0);
+  assert.equal(gateway.calls.requests.length, 0);
+  assert.equal(JSON.parse(lines.at(-1)).variable, 'TOT_APP_CLIENT_ID');
 });
 
 test('wrangler.toml names its own worker, uses a cron trigger, and carries no account id or secret', () => {

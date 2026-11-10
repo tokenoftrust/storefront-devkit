@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { createLogger } from '../src/log.js';
 import { MAX_BODY_BYTES, nodeRequestListener } from '../src/webhook.js';
-import { createLocalGateway, SIM_BASE_URL, SIM_CLIENT_ID, SIM_CLIENT_SECRET, SIM_WEBHOOK_URL } from '../sim/local-gateway.js';
+import { createLocalGateway, SIM_PREVIEW_BASE_URL, SIM_CLIENT_ID, SIM_CLIENT_SECRET, SIM_WEBHOOK_URL } from '../sim/local-gateway.js';
 import { createWorker } from '../worker.js';
 
 test('node:http: a streamed body over 1 MiB is answered 413 and never reaches the handler', async () => {
@@ -38,7 +38,7 @@ test('node:http: a streamed body over 1 MiB is answered 413 and never reaches th
   assert.deepEqual([res.status, req.destroyed, handled], [413, true, false]);
 });
 
-const env = { TOT_APP_CLIENT_ID: SIM_CLIENT_ID, TOT_APP_CLIENT_SECRET: SIM_CLIENT_SECRET, TOT_STOREFRONT_BASE_URL: SIM_BASE_URL, WEBHOOK_PUBLIC_URL: SIM_WEBHOOK_URL, LABEL_PROVIDER: 'simulated' };
+const env = { TOT_APP_CLIENT_ID: SIM_CLIENT_ID, TOT_APP_CLIENT_SECRET: SIM_CLIENT_SECRET, TOT_STOREFRONT_BASE_URL: SIM_PREVIEW_BASE_URL, WEBHOOK_PUBLIC_URL: SIM_WEBHOOK_URL, LABEL_PROVIDER: 'simulated' };
 
 function worker() {
   const gateway = createLocalGateway();
