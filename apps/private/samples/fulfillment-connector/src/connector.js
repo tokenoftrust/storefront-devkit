@@ -69,6 +69,7 @@ export function createConnector({ gateway, labelProvider, logger, simulate = {} 
     }
     const recipient = await gateway.readRecipient(assignment.orderId);
     if (!recipient.ok) return { refused: recipient };
+    logger.info('recipient read returned', { kind: 'recipient-read-succeeded', orderId: assignment.orderId, assignmentId: assignment.assignmentId });
     let shipTo = recipient.body;
     try {
       const label = await providerCall('purchase', assignment, () =>
@@ -172,6 +173,7 @@ export function createConnector({ gateway, labelProvider, logger, simulate = {} 
         logger.info('order not in the reconciliation read; nothing to do', { orderId });
         return { status: 'absent' };
       }
+      logger.info('reconciliation assignment read', { kind: 'reconciliation-read-succeeded', orderId: assignment.orderId, assignmentId: assignment.assignmentId });
       return processAssignment(assignment, { traceparent });
     });
   }
@@ -199,6 +201,7 @@ export function createConnector({ gateway, labelProvider, logger, simulate = {} 
       }
       const results = [];
       for (const assignment of list.assignments) {
+        logger.info('reconciliation assignment read', { kind: 'reconciliation-read-succeeded', orderId: assignment.orderId, assignmentId: assignment.assignmentId });
         if (assignments.get(assignment.assignmentId)?.state === 'held') record(assignment.assignmentId, assignment.orderId, { state: 'active' });
         results.push(await oncePerOrder(assignment.orderId, () => processAssignment(assignment)));
       }
