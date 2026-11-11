@@ -30,6 +30,53 @@ Worker (`worker.js`), with no dependencies: Node built-ins and Web Crypto only.
    `Idempotency-Key` derived from the order id and the canonical evidence body, so a retry re-sends
    identical bytes under the identical key and a different fact always gets a different key.
 
+## Preview stage transport
+
+The deployed connector (`server.js` and `worker.js`) talks to the tenant's **preview stage**, and
+there is no opt-out: no flag, `NODE_ENV` or `LABEL_PROVIDER` value turns it off. The preview
+capability is the one `__preview` query parameter of the private `TOT_STOREFRONT_BASE_URL`:
+
+```
+https://<tenant>.tokenoftrust.store/?__preview=<claims>.<signature>
+```
+
+[`src/config.js`](./src/config.js) takes the capability out before reducing the URL to its origin.
+It requires HTTPS, no userinfo, no fragment, the root path of a host-routed storefront, no other
+query parameter, exactly one nonempty `__preview` of two base64url segments, and a decoded claims
+segment whose `env` is `test` and whose `exp` is a number. Anything else refuses initialization with
+`config_invalid`, naming the variable and never its value: `server.js` exits 1, and the Worker
+answers every request `503 {"code":"config_invalid"}` while its cron logs the refusal and makes no
+request. The Worker reads its configuration on every request.
+
+Every outbound request goes through ONE scoped fetch ([`src/preview-transport.js`](./src/preview-transport.js)):
+
+- **Destination.** HTTPS to the exact configured origin, and only these five method/path pairs:
+  `GET /.well-known/tot-app-authorization-metadata`, `POST /api/apps/oauth/token`,
+  `GET /api/apps/v1/fulfillment/assignments` (query keys `limit` and `cursor` only),
+  `GET /api/apps/v1/fulfillment/orders/{orderId}/recipient` and
+  `POST /api/apps/v1/fulfillment/orders/{orderId}/shipment-evidence`. An order id that would need
+  percent-encoding is refused. The metadata's `token_endpoint` must be that exact same-origin OAuth
+  path. Signing-key refresh is only a `GET` of the metadata document.
+- **Capability.** Sent only as `Cookie: tot_preview=<capability>`, never in a URL, log line, error or
+  returned configuration (which carries no client secret either). A caller-supplied `Cookie` header
+  is refused, not overwritten.
+- **Redirects.** Sent with `redirect: 'manual'`; any 3xx or opaque-redirect response is refused and
+  never followed. workerd rejects `redirect: 'error'`, so manual mode is the one that works on both
+  Workers and Node.
+- **Expiry.** Before every request, including with cached metadata or a cached token, the
+  capability's own `exp` claim is checked against the clock. At or past it the request is refused
+  with `preview_context_expired` and nothing is sent. The check is deny-only: the storefront still
+  verifies the capability's signature and tenant on every request.
+- **Storefront refusal.** An answer whose `code` is `preview_context_refused` (at any status,
+  including 503) is recognised before anything else reads the body, and is surfaced as that code:
+  no new token is requested and nothing is retried. Mint a new capability, update
+  `TOT_STOREFRONT_BASE_URL`, and redeploy.
+
+Every refusal the transport decides is a `TransportRefusal` with a fixed code and is never retried.
+Remote refusal bodies are reduced to the contract's `FulfillmentRefusal.code` values (anything else
+is `unexpected`) and their `error` text is never read, so no remote text reaches an error message or
+a log line.
+
 Every pass asks the provider about the `purchaseId` first (`lookup`), before it reads the
 recipient, and buys only when the provider has no attempt on record. So an `unknown` label outcome
 is reported once and then reconciled with the provider under the same `purchaseId` on later passes,
@@ -108,7 +155,7 @@ you are logged in to, and all five settings are Worker secrets.
 npx wrangler login
 npx wrangler secret put TOT_APP_CLIENT_ID
 npx wrangler secret put TOT_APP_CLIENT_SECRET
-npx wrangler secret put TOT_STOREFRONT_BASE_URL   # https://<tenant>.tokenoftrust.store
+npx wrangler secret put TOT_STOREFRONT_BASE_URL   # https://<tenant>.tokenoftrust.store/?__preview=<capability>
 npx wrangler secret put WEBHOOK_PUBLIC_URL        # https://tot-fulfillment-connector-sample.<subdomain>.workers.dev/webhooks/tot
 npx wrangler secret put LABEL_PROVIDER            # carrier (your provider) or simulated (nothing ships)
 npx wrangler deploy
@@ -140,7 +187,7 @@ only), for example in a Durable Object, D1 or KV.
 
 ```sh
 TOT_APP_CLIENT_ID=... TOT_APP_CLIENT_SECRET=... \
-TOT_STOREFRONT_BASE_URL=https://<tenant>.tokenoftrust.store \
+TOT_STOREFRONT_BASE_URL='https://<tenant>.tokenoftrust.store/?__preview=<capability>' \
 WEBHOOK_PUBLIC_URL=https://<your-host>/webhooks/tot \
 LABEL_PROVIDER=carrier \
 node server.js
@@ -149,7 +196,7 @@ node server.js
 | Variable | Required | Meaning |
 |---|---|---|
 | `TOT_APP_CLIENT_ID`, `TOT_APP_CLIENT_SECRET` | yes | Installation credentials from the approved setup flow. Server-side only. |
-| `TOT_STOREFRONT_BASE_URL` | yes | The tenant's storefront origin (https). The API is `/api/apps/v1`; the token endpoint and the webhook signing keys are discovered from `/.well-known/tot-app-authorization-metadata`. |
+| `TOT_STOREFRONT_BASE_URL` | yes | The tenant's host-routed storefront root (https) with its preview capability as the only query parameter, `?__preview=<capability>`. Treat it as a secret. The API is `/api/apps/v1`; the token endpoint and the webhook signing keys are discovered from `/.well-known/tot-app-authorization-metadata`. See [Preview stage transport](#preview-stage-transport). |
 | `WEBHOOK_PUBLIC_URL` | yes | The exact HTTPS URL registered as `webhooks.endpoint` in [`tot-app.json`](./tot-app.json). It is the signed `@target-uri`, so it must match byte for byte. |
 | `LABEL_PROVIDER` | yes | `carrier` (your provider) or `simulated` (fabricated labels, nothing ships). See [Label provider](#label-provider). |
 | `PORT` | no | Local listen port, default 8787. Terminate TLS in front of it. |
@@ -183,8 +230,10 @@ is a real credential, tenant or address.
 | `worker.js`, `wrangler.toml` | Cloudflare Workers entry point: `fetch` for deliveries, `scheduled` for the reconciliation cron. |
 | `demo.js` | Offline walkthrough with the simulation flags. |
 | `src/http-signature.js`, `src/structured-fields.js` | Content-Digest and RFC 9421 verification. |
-| `src/gateway-metadata.js` | Authorization-metadata discovery and signing-key cache. |
-| `src/gateway-client.js` | Client-credentials token, the three `/fulfillment` routes, stable idempotency keys, retries. |
+| `src/config.js` | Environment configuration and the private extraction of the preview capability. |
+| `src/preview-transport.js` | The one scoped fetch: exact origin, five method/path pairs, preview cookie, redirect refusal, expiry precheck, `preview_context_refused`. |
+| `src/gateway-metadata.js` | Authorization-metadata discovery (GET only), same-origin token endpoint check, signing-key cache. |
+| `src/gateway-client.js` | Client-credentials token, the three `/fulfillment` routes, stable idempotency keys, retries, remote refusals reduced to fixed codes. |
 | `src/connector.js` | Reconcile, recipient, label, evidence. |
 | `src/webhook.js` | Delivery handler and the `node:http` adapter. |
 | `src/label-provider.js` | Provider selection (`LABEL_PROVIDER`), the `createCarrierLabelProvider` stub you implement, and the simulator. |

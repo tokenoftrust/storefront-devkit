@@ -15,6 +15,19 @@ export const SIM_WEBHOOK_URL = 'https://fulfillment.example.com/webhooks/tot';
 export const SIM_CLIENT_ID = 'sim-client-id';
 export const SIM_CLIENT_SECRET = 'sim-client-secret-not-a-real-secret';
 
+/**
+ * A synthetic preview capability in the platform's shape: a base64url JSON
+ * claims segment and a second segment. The simulator does not verify the
+ * second segment; it only checks that the Cookie carries this exact value.
+ */
+export function previewCapabilityFor(claims, signature = 'c2ltLXByZXZpZXctc2lnbmF0dXJl') {
+  return `${Buffer.from(JSON.stringify(claims)).toString('base64url')}.${signature}`;
+}
+export const SIM_PREVIEW_EXP = 4_102_444_800; // 2100-01-01, epoch seconds
+export const SIM_PREVIEW_CAPABILITY = previewCapabilityFor({ tenantId: 'sim-tenant', env: 'test', exp: SIM_PREVIEW_EXP });
+export const SIM_PREVIEW_BASE_URL = `${SIM_BASE_URL}/?__preview=${SIM_PREVIEW_CAPABILITY}`;
+export const PREVIEW_CONTEXT_REFUSED = 'preview_context_refused';
+
 const CARRIERS = new Set(['UPS', 'FEDEX', 'USPS', 'DHL']);
 const LABEL_FIELDS = ['carrier', 'service', 'trackingNumber', 'trackingUrl', 'adultSignature'];
 
@@ -39,14 +52,23 @@ const json = (status, body, extra = {}) =>
   });
 const refuse = (status, code, extra = {}) => json(status, { code, error: code, ...extra });
 
-export function createLocalGateway({ assignment = example('fulfillment.assignments.response.json').assignments[0], recipient = example('fulfillment.recipient.response.json') } = {}) {
+/**
+ * `previewCapability`: when set, the double behaves like a preview stage and
+ * refuses any request whose Cookie is not exactly `tot_preview=<capability>`
+ * with 401 preview_context_refused.
+ */
+export function createLocalGateway({
+  assignment = example('fulfillment.assignments.response.json').assignments[0],
+  recipient = example('fulfillment.recipient.response.json'),
+  previewCapability,
+} = {}) {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const keyid = 'sim-webhook-key-1';
   const jwk = { ...publicKey.export({ format: 'jwk' }), kid: keyid, alg: 'RS256', use: 'sig' };
   const tokens = new Set();
   const idempotency = new Map();
   const order = { version: assignment.eventVersion, label: 'intent', handoff: 'none', facts: null };
-  const calls = { recipientReads: 0, evidence: [] };
+  const calls = { recipientReads: 0, evidence: [], requests: [] };
 
   function view() {
     const v = { orderId: assignment.orderId, version: order.version, label: order.label, handoff: order.handoff, purchaseId: assignment.purchaseId };
@@ -102,6 +124,10 @@ export function createLocalGateway({ assignment = example('fulfillment.assignmen
     const method = (init.method ?? 'GET').toUpperCase();
     const headers = Object.fromEntries(Object.entries(init.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
     if (url.origin !== SIM_BASE_URL) throw new TypeError(`simulator has no route for ${url.origin}`);
+    calls.requests.push({ method, path: url.pathname, search: url.search, cookie: headers.cookie, redirect: init.redirect });
+    if (previewCapability !== undefined && headers.cookie !== `tot_preview=${previewCapability}`) {
+      return refuse(401, PREVIEW_CONTEXT_REFUSED);
+    }
 
     if (method === 'GET' && url.pathname === '/.well-known/tot-app-authorization-metadata') {
       return json(200, {
