@@ -60,8 +60,10 @@ channels:
 
   inventory.changed:
     description: >
-      Emitted when inventory availability changes. Requires scope inventory:read. An app
-      correction through POST /inventory/movements (scope inventory:write) emits no event.
+      Emitted once on every committed inventory ledger movement (app correction, source
+      on-hand observation, catalog import, and order decrement). Requires scope
+      inventory:read. Carries SKU, location, the resulting balance and as-of stamp, with no
+      customer identity.
     subscribe:
       operationId: onInventoryChanged
       message:
@@ -236,12 +238,16 @@ components:
     InventoryChangedData:
       type: object
       additionalProperties: false
-      required: [sku, available]
+      description: >
+        Closed four-key payload emitted on every committed inventory ledger movement. Carries
+        only SKU, location, the resulting balance and as-of stamp — no customer identity or
+        order fields.
+      required: [sku, locationId, balance, asOf]
       properties:
-        sku: { type: string }
-        available: { type: boolean }
-        quantity: { type: integer }
-        policy: { type: string, enum: [continue, deny] }
+        sku: { type: string, minLength: 1 }
+        locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        balance: { type: integer }
+        asOf: { type: string, format: date-time }
 
     CustomerMarketingConsentUpdatedData:
       type: object

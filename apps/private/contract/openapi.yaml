@@ -328,7 +328,8 @@ paths:
         sets the balance to the observed value, and an app correction committed before it
         does not survive it. Every row remains in the ledger. Fulfilment progress is a
         separate write-back: `POST /fulfillment/orders/{orderId}/shipment-evidence`.
-        No event is emitted. Response is always `cache-control: no-store`.
+        Commits emit `inventory.changed` to active installs holding `inventory:read`. Response
+        is always `cache-control: no-store`.
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - $ref: '#/components/parameters/IdempotencyKey'

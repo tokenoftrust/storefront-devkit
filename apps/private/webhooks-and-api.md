@@ -101,10 +101,12 @@ through `POST /inventory/movements`, and an inventory correction never advances 
   source on-hand observation committed after an app correction sets the balance to the observed
   value, superseding the earlier correction; every row remains in the append-only ledger so the
   history stays auditable. Refused writes leave no movement, no audit row, and no receipt.
-- **Webhook notifications.** `inventory.changed`
-  ([example](./contract/examples/inventory.changed.cloudevent.json)) requires `inventory:read` and
-  carries SKU availability (`sku`, `available`, `quantity`, `policy`). An app correction through
-  `POST /inventory/movements` emits no event.
+- **Webhook notifications.** Every committed inventory ledger movement (app correction, source
+  on-hand observation, catalog import, and order decrement) emits `inventory.changed`
+  ([example](./contract/examples/inventory.changed.cloudevent.json)) once to active installs
+  holding `inventory:read`, carrying the closed four-key payload (`sku`, `locationId`, `balance`,
+  `asOf`) with no customer identity or order fields. Refused or replayed writes emit no duplicate
+  event.
 
 ### Inventory refusal codes
 

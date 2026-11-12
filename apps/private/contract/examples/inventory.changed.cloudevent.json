@@ -13,8 +13,8 @@
   "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
   "data": {
     "sku": "VAPE-KIT-STARTER",
-    "available": true,
-    "quantity": 18,
-    "policy": "deny"
+    "locationId": "unspecified",
+    "balance": 18,
+    "asOf": "2026-07-21T19:12:04.000Z"
   }
 }
