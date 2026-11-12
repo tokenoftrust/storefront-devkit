@@ -59,7 +59,9 @@ channels:
         $ref: '#/components/messages/CatalogProductUpdated'
 
   inventory.changed:
-    description: Emitted when inventory availability changes. Requires scope inventory:read.
+    description: >
+      Emitted when inventory availability changes. Requires scope inventory:read. An app
+      correction through POST /inventory/movements (scope inventory:write) emits no event.
     subscribe:
       operationId: onInventoryChanged
       message:

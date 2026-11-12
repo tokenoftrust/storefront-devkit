@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "sku": "VAPE-KIT-STARTER",
+      "available": true,
+      "quantity": 18,
+      "policy": "deny",
+      "mirror": {
+        "locationId": "unspecified",
+        "balance": 18,
+        "asOf": "2026-07-21T19:12:04.000Z"
+      }
+    }
+  ],
+  "pageSize": 50,
+  "total": 1,
+  "nextCursor": null
+}

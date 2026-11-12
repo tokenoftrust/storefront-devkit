@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Storefront Private Apps API
-  version: "1.1.0"
+  version: "1.2.0"
   license:
     name: Apache-2.0
     url: https://www.apache.org/licenses/LICENSE-2.0
@@ -34,7 +34,10 @@ tags:
   - name: orders
     description: Minimal order reads.
   - name: inventory
-    description: Inventory availability reads.
+    description: >
+      Inventory availability reads, and merchant-consented stock corrections into the tenant's
+      mirror ledger. An app correction is a mirror observation, never an order decrement, a
+      reservation or an authoritative provider.
   - name: reports
     description: Report snapshots.
   - name: attribution
@@ -104,7 +107,12 @@ paths:
       operationId: listCatalogProducts
       summary: List published catalog products
       x-requiredScope: catalog:read
-      description: Requires scope `catalog:read`. Public catalog data only.
+      description: >
+        Requires scope `catalog:read`. Public catalog data only. Supports opaque keyset
+        `cursor` pagination and `updatedSince` filtering (ordered by `handle ASC`), stable
+        under concurrent writes. Enforces the per-install fixed-window rate limit (120
+        requests per 60-second window per install; returns 429 with `Retry-After`, and fails
+        closed with 503 when rate-limit state is unavailable).
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - name: collection
@@ -115,6 +123,18 @@ paths:
           in: query
           schema: { type: string }
           description: Free-text search.
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 512 }
+          description: Opaque keyset cursor returned in a prior page's `nextCursor`. Stable under concurrent writes.
+        - name: updatedSince
+          in: query
+          schema: { type: string, format: date-time }
+          description: ISO-8601 date-time filter; returns only products updated at or after this instant.
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 24 }
+          description: Maximum number of products returned per page (1..100, default 24; alias of `pageSize`).
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }
@@ -130,8 +150,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProductList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /catalog/products/{handle}:
     get:
@@ -224,24 +247,110 @@ paths:
       operationId: listInventory
       summary: Read inventory availability
       x-requiredScope: inventory:read
-      description: Requires scope `inventory:read`. Availability/quantity/policy per SKU only.
+      description: >
+        Requires scope `inventory:read`. Availability/quantity/policy per SKU only, paged
+        (1..100 items per page, default 50) in deterministic `sku ASC` order with an opaque
+        keyset `cursor` and `updatedSince` filter stable under concurrent writes. The tenant's
+        mirror ledger for the routed stage and one location is applied the way storefront pages
+        apply it; a SKU the ledger holds carries its `mirror` reading. The
+        reservation-authority response header states that this projection is not reservation
+        authority. Enforces the per-install fixed-window rate limit (120 requests per
+        60-second window per install; returns 429 with `Retry-After`, and fails closed with
+        503 when rate-limit state is unavailable).
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - name: sku
           in: query
           schema: { type: string }
           description: Optional SKU filter.
+        - name: locationId
+          in: query
+          schema: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$', default: unspecified }
+          description: Ledger location to apply. Defaults to `unspecified`.
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 512 }
+          description: Opaque keyset cursor returned in a prior page's `nextCursor`. Stable under concurrent writes.
+        - name: updatedSince
+          in: query
+          schema: { type: string, format: date-time }
+          description: ISO-8601 date-time filter; returns only SKUs whose mirror ledger reading or catalog product was updated at or after this instant.
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+          description: Maximum number of inventory items returned per page (1..100, default 50).
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+          description: Page size alias for `limit` (1..100, default 50).
       responses:
         '200':
-          description: Inventory list.
+          description: Paged inventory list.
           headers:
             tot-request-id: { $ref: '#/components/headers/TotRequestId' }
             traceparent: { $ref: '#/components/headers/Traceparent' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/InventoryList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /inventory/movements:
+    post:
+      tags: [inventory]
+      operationId: recordInventoryMovement
+      summary: Record one per-SKU, per-location stock correction (idempotent)
+      x-requiredScope: inventory:write
+      description: >
+        Requires scope `inventory:write` on an active install of the host tenant whose env
+        matches the routed stage. Authority: the write is a merchant-consented mirror
+        correction in the tenant's ledger. It never decrements for an order, never
+        reserves and never makes the app an authoritative provider. The install's consent is
+        checked when the movement commits, so a suspend, uninstall or scope removal committed
+        before the write refuses it.
+        Delta semantics: `quantityDelta` is a nonzero safe integer added to the ledger
+        balance of (`sku`, `locationId`). The resulting balance must stay between 0 and
+        2^53-1; a positive delta on a negative balance is accepted when it does not move the
+        balance further below zero. Overflow is refused, never clamped. `sku` must be in
+        the tenant catalog; `locationId` is `unspecified` (the default) or a location that
+        already has movements in this tenant's ledger for this stage.
+        Server-derived fields: `asOf` is the server receive time, `source` the app
+        namespace, `actorId` the install, and the event id a digest of the idempotency key.
+        A body naming any of them is refused with 400 `server-derived-field`.
+        Idempotency: `Idempotency-Key` is REQUIRED, scoped to the install, tenant, stage
+        and operation, and bound to the canonical body. A same-key, same-body retry returns
+        the original receipt; another body answers 409 `idempotency-conflict`; concurrent
+        duplicates apply once.
+        Conflict and reconciliation: a later source on-hand observation (by commit order)
+        sets the balance to the observed value, and an app correction committed before it
+        does not survive it. Every row remains in the ledger. Fulfilment progress is a
+        separate write-back: `POST /fulfillment/orders/{orderId}/shipment-evidence`.
+        No event is emitted. Response is always `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InventoryMovementWrite' }
+      responses:
+        '201':
+          description: The correction is recorded, or this is the replay of the receipt under the same key.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryReceipt' }
+        '400': { $ref: '#/components/responses/InventoryRefused' }
+        '401': { $ref: '#/components/responses/InventoryRefused' }
+        '403': { $ref: '#/components/responses/InventoryRefused' }
+        '409': { $ref: '#/components/responses/InventoryRefused' }
+        '422': { $ref: '#/components/responses/InventoryRefused' }
+        '503': { $ref: '#/components/responses/InventoryRefused' }
 
   /reports:
     get:
@@ -552,6 +661,18 @@ components:
     Traceparent:
       description: Echoed W3C Trace Context for the served request.
       schema: { type: string }
+    RetryAfter:
+      description: Seconds remaining until the per-install rate-limit window resets.
+      schema: { type: integer, minimum: 1 }
+    RateLimitLimit:
+      description: Maximum requests permitted per install in the rate-limit window (120 per 60-second window).
+      schema: { type: integer, minimum: 1 }
+    RateLimitRemaining:
+      description: Remaining requests permitted for this install in the current window.
+      schema: { type: integer, minimum: 0 }
+    RateLimitReset:
+      description: Unix epoch seconds when the current per-install rate-limit window resets.
+      schema: { type: integer }
 
   responses:
     Unauthorized:
@@ -576,7 +697,29 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     BadRequest:
-      description: Malformed request (e.g. missing Idempotency-Key).
+      description: Malformed request (e.g. missing Idempotency-Key, malformed cursor or updatedSince).
+      headers:
+        tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: >
+        Per-install fixed-window rate limit exceeded (120 requests per 60-second window per
+        install). Back off for at least `Retry-After` seconds before retrying.
+      headers:
+        tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+        X-RateLimit-Limit: { $ref: '#/components/headers/RateLimitLimit' }
+        X-RateLimit-Remaining: { $ref: '#/components/headers/RateLimitRemaining' }
+        X-RateLimit-Reset: { $ref: '#/components/headers/RateLimitReset' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ServiceUnavailable:
+      description: >
+        Backing storage or rate-limit state is unconfigured or unavailable (`unavailable` /
+        `unconfigured`).
       headers:
         tot-request-id: { $ref: '#/components/headers/TotRequestId' }
       content:
@@ -599,6 +742,17 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/FulfillmentRefusal' }
+
+    InventoryRefused:
+      description: >
+        A refusal from `POST /inventory/movements`. Status and `code` pairs are listed on
+        `InventoryRefusal.code`. Always `cache-control: no-store`; refused writes leave no
+        movement and no receipt.
+      headers:
+        tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/InventoryRefusal' }
 
   schemas:
     Error:
@@ -633,6 +787,7 @@ components:
               - orders:webhook
               - customers:read:minimal
               - inventory:read
+              - inventory:write
               - reports:read
               - attribution:write
               - widgets:launch
@@ -678,10 +833,14 @@ components:
       properties:
         products:
           type: array
+          maxItems: 100
           items: { $ref: '#/components/schemas/Product' }
-        page: { type: integer }
-        pageSize: { type: integer }
-        total: { type: integer }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        nextCursor:
+          type: [string, 'null']
+          description: Opaque keyset cursor for the next page, or null on the final page.
 
     Product:
       type: object
@@ -756,10 +915,11 @@ components:
     InventoryList:
       type: object
       additionalProperties: false
-      required: [items]
+      required: [items, pageSize, total]
       properties:
         items:
           type: array
+          maxItems: 100
           items:
             type: object
             additionalProperties: false
@@ -769,6 +929,70 @@ components:
               available: { type: boolean }
               quantity: { type: integer }
               policy: { type: string, enum: [deny, continue] }
+              mirror:
+                type: object
+                additionalProperties: false
+                required: [locationId, balance, asOf]
+                description: The mirror ledger reading for this SKU at the requested location.
+                properties:
+                  locationId: { type: string }
+                  balance: { type: integer }
+                  asOf: { type: string, format: date-time }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        nextCursor:
+          type: [string, 'null']
+          description: Opaque keyset cursor for the next page, or null on the final page.
+
+    InventoryMovementWrite:
+      type: object
+      additionalProperties: false
+      required: [sku, quantityDelta]
+      properties:
+        sku: { type: string, minLength: 1 }
+        locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$', default: unspecified }
+        quantityDelta:
+          type: integer
+          not: { const: 0 }
+          minimum: -9007199254740991
+          maximum: 9007199254740991
+
+    InventoryReceipt:
+      type: object
+      additionalProperties: false
+      required: [receiptId, sku, locationId, quantityDelta, asOf, balance]
+      properties:
+        receiptId: { type: string }
+        sku: { type: string, description: The catalog's stored form of the SKU. }
+        locationId: { type: string }
+        quantityDelta: { type: integer }
+        asOf: { type: string, format: date-time, description: Server receive time. }
+        balance: { type: integer, description: Ledger balance for the SKU and location after this correction. }
+
+    InventoryRefusal:
+      type: object
+      additionalProperties: false
+      required: [code, error]
+      properties:
+        code:
+          type: string
+          enum:
+            - malformed
+            - server-derived-field
+            - invalid_token
+            - scope_denied
+            - denied
+            - unknown-sku
+            - unknown-location
+            - balance-out-of-range
+            - idempotency-conflict
+            - unavailable
+          description: >
+            400 malformed (body, key or query outside the contract), 400 server-derived-field,
+            401 invalid_token (also a suspended or uninstalled install), 403 scope_denied,
+            403 denied (tenant or stage mismatch), 422 unknown-sku, 422 unknown-location,
+            409 balance-out-of-range, 409 idempotency-conflict, 503 unavailable.
+        error: { type: string }
 
     ReportList:
       type: object

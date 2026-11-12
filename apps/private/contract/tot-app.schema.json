@@ -71,6 +71,7 @@
           "orders:webhook",
           "customers:read:minimal",
           "inventory:read",
+          "inventory:write",
           "reports:read",
           "attribution:write",
           "widgets:launch",

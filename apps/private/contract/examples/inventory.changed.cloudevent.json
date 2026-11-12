@@ -1,0 +1,20 @@
+{
+  "specversion": "1.0",
+  "id": "evt_01J9Z5C1R8M2K4V6B0N3X5Y7A9",
+  "source": "/tenants/acme/storefront",
+  "type": "com.tokenoftrust.storefront.inventory.changed",
+  "time": "2026-07-21T19:12:05.104Z",
+  "datacontenttype": "application/json",
+  "dataschemaversion": "1",
+  "tenantid": "acme",
+  "appinstallid": "inst_01J9Z2R4H5T3W1P8D6F0K9M2C7",
+  "retrycount": 0,
+  "totrequestid": "req_4e8a2c6f1b9d",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+  "data": {
+    "sku": "VAPE-KIT-STARTER",
+    "available": true,
+    "quantity": 18,
+    "policy": "deny"
+  }
+}
