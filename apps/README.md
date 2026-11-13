@@ -23,9 +23,9 @@ examples, concise webhook/API guidance, extensible cloud/runtime hosting guides
 covering Cloudflare Workers, AWS Lambda, Google Cloud Run, Microsoft Azure Functions/Container Apps,
 and Docker), and runnable reference implementations:
 [`examples/hello-inventory/`](./private/examples/hello-inventory/),
-[`recipes/inventory-sync-skuvault/`](./private/recipes/inventory-sync-skuvault/),
-[`recipes/fulfillment-shipstation/`](./private/recipes/fulfillment-shipstation/),
-[`recipes/dropship-split-duoplane/`](./private/recipes/dropship-split-duoplane/), and
+[`recipes/inventory-sync-wms/`](./private/recipes/inventory-sync-wms/),
+[`recipes/fulfillment-label-station/`](./private/recipes/fulfillment-label-station/),
+[`recipes/dropship-multi-supplier/`](./private/recipes/dropship-multi-supplier/), and
 [`samples/fulfillment-connector/`](./private/samples/fulfillment-connector/).
 [`private-apps/`](../private-apps/) remains the stable legacy guide.
 

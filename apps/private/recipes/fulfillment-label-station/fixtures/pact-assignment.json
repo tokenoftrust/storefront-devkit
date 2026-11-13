@@ -8,7 +8,7 @@
     "datacontenttype": "application/json",
     "dataschemaversion": "1",
     "tenantid": "acme-vape",
-    "appinstallid": "inst_shipstation_01",
+    "appinstallid": "inst_label_station_01",
     "retrycount": 0,
     "totrequestid": "req_ship_01J9Z8",
     "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",

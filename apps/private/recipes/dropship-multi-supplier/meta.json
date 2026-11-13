@@ -1,0 +1,9 @@
+{
+  "id": "private-app-recipe-dropship-multi-supplier",
+  "kind": "recipe",
+  "title": "3PL & Multi-Supplier Dropship Routing Connector (Location Routing, Partial Shipments & Exceptions)",
+  "description": "Runnable Private App connector recipe for 3PL and multi-supplier dropship routing: Stone 1 location-keyed processor coexistence ((tenant_id, stage, location_id)), partial line shipments emitting order.partially_fulfilled -> order.fulfilled, processor line exceptions (backordered, cannot_fulfill, address_undeliverable), and Stone 2 multi-supplier cart auto-split contract shape.",
+  "tags": ["private-apps", "fulfillment", "inventory", "dropship", "3pl", "multi-warehouse", "exceptions", "recipe"],
+  "contract": "private-apps@1.3",
+  "requires": { "node": ">=20", "cli": ">=6.12.2" }
+}

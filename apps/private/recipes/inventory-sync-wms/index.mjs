@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Multi-Location WMS Connector Recipe (SkuVault / Finale Inventory / ERP stock masters):
+// Multi-Location WMS Connector Recipe (WMS / ERP stock masters):
 // 1. Declares and inspects warehouse/3PL locations (GET/PUT /api/apps/v1/inventory/locations/{locationId}).
 // 2. Reconciles absolute on-hand levels (PUT /api/apps/v1/inventory/levels) with expectedVersion CAS,
 //    automatically recovering from 409 version_conflict by re-reading GET /api/apps/v1/inventory.
@@ -19,7 +19,7 @@ const SAMPLE_EVENT = JSON.parse(
 );
 
 /**
- * Maps WMS/SkuVault reason vocabularies (`receive`, `pick`, `cycle_count`, `damage`,
+ * Maps WMS reason vocabularies (`receive`, `pick`, `cycle_count`, `damage`,
  * `transfer_in`, `transfer_out`, `return_restock`) to the OpenAPI InventoryMovementReason wire enum.
  */
 export const WMS_REASON_TO_CONTRACT = Object.freeze({
@@ -73,7 +73,7 @@ export function classifyThresholdTransition({ previousAvailable, currentAvailabl
   return 'steady';
 }
 
-export function createSkuVaultWmsConnector({ baseUrl, accessToken, fetchImpl = fetch, lowStockThreshold = 5 }) {
+export function createWmsInventoryConnector({ baseUrl, accessToken, fetchImpl = fetch, lowStockThreshold = 5 }) {
   const seenEvents = new Set();
   const lastAvailableBySkuLocation = new Map();
 
@@ -342,7 +342,7 @@ export function createSimulatedWmsGateway() {
 
 export async function runSelfTest() {
   const sim = createSimulatedWmsGateway();
-  const connector = createSkuVaultWmsConnector({
+  const connector = createWmsInventoryConnector({
     baseUrl: 'https://tot-preview.tokenoftrust.store',
     accessToken: 'sim-wms-token',
     fetchImpl: sim.fetchImpl,
@@ -419,5 +419,5 @@ export async function runSelfTest() {
 
 if (process.argv.includes('--self-test') || import.meta.url === `file://${process.argv[1]}`) {
   const summary = await runSelfTest();
-  console.log(JSON.stringify({ event: 'inventory-sync-skuvault:self-test:passed', ...summary }));
+  console.log(JSON.stringify({ event: 'inventory-sync-wms:self-test:passed', ...summary }));
 }

@@ -1,9 +1,9 @@
 {
-  "id": "private-app-recipe-inventory-sync-skuvault",
+  "id": "private-app-recipe-inventory-sync-wms",
   "kind": "recipe",
-  "title": "Multi-Location WMS Inventory Sync (SkuVault / Finale / ERP)",
+  "title": "Multi-Location WMS Inventory Sync (Locations, CAS Reconcile & Batch Movements)",
   "description": "Runnable Private App connector recipe for multi-location WMS stock masters: location upsert, PUT /inventory/levels CAS reconciliation (including 409 version_conflict recovery), batch WMS POST /inventory/movements, and inventory.changed threshold transition handling.",
-  "tags": ["private-apps", "inventory", "wms", "skuvault", "finale", "locations", "reconcile", "recipe"],
+  "tags": ["private-apps", "inventory", "wms", "erp", "locations", "reconcile", "recipe"],
   "contract": "private-apps@1.3",
   "requires": { "node": ">=20", "cli": ">=6.12.2" }
 }

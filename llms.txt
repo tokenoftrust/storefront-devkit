@@ -25,9 +25,9 @@
   Lambda, Google Cloud Run, Microsoft Azure Functions, and Docker), and runnable reference
   implementations:
   [hello-inventory](./apps/private/examples/hello-inventory/),
-  [inventory-sync-skuvault](./apps/private/recipes/inventory-sync-skuvault/),
-  [fulfillment-shipstation](./apps/private/recipes/fulfillment-shipstation/),
-  [dropship-split-duoplane](./apps/private/recipes/dropship-split-duoplane/), and
+  [inventory-sync-wms](./apps/private/recipes/inventory-sync-wms/),
+  [fulfillment-label-station](./apps/private/recipes/fulfillment-label-station/),
+  [dropship-multi-supplier](./apps/private/recipes/dropship-multi-supplier/), and
   [fulfillment-connector](./apps/private/samples/fulfillment-connector/).
 - [private-apps/](./private-apps/): Stable compatibility guide for the current, language-neutral
   private-app path. The MCP recipe `recipe://storefront-private-apps-devbook` is a pointer/index,

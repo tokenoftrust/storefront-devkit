@@ -1,6 +1,6 @@
-# Recipe: Multi-Location WMS Inventory Sync (`inventory-sync-skuvault`)
+# Recipe: Multi-Location WMS Inventory Sync (`inventory-sync-wms`)
 
-**Target systems:** SkuVault, Finale Inventory, NetSuite/ERP stock masters, and custom multi-warehouse WMS connectors.
+**Target systems:** Multi-location warehouse management systems (WMS), ERP stock masters, and custom multi-warehouse inventory connectors.
 
 **Scopes required (`tot-app.json`):** `catalog:read`, `inventory:read`, `inventory:write`
 
@@ -14,7 +14,7 @@ atomic batches of WMS stock movements, and processes `inventory.changed` thresho
 
 1. **Day-1 initial stock import (certified migration agencies):**
    Before cutover, migration engineers can seed baseline on-hand inventory from a merchant's legacy
-   Shopify/SkuVault CSV export using the Agency Kit CLI (`agency-kit/tools/import-stock.mjs`) or seed
+   commerce or WMS CSV export using the Agency Kit CLI (`agency-kit/tools/import-stock.mjs`) or seed
    a preview store directly via:
    ```bash
    tot catalog seed --preset=multi-warehouse
@@ -106,13 +106,13 @@ curl -sS -X POST "https://<tenant>.tokenoftrust.store/api/apps/admin/candidates"
   -H "Content-Type: application/json" \
   -d @- <<'EOF'
 {
-  "appId": "com.example.wms-skuvault-sync",
+  "appId": "com.example.wms-inventory-sync",
   "appVersion": "1.3.0",
   "scopes": ["catalog:read", "inventory:read", "inventory:write"],
   "manifest": {
     "contractVersion": "1",
-    "id": "com.example.wms-skuvault-sync",
-    "name": "SkuVault Multi-Location WMS Sync",
+    "id": "com.example.wms-inventory-sync",
+    "name": "Multi-Location WMS Inventory Sync",
     "version": "1.3.0",
     "owner": { "name": "Example WMS Integrations", "email": "wms-ops@integrations.example.com" },
     "installMode": "external",

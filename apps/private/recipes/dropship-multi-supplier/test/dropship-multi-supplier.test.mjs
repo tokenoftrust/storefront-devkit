@@ -7,7 +7,7 @@ import {
   runSelfTest,
 } from '../index.mjs';
 
-test('dropship-split-duoplane manifest requests fulfillment, recipient, orders, and inventory scopes', () => {
+test('dropship-multi-supplier manifest requests fulfillment, recipient, orders, and inventory scopes', () => {
   const manifest = JSON.parse(readFileSync(new URL('../tot-app.json', import.meta.url), 'utf8'));
   assert.equal(manifest.contractVersion, '1');
   assert.deepEqual(manifest.scopes, [
@@ -38,7 +38,7 @@ test('self-test verifies Stone 1 location-keyed routing, partial shipments (orde
 test('planStone2MultiVendorSplit groups cart lines by (appInstallId, locationId)', () => {
   const bindings = new Map([
     ['wh-east', { appInstallId: 'inst_wh_east' }],
-    ['vendor-alpha', { appInstallId: 'inst_duoplane' }],
+    ['vendor-alpha', { appInstallId: 'inst_dropship_alpha' }],
   ]);
   const routes = planStone2MultiVendorSplit({
     orderId: 'ord_99',

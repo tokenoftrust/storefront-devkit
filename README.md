@@ -53,9 +53,9 @@ Storefront tenant rather than customizing its tenant-owned files.
   multi-tenant & cloud hosting fast-paths ([`apps/private/hosting/`](./apps/private/hosting/README.md)
   for Cloudflare Workers, AWS Lambda, Google Cloud Run, Microsoft Azure Functions, and Docker),
   starter example ([`apps/private/examples/hello-inventory/`](./apps/private/examples/hello-inventory/)),
-  and connector recipes ([`apps/private/recipes/inventory-sync-skuvault/`](./apps/private/recipes/inventory-sync-skuvault/),
-  [`apps/private/recipes/fulfillment-shipstation/`](./apps/private/recipes/fulfillment-shipstation/),
-  [`apps/private/recipes/dropship-split-duoplane/`](./apps/private/recipes/dropship-split-duoplane/)).
+  and connector recipes ([`apps/private/recipes/inventory-sync-wms/`](./apps/private/recipes/inventory-sync-wms/),
+  [`apps/private/recipes/fulfillment-label-station/`](./apps/private/recipes/fulfillment-label-station/),
+  [`apps/private/recipes/dropship-multi-supplier/`](./apps/private/recipes/dropship-multi-supplier/)).
   The stable [`private-apps/`](./private-apps/) guide remains available for existing links.
 - **Public apps are reserved, not announced.** The devkit does not claim a public-app API,
   marketplace, installation flow, or review process. Do not infer one from this repository.

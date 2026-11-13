@@ -1,0 +1,12 @@
+{
+  "name": "storefront-private-app-recipe-inventory-sync-wms",
+  "private": true,
+  "type": "module",
+  "description": "Multi-location WMS connector recipe (warehouse locations, CAS level reconciliation, and batch stock movements) for Storefront Private Apps v1.3.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node index.mjs",
+    "self-test": "node index.mjs --self-test",
+    "test": "node --test test/*.test.mjs"
+  }
+}

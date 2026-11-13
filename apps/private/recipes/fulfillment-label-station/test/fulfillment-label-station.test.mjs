@@ -7,7 +7,7 @@ import {
   runSelfTest,
 } from '../index.mjs';
 
-test('fulfillment-shipstation manifest requests least-privilege fulfillment and recipient scopes', () => {
+test('fulfillment-label-station manifest requests least-privilege fulfillment and recipient scopes', () => {
   const manifest = JSON.parse(readFileSync(new URL('../tot-app.json', import.meta.url), 'utf8'));
   assert.equal(manifest.contractVersion, '1');
   assert.deepEqual(manifest.scopes, [

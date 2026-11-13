@@ -27,19 +27,19 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
     Container Apps, Docker containers, pull-only scheduled jobs, and local preview tunnels.
   - `apps/private/examples/hello-inventory/` — starter private app demonstrating location
     registration, stock reads, idempotent movement writes, and synthetic preview orders.
-  - `apps/private/recipes/inventory-sync-skuvault/` — multi-location WMS connector recipe (SkuVault,
-    Finale Inventory, ERP/WMS) demonstrating location upsert, `PUT /inventory/levels` CAS
+  - `apps/private/recipes/inventory-sync-wms/` — multi-location WMS connector recipe
+    demonstrating location upsert, `PUT /inventory/levels` CAS
     reconciliation, batch WMS movement writes across all 7 reason codes, and `inventory.changed`
     threshold transition handling (`low_stock`, `out_of_stock`, `back_in_stock`).
-  - `apps/private/recipes/fulfillment-shipstation/` — shipping & PACT label station connector recipe
-    (ShipStation, PirateShip, Shippo) demonstrating assignment webhooks/reconciliation, recipient
+  - `apps/private/recipes/fulfillment-label-station/` — shipping & PACT label station connector recipe
+    demonstrating assignment webhooks/reconciliation, recipient
     hydration, PACT carrier validation (refusing USPS with `422 pact_carrier_ineligible`), 1:N split
     cartons, and `label-voided` recovery.
-  - `apps/private/recipes/dropship-split-duoplane/` — 3PL & multi-vendor routing connector recipe
-    (Duoplane, DSCO, multi-warehouse dropship) demonstrating Stone 1 location-keyed processor
+  - `apps/private/recipes/dropship-multi-supplier/` — 3PL & multi-supplier routing connector recipe
+    demonstrating Stone 1 location-keyed processor
     coexistence, partial line shipments (`order.partially_fulfilled` → `order.fulfilled`), and
     exception reporting (`backordered`, `cannot_fulfill`, `address_undeliverable`), plus Stone 2
-    multi-vendor cart auto-split planning.
+    multi-supplier cart auto-split planning.
 - Private Apps contract 1.2 (minor, compatible), mirrored from Storefront
   `ba07b4eb19c54e160277c2b086e6cba7510e20c2`: new `inventory:write` scope (`scopes.json`,
   `tot-app.schema.json`, `openapi.yaml`); idempotent `POST /inventory/movements` with closed

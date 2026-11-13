@@ -1,9 +1,9 @@
 {
-  "id": "private-app-recipe-fulfillment-shipstation",
+  "id": "private-app-recipe-fulfillment-label-station",
   "kind": "recipe",
-  "title": "Shipping & Label Station Connector (ShipStation / PirateShip / Shippo / PACT)",
+  "title": "Shipping & Label Station Connector (PACT Carriers, 1:N Split Cartons & Label Void)",
   "description": "Runnable Private App fulfillment recipe demonstrating PACT & adultSignature carrier catalog checks (GET /fulfillment/carriers), USPS refusal on regulated orders, recipient hydration, 1:N split-carton shipments (POST /fulfillment/assignments/{assignmentId}/shipments), and whole-order shipment evidence including label-voided.",
-  "tags": ["private-apps", "fulfillment", "shipstation", "shippo", "pirateship", "pact", "carriers", "recipe"],
+  "tags": ["private-apps", "fulfillment", "shipping", "labels", "pact", "carriers", "split-shipment", "recipe"],
   "contract": "private-apps@1.3",
   "requires": { "node": ">=20", "cli": ">=6.12.2" }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 3PL & Multi-Vendor Dropship Routing Connector Recipe (Duoplane / DSCO):
+// 3PL & Multi-Supplier Dropship Routing Connector Recipe:
 // Demonstrates:
 // - Stone 1 (Live):
 //   1. Location-keyed processor coexistence keyed by (tenant_id, stage, location_id).
@@ -10,7 +10,7 @@
 //   4. Reporting processor line exceptions via POST /fulfillment/assignments/{assignmentId}/exceptions
 //      (backordered, cannot_fulfill / vendor_rejected, address_undeliverable).
 // - Stone 2 (Contract Locked):
-//   5. Planning a multi-vendor single-cart auto-split across distinct (appInstallId, locationId) pairs.
+//   5. Planning a multi-supplier single-cart auto-split across distinct (appInstallId, locationId) pairs.
 //
 // Run offline self-test:
 //   node index.mjs --self-test
@@ -19,11 +19,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 const FIXTURE = JSON.parse(
-  readFileSync(new URL('./fixtures/duoplane-routing.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('./fixtures/multi-supplier-routing.json', import.meta.url), 'utf8'),
 );
 
 /**
- * Maps processor/Duoplane exception reasons (`backordered`, `cannot_fulfill`, `address_undeliverable`)
+ * Maps processor/supplier exception reasons (`backordered`, `cannot_fulfill`, `address_undeliverable`)
  * onto the contract's `AssignmentExceptionWrite.code` enum (`vendor_rejected`, `backordered`,
  * `out_of_stock`, `damaged`, `address_undeliverable`, `carrier_refused`, `other`).
  */
@@ -80,7 +80,7 @@ export function planStone2MultiVendorSplit({ orderId, cartLines, locationBinding
   return Array.from(groups.values());
 }
 
-export function createDuoplaneRoutingConnector({ baseUrl, accessToken, fetchImpl = fetch }) {
+export function createMultiSupplierRoutingConnector({ baseUrl, accessToken, fetchImpl = fetch }) {
   async function request(method, path, { body, idempotencyKey } = {}) {
     const headers = {
       accept: 'application/json',
@@ -105,7 +105,7 @@ export function createDuoplaneRoutingConnector({ baseUrl, accessToken, fetchImpl
     listAssignments() {
       return request('GET', '/fulfillment/assignments');
     },
-    postPartialShipment(assignmentId, shipmentWrite, idempotencyKey = deriveIdempotencyKey(`duo-shp-${assignmentId}`, shipmentWrite)) {
+    postPartialShipment(assignmentId, shipmentWrite, idempotencyKey = deriveIdempotencyKey(`sup-shp-${assignmentId}`, shipmentWrite)) {
       return request('POST', `/fulfillment/assignments/${encodeURIComponent(assignmentId)}/shipments`, {
         body: shipmentWrite,
         idempotencyKey,
@@ -114,7 +114,7 @@ export function createDuoplaneRoutingConnector({ baseUrl, accessToken, fetchImpl
     postLineException(assignmentId, { reason, lines, note }, idempotencyKey) {
       const code = normalizeExceptionCode(reason);
       const body = { code, lines, ...(note ? { note } : {}) };
-      const key = idempotencyKey ?? deriveIdempotencyKey(`duo-exc-${assignmentId}`, body);
+      const key = idempotencyKey ?? deriveIdempotencyKey(`sup-exc-${assignmentId}`, body);
       return request('POST', `/fulfillment/assignments/${encodeURIComponent(assignmentId)}/exceptions`, {
         body,
         idempotencyKey: key,
@@ -128,11 +128,11 @@ export function createDuoplaneRoutingConnector({ baseUrl, accessToken, fetchImpl
  * coexistence, partial line shipments (`order.partially_fulfilled` -> `order.fulfilled`),
  * and processor exceptions (`backordered`, `cannot_fulfill`/`vendor_rejected`, `address_undeliverable`).
  */
-export function createSimulatedDuoplaneGateway() {
+export function createSimulatedMultiSupplierGateway() {
   // Processor registry keyed by `${tenantId}:${stage}:${locationId}` -> appInstallId
   const processorBindings = new Map([
-    ['acme:preview:wh-house-tx', 'inst_shipstation_house_wh'],
-    ['acme:preview:vendor-west-ca', 'inst_duoplane_dropship'],
+    ['acme:preview:wh-house-tx', 'inst_label_station_house_wh'],
+    ['acme:preview:vendor-west-ca', 'inst_3pl_dropship_router'],
   ]);
   const assignments = structuredClone(FIXTURE.stone1Assignments);
   const exceptions = [];
@@ -221,21 +221,21 @@ export function createSimulatedDuoplaneGateway() {
 }
 
 export async function runSelfTest() {
-  const sim = createSimulatedDuoplaneGateway();
-  const connector = createDuoplaneRoutingConnector({
+  const sim = createSimulatedMultiSupplierGateway();
+  const connector = createMultiSupplierRoutingConnector({
     baseUrl: 'https://tot-preview.tokenoftrust.store',
-    accessToken: 'sim-duoplane-token',
+    accessToken: 'sim-dropship-token',
     fetchImpl: sim.fetchImpl,
   });
 
   // 1. Stone 1: Declare dropship vendor location and verify location-keyed processor coexistence
   const loc = await connector.upsertVendorLocation('vendor-west-ca', {
-    name: 'West Coast Glass Supplier (Duoplane)',
+    name: 'West Coast Glass Supplier (3PL)',
     kind: 'dropship_vendor',
   });
   assert.equal(loc.status, 200);
-  assert.equal(sim.processorBindings.get('acme:preview:wh-house-tx'), 'inst_shipstation_house_wh');
-  assert.equal(sim.processorBindings.get('acme:preview:vendor-west-ca'), 'inst_duoplane_dropship');
+  assert.equal(sim.processorBindings.get('acme:preview:wh-house-tx'), 'inst_label_station_house_wh');
+  assert.equal(sim.processorBindings.get('acme:preview:vendor-west-ca'), 'inst_3pl_dropship_router');
 
   // 2. Reconcile location-routed assignment and inspect lines[]
   const list = await connector.listAssignments();
@@ -284,10 +284,10 @@ export async function runSelfTest() {
   assert.equal(finalShipment.body.complete, true);
   assert.deepEqual(sim.emittedEvents, ['order.partially_fulfilled', 'order.fulfilled']);
 
-  // 6. Stone 2: Validate multi-vendor cart auto-split across distinct (appInstallId, locationId) pairs
+  // 6. Stone 2: Validate multi-supplier cart auto-split across distinct (appInstallId, locationId) pairs
   const bindings = new Map([
-    ['wh-house-tx', { appInstallId: 'inst_shipstation_house_wh' }],
-    ['vendor-west-ca', { appInstallId: 'inst_duoplane_dropship' }],
+    ['wh-house-tx', { appInstallId: 'inst_label_station_house_wh' }],
+    ['vendor-west-ca', { appInstallId: 'inst_3pl_dropship_router' }],
   ]);
   const splitPlan = planStone2MultiVendorSplit({
     orderId: 'ord_autosplit_8002',
@@ -310,5 +310,5 @@ export async function runSelfTest() {
 
 if (process.argv.includes('--self-test') || import.meta.url === `file://${process.argv[1]}`) {
   const summary = await runSelfTest();
-  console.log(JSON.stringify({ event: 'dropship-split-duoplane:self-test:passed', ...summary }));
+  console.log(JSON.stringify({ event: 'dropship-multi-supplier:self-test:passed', ...summary }));
 }

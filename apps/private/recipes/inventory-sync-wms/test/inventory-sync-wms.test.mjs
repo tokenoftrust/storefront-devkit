@@ -4,11 +4,11 @@ import { readFileSync } from 'node:fs';
 import {
   classifyThresholdTransition,
   createSimulatedWmsGateway,
-  createSkuVaultWmsConnector,
+  createWmsInventoryConnector,
   runSelfTest,
 } from '../index.mjs';
 
-test('inventory-sync-skuvault manifest declares least-privilege WMS scopes and private_key_jwt clientAuth', () => {
+test('inventory-sync-wms manifest declares least-privilege WMS scopes and private_key_jwt clientAuth', () => {
   const manifest = JSON.parse(readFileSync(new URL('../tot-app.json', import.meta.url), 'utf8'));
   assert.equal(manifest.contractVersion, '1');
   assert.deepEqual(manifest.scopes, ['catalog:read', 'inventory:read', 'inventory:write']);
@@ -27,7 +27,7 @@ test('self-test exercises multi-location upsert, CAS reconciliation recovery, 7 
 
 test('duplicate inventory.changed CloudEvent ids are deduplicated without re-firing transitions', () => {
   const sim = createSimulatedWmsGateway();
-  const connector = createSkuVaultWmsConnector({
+  const connector = createWmsInventoryConnector({
     baseUrl: 'https://tot-preview.tokenoftrust.store',
     accessToken: 'sim-wms-token',
     fetchImpl: sim.fetchImpl,

@@ -77,12 +77,12 @@ repository.
 6. **Start from a runnable reference recipe** under [`../apps/private/`](../apps/private/):
    - [`../apps/private/examples/hello-inventory/`](../apps/private/examples/hello-inventory/) —
      locations, stock read/write, and synthetic preview orders
-   - [`../apps/private/recipes/inventory-sync-skuvault/`](../apps/private/recipes/inventory-sync-skuvault/) —
+   - [`../apps/private/recipes/inventory-sync-wms/`](../apps/private/recipes/inventory-sync-wms/) —
      multi-location WMS sync, CAS reconciliation, and `inventory.changed` threshold transitions
-   - [`../apps/private/recipes/fulfillment-shipstation/`](../apps/private/recipes/fulfillment-shipstation/) —
-     ShipStation/PirateShip/Shippo connector, PACT carrier validation, and 1:N split cartons
-   - [`../apps/private/recipes/dropship-split-duoplane/`](../apps/private/recipes/dropship-split-duoplane/) —
-     Duoplane/3PL location-keyed routing, partial shipments, and fulfillment exceptions
+   - [`../apps/private/recipes/fulfillment-label-station/`](../apps/private/recipes/fulfillment-label-station/) —
+     shipping & label station connector, PACT carrier validation, and 1:N split cartons
+   - [`../apps/private/recipes/dropship-multi-supplier/`](../apps/private/recipes/dropship-multi-supplier/) —
+     3PL & multi-supplier location-keyed routing, partial shipments, and fulfillment exceptions
    - [`../apps/private/samples/fulfillment-connector/`](../apps/private/samples/fulfillment-connector/) —
      full HTTP and Cloudflare Worker webhook/reconciliation reference sample
 

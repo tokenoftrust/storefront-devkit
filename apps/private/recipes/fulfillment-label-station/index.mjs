@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Shipping & Label Station Connector Recipe (ShipStation / PirateShip / Shippo / Regional PACT Desks):
+// Shipping & Label Station Connector Recipe (Multi-Carrier & Regional PACT Label Desks):
 // 1. Receives fulfillment.assignment.created / .updated CloudEvents and reconciles via GET /fulfillment/assignments.
 // 2. Queries GET /fulfillment/carriers to validate PACT Act & adultSignature eligibility
 //    (ups, fedex, dhl_express, ontrac, lasership, gso_gls, lso, spee_dee, stat_overnight, better_trucks)
@@ -55,7 +55,7 @@ export function deriveIdempotencyKey(prefix, payload) {
   return `${prefix}-${digest}`;
 }
 
-export function createShipStationConnector({ baseUrl, accessToken, fetchImpl = fetch }) {
+export function createLabelStationConnector({ baseUrl, accessToken, fetchImpl = fetch }) {
   const seenEvents = new Set();
 
   async function request(method, path, { body, idempotencyKey } = {}) {
@@ -114,7 +114,7 @@ export function createShipStationConnector({ baseUrl, accessToken, fetchImpl = f
  * In-memory gateway simulator supporting PACT & adultSignature carrier enforcement,
  * 1:N split-carton shipments, and whole-order shipment evidence (`label-outcome`, `label-voided`, `handoff`).
  */
-export function createSimulatedShipStationGateway({ pactAct = true } = {}) {
+export function createSimulatedLabelStationGateway({ pactAct = true } = {}) {
   const assignment = structuredClone(FIXTURE.assignment);
   const recipient = structuredClone(FIXTURE.recipient);
   const emittedTopics = [];
@@ -262,10 +262,10 @@ export function createSimulatedShipStationGateway({ pactAct = true } = {}) {
 }
 
 export async function runSelfTest() {
-  const sim = createSimulatedShipStationGateway({ pactAct: true });
-  const connector = createShipStationConnector({
+  const sim = createSimulatedLabelStationGateway({ pactAct: true });
+  const connector = createLabelStationConnector({
     baseUrl: 'https://tot-preview.tokenoftrust.store',
-    accessToken: 'sim-shipstation-token',
+    accessToken: 'sim-label-station-token',
     fetchImpl: sim.fetchImpl,
   });
 
@@ -385,5 +385,5 @@ export async function runSelfTest() {
 
 if (process.argv.includes('--self-test') || import.meta.url === `file://${process.argv[1]}`) {
   const summary = await runSelfTest();
-  console.log(JSON.stringify({ event: 'fulfillment-shipstation:self-test:passed', ...summary }));
+  console.log(JSON.stringify({ event: 'fulfillment-label-station:self-test:passed', ...summary }));
 }

@@ -1,7 +1,7 @@
 {
   "contractVersion": "1",
-  "id": "com.example.dropship-duoplane-router",
-  "name": "Duoplane 3PL & Dropship Vendor Router",
+  "id": "com.example.dropship-multi-supplier",
+  "name": "3PL & Multi-Supplier Dropship Router",
   "version": "1.3.0",
   "owner": {
     "name": "Example Dropship & 3PL Ops",
@@ -19,7 +19,7 @@
     "inventory:write"
   ],
   "webhooks": {
-    "endpoint": "https://duoplane.integrations.example.com/webhooks/tot-routing",
+    "endpoint": "https://routing.integrations.example.com/webhooks/tot-routing",
     "topics": [
       "fulfillment.assignment.created",
       "fulfillment.assignment.updated",
@@ -31,7 +31,7 @@
   },
   "clientAuth": {
     "method": "private_key_jwt",
-    "jwksUri": "https://duoplane.integrations.example.com/.well-known/jwks.json"
+    "jwksUri": "https://routing.integrations.example.com/.well-known/jwks.json"
   },
   "telemetryMode": "sampled",
   "retention": {

@@ -1,0 +1,12 @@
+{
+  "name": "storefront-private-app-recipe-fulfillment-label-station",
+  "private": true,
+  "type": "module",
+  "description": "Shipping & label station connector recipe (PACT carrier catalog, 1:N split cartons, and whole-order shipment evidence) for Storefront Private Apps v1.3.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node index.mjs",
+    "self-test": "node index.mjs --self-test",
+    "test": "node --test test/*.test.mjs"
+  }
+}

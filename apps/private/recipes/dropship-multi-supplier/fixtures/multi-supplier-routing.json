@@ -45,15 +45,15 @@
     "mode": "supplier-split",
     "routes": [
       {
-        "appInstallId": "inst_shipstation_house_wh",
+        "appInstallId": "inst_label_station_house_wh",
         "locationId": "wh-house-tx",
         "poRef": "PO-HOUSE-8002A",
         "lines": [{ "lineId": "line_8002_1", "sku": "VAPE-KIT-STARTER", "quantity": 1 }]
       },
       {
-        "appInstallId": "inst_duoplane_dropship",
+        "appInstallId": "inst_3pl_dropship_router",
         "locationId": "vendor-west-ca",
-        "poRef": "PO-DUO-8002B",
+        "poRef": "PO-SUP-8002B",
         "lines": [{ "lineId": "line_8002_2", "sku": "GLASS-RIG-MINI", "quantity": 1 }]
       }
     ]

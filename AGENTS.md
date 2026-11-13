@@ -22,9 +22,9 @@ publish.
    Cloud Run, Microsoft Azure Functions, or Docker containers), and runnable reference
    examples/recipes
    ([`apps/private/examples/hello-inventory/`](./apps/private/examples/hello-inventory/),
-   [`apps/private/recipes/inventory-sync-skuvault/`](./apps/private/recipes/inventory-sync-skuvault/),
-   [`apps/private/recipes/fulfillment-shipstation/`](./apps/private/recipes/fulfillment-shipstation/),
-   [`apps/private/recipes/dropship-split-duoplane/`](./apps/private/recipes/dropship-split-duoplane/),
+   [`apps/private/recipes/inventory-sync-wms/`](./apps/private/recipes/inventory-sync-wms/),
+   [`apps/private/recipes/fulfillment-label-station/`](./apps/private/recipes/fulfillment-label-station/),
+   [`apps/private/recipes/dropship-multi-supplier/`](./apps/private/recipes/dropship-multi-supplier/),
    and [`apps/private/samples/fulfillment-connector/`](./apps/private/samples/fulfillment-connector/)).
    [`private-apps/`](./private-apps/) remains a stable compatibility guide. The ToT MCP recipe
    `recipe://storefront-private-apps-devbook` is only a discovery index.

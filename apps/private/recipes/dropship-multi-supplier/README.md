@@ -1,12 +1,12 @@
-# Recipe: 3PL & Multi-Vendor Dropship Routing (`dropship-split-duoplane`)
+# Recipe: 3PL & Multi-Supplier Dropship Routing (`dropship-multi-supplier`)
 
-**Target systems:** Duoplane, DSCO, Logicbroker, multi-warehouse 3PL routers, and dropship vendor portals.
+**Target systems:** Multi-warehouse 3PL routers, dropship supplier portals, and split-fulfillment connectors.
 
 **Scopes required (`tot-app.json`):** `orders:read:minimal`, `orders:read:recipient`, `orders:webhook`, `fulfillment:process`, `inventory:read`, `inventory:write`
 
-This recipe demonstrates how a multi-vendor dropship or 3PL connector integrates with Storefront
+This recipe demonstrates how a multi-supplier dropship or 3PL connector integrates with Storefront
 Private Apps v1.3 across both **Stone 1 (Live)** — location-keyed processor coexistence, partial PO
-line shipments, and line-level exceptions — and **Stone 2 (Contract Locked)** — multi-vendor
+line shipments, and line-level exceptions — and **Stone 2 (Contract Locked)** — multi-supplier
 single-cart auto-split across distinct `(appInstallId, locationId)` processor pairs.
 
 ---
@@ -18,7 +18,7 @@ single-cart auto-split across distinct `(appInstallId, locationId)` processor pa
 1. **Per-location processor binding (`(tenant_id, stage, location_id)`):**
    Multiple fulfillment processors can coexist on a single tenant and stage, each bound to its own
    `locationId` (with `*` / `unspecified` serving as the catch-all processor). For example, an
-   in-house ShipStation install can handle `wh-house-tx` while a Duoplane install handles
+   in-house label station install can handle `wh-house-tx` while a 3PL/dropship router install handles
    `vendor-west-ca`.
 2. **Assignment lines & location routing (`GET /api/apps/v1/fulfillment/assignments`):**
    Each `FulfillmentAssignment` carries `locationId`, `allowedCarriers`, `adultSignatureRequired`,
@@ -37,11 +37,11 @@ single-cart auto-split across distinct `(appInstallId, locationId)` processor pa
    exception surfaces on the Storefront operator desk for resolution without silently mutating
    payment or tax.
 
-### Stone 2 — Multi-Vendor Single-Cart Auto-Split (Contract Locked)
+### Stone 2 — Multi-Supplier Single-Cart Auto-Split (Contract Locked)
 
 When a single customer cart contains items sourced from multiple distinct `(appInstallId, locationId)`
-pairs (for example, one in-house warehouse SKU fulfilled by ShipStation and one dropship SKU
-fulfilled by Duoplane), the Stone 2 routing model partitions the order at release time into
+pairs (for example, one in-house warehouse SKU fulfilled by an internal label station and one dropship SKU
+fulfilled by an external supplier router), the Stone 2 routing model partitions the order at release time into
 independent, versioned line assignments per `(appInstallId, locationId)` pair:
 
 - Each processor sees and acts only on its own assigned lines (`GET /fulfillment/assignments`).
@@ -60,7 +60,7 @@ independent, versioned line assignments per `(appInstallId, locationId)` pair:
 tot catalog seed --preset=multi-warehouse
 tot preview
 
-# 2. Validate and install the Duoplane routing connector in test mode:
+# 2. Validate and install the multi-supplier routing connector in test mode:
 tot app dev validate ./tot-app.json
 tot app install --tenant <tenant> --env=test --app .
 

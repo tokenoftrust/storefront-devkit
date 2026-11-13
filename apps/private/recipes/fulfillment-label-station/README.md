@@ -1,6 +1,6 @@
-# Recipe: Shipping & Label Station Connector (`fulfillment-shipstation`)
+# Recipe: Shipping & Label Station Connector (`fulfillment-label-station`)
 
-**Target systems:** ShipStation, PirateShip, Shippo, EasyPost, and regional/PACT Act fulfillment desks.
+**Target systems:** Shipping & label stations, multi-carrier rate/label desks, and regional/PACT Act fulfillment workflows.
 
 **Scopes required (`tot-app.json`):** `orders:read:minimal`, `orders:read:recipient`, `orders:webhook`, `fulfillment:process`
 

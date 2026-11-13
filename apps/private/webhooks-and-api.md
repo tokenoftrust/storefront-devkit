@@ -285,14 +285,14 @@ or change to payment, tax, price or checkout.
 
 - [`examples/hello-inventory/`](./examples/hello-inventory/) — Starter app: location upsert, stock
   read/write, and synthetic preview orders (`POST /api/apps/admin/test-orders`).
-- [`recipes/inventory-sync-skuvault/`](./recipes/inventory-sync-skuvault/) — Multi-location WMS sync
-  (SkuVault / Finale / ERP): `PUT /inventory/levels` CAS reconciliation, batch WMS movements, and
+- [`recipes/inventory-sync-wms/`](./recipes/inventory-sync-wms/) — Multi-location WMS sync:
+  `PUT /inventory/levels` CAS reconciliation, batch WMS movements, and
   `inventory.changed` threshold transitions.
-- [`recipes/fulfillment-shipstation/`](./recipes/fulfillment-shipstation/) — Shipping & PACT label
-  station (ShipStation / PirateShip / Shippo): carrier eligibility checks, 1:N split cartons, and
+- [`recipes/fulfillment-label-station/`](./recipes/fulfillment-label-station/) — Shipping & PACT label
+  station: carrier eligibility checks, 1:N split cartons, and
   `label-voided` recovery.
-- [`recipes/dropship-split-duoplane/`](./recipes/dropship-split-duoplane/) — 3PL & multi-vendor
-  routing (Duoplane / DSCO): location-keyed processor coexistence, partial line shipments,
+- [`recipes/dropship-multi-supplier/`](./recipes/dropship-multi-supplier/) — 3PL & multi-supplier
+  routing: location-keyed processor coexistence, partial line shipments,
   exception reporting, and Stone 2 cart auto-split planning.
 - [`samples/fulfillment-connector/`](./samples/fulfillment-connector/) — Full HTTP and Cloudflare
   Worker reference sample for whole-order webhook verification and shipment evidence.
