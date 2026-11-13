@@ -31,12 +31,13 @@ Developers holding `preview-access` or `ship-on-behalf` on a store can run the e
 without waiting for store-owner approval:
 
 ```bash
-# 1. Seed the preview catalog with general sample products and stock:
-tot catalog seed --store <tenant> --preset=general
+# 1. Inside a cloned store checkout, seed the preview catalog with general sample products and stock:
+tot catalog seed --preset=general
+tot preview
 
 # 2. Validate tot-app.json against the contract schema and self-serve install in test mode:
-tot app validate ./tot-app.json
-tot app install --store <tenant> --env=test --manifest ./tot-app.json
+tot app dev validate ./tot-app.json
+tot app install --tenant <tenant> --env=test --app .
 
 # 3. Create a synthetic preview order on the preview gateway:
 curl -sS -X POST "https://tot-preview.tokenoftrust.store/api/apps/admin/test-orders" \

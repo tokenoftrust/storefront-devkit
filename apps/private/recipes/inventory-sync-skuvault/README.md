@@ -17,7 +17,8 @@ atomic batches of WMS stock movements, and processes `inventory.changed` thresho
    Shopify/SkuVault CSV export using the Agency Kit CLI (`agency-kit/tools/import-stock.mjs`) or seed
    a preview store directly via:
    ```bash
-   tot catalog seed --store <tenant> --preset=multi-warehouse
+   tot catalog seed --preset=multi-warehouse
+   tot preview
    ```
 2. **Continuous delta & cycle-count sync (Private App):**
    Once installed, the WMS connector keeps the tenant's mirror ledger current through the Private

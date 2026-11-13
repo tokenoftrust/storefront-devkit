@@ -56,12 +56,13 @@ independent, versioned line assignments per `(appInstallId, locationId)` pair:
 ## Self-Serve Multi-Warehouse Preview Loop (`env="test"`)
 
 ```bash
-# 1. Seed the preview catalog with multi-warehouse locations and stock:
-tot catalog seed --store <tenant> --preset=multi-warehouse
+# 1. Inside a cloned store checkout, seed the preview catalog with multi-warehouse locations and stock:
+tot catalog seed --preset=multi-warehouse
+tot preview
 
 # 2. Validate and install the Duoplane routing connector in test mode:
-tot app validate ./tot-app.json
-tot app install --store <tenant> --env=test --manifest ./tot-app.json
+tot app dev validate ./tot-app.json
+tot app install --tenant <tenant> --env=test --app .
 
 # 3. Bind the test install, create a synthetic preview order, and release it:
 curl -sS -X POST "https://tot-preview.tokenoftrust.store/api/apps/admin/test-orders" \

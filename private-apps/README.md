@@ -54,8 +54,8 @@ repository.
    need (from the 11-scope V1 catalog in `apps/private/contract/scopes.json`). Validate against
    `tot-app.schema.json`.
 2. **Self-serve in `preview` (`env: "test"`)** — seed a realistic preview catalog
-   (`tot catalog seed --store <tenant> --preset=general|regulated-vape|multi-warehouse`), install
-   your app into the `test` stage (`tot app install --store <tenant> --manifest ./tot-app.json`),
+   (`tot catalog seed --preset=general|regulated-vape|multi-warehouse` followed by `tot preview`), install
+   your app into the `test` stage (`tot app install --tenant <tenant> --env=test --app .`),
    and generate synthetic preview orders (`POST /api/apps/admin/test-orders`) without touching live
    merchant inventory or customer data.
 3. **Exchange credentials for a short-lived JWT** (`POST /oauth/token`, `client_credentials` with

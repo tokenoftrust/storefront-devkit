@@ -71,12 +71,13 @@ or persist recipient PII**.
 ## Self-Serve Regulated PACT Preview Verification (`env="test"`)
 
 ```bash
-# 1. Seed the preview store with the regulated-vape preset (enables PACT Act & adultSignature):
-tot catalog seed --store <tenant> --preset=regulated-vape
+# 1. Inside a cloned store checkout, seed the preview store with the regulated-vape preset (enables PACT Act & adultSignature):
+tot catalog seed --preset=regulated-vape
+tot preview
 
-# 2. Install the connector in test mode:
-tot app validate ./tot-app.json
-tot app install --store <tenant> --env=test --manifest ./tot-app.json
+# 2. Validate and install the connector in test mode:
+tot app dev validate ./tot-app.json
+tot app install --tenant <tenant> --env=test --app .
 
 # 3. Bind as the preview processor, create a synthetic PACT order, and release it:
 curl -sS -X POST "https://tot-preview.tokenoftrust.store/api/apps/admin/test-orders" \
