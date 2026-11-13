@@ -1,16 +1,20 @@
 # Private Apps — public contract
 
 This directory is the canonical, public, language-neutral contract for Storefront private apps.
-Use it to build a service that connects to one merchant tenant through scoped APIs and signed
-webhooks. It contains documentation, machine-readable specifications, starter examples under
-[`examples/`](./examples/), runnable connector recipes under [`recipes/`](./recipes/), and
-self-contained reference samples under [`samples/`](./samples/)—no platform runtime, credentials,
-tenant data or operator procedures.
+Use it to build an independently hosted service that connects to merchant tenants through scoped
+APIs and signed webhooks. While each installation record and credential is scoped to one merchant
+tenant and stage (`preview`/`env="test"` vs `publication`/`env="production"`), **a single deployed
+app service and `tot-app.json` manifest can serve one merchant or many merchants (multi-tenant)**
+using the `tenantid` and `appinstallid` carried on every webhook and OAuth token. It contains
+documentation, machine-readable specifications, starter examples under [`examples/`](./examples/),
+runnable connector recipes under [`recipes/`](./recipes/), self-contained reference samples under
+[`samples/`](./samples/), and extensible cloud/runtime hosting guides under
+[`hosting/`](./hosting/)—no platform runtime, credentials, tenant data or operator procedures.
 
-Private apps are available today. They are not public apps: do not infer a marketplace, a
-multi-tenant distribution model, or any public-app API from these files. Developers can self-serve
-installation and end-to-end verification in the `preview` (`env="test"`) sandbox, and stage
-production candidate manifests (`pending_approval`) for 1-click Merchant Owner approval.
+Private apps are available today. They are not public marketplace apps: do not infer a public
+marketplace or an unapproved self-install flow on live stores from these files. Developers can
+self-serve installation and end-to-end verification in the `preview` (`env="test"`) sandbox, and
+stage production candidate manifests (`pending_approval`) for 1-click Merchant Owner approval.
 
 ## Read in this order
 
@@ -23,6 +27,10 @@ production candidate manifests (`pending_approval`) for 1-click Merchant Owner a
    [`contract/asyncapi.yaml`](./contract/asyncapi.yaml) for outbound webhook topics.
 5. [`webhooks-and-api.md`](./webhooks-and-api.md) for the concise implementation guide and the
    safe examples in [`contract/examples/`](./contract/examples/).
+6. [`hosting/`](./hosting/README.md) (and [`hosting/index.json`](./hosting/index.json)) for
+   multi-tenant routing and runtime deployment fast-paths (**Cloudflare Workers**, **AWS Lambda**,
+   **Google Cloud Run / Functions**, **Microsoft Azure Functions / Container Apps**, **Docker
+   containers**, **pull-only scheduled jobs**, and **local preview tunnels**).
 
 For LLMs and developers, these GitHub-relative files are authoritative. The ToT MCP recipe
 `recipe://storefront-private-apps-devbook` is a discovery index to this material; it never

@@ -17,12 +17,22 @@ writing app-owned records (e.g. affiliate attribution), or rendering a small UI 
 
 ## What a private app is
 
-A private app is **your service, hosted anywhere, in any language**, connected to **one merchant
-tenant** through a language-neutral contract — OpenAPI + JSON Schema + AsyncAPI + CloudEvents + JWT
-(OAuth2 client-credentials) + HTTP Message Signatures. **No ToT package is required**, and app code
-**never runs in the shared platform Worker**. The compliance floor (age/identity, tax, jurisdiction,
-warnings, CSP, go-live, signed-cart, checkout totals) is **unreachable** — no scope, endpoint, or
-event in the contract can touch it.
+A private app is **your service, hosted anywhere, in any language**, connected to merchant tenants
+through a language-neutral contract — OpenAPI + JSON Schema + AsyncAPI + CloudEvents + JWT
+(OAuth2 client-credentials / `private_key_jwt`) + HTTP Message Signatures. **No ToT package is
+required**, and app code **never runs in the shared platform Worker**.
+
+While each installation record and credential is scoped to one merchant store and stage, **vendors
+and agencies can run a single multi-tenant service across many merchant stores**: every inbound
+CloudEvent carries `tenantid`, `appinstallid`, and `source`, and every OAuth2 token exchange mints a
+tenant-scoped Bearer JWT (`tenant`, `sub = appInstallId`, `env`). See
+[`../apps/private/hosting/`](../apps/private/hosting/README.md) (and its machine index
+[`../apps/private/hosting/index.json`](../apps/private/hosting/index.json)) for multi-tenant
+routing and deployment fast-paths on **Cloudflare Workers**, **AWS Lambda**, **Google Cloud Run**,
+**Microsoft Azure Functions / Container Apps**, **Docker**, and **local preview tunnels**.
+
+The compliance floor (age/identity, tax, jurisdiction, warnings, CSP, go-live, signed-cart, checkout
+totals) is **unreachable** — no scope, endpoint, or event in the contract can touch it.
 
 ## Public documentation authority
 

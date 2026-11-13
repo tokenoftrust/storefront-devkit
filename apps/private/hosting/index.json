@@ -1,0 +1,74 @@
+{
+  "$comment": "Extensible machine-readable catalog of Private App hosting guides. Coding agents and developers: read this file and list subdirectories of apps/private/hosting/ to discover runtime-specific deployment instructions. New providers are added here and in apps/private/hosting/<slug>/ without modifying core contract files.",
+  "contract": "private-apps@1.3",
+  "multiTenantSupported": true,
+  "multiTenantRoutingKeys": {
+    "inboundWebhook": ["tenantid", "appinstallid", "source", "id"],
+    "outboundOAuth": ["tenant", "sub", "env", "scopes"]
+  },
+  "topologies": [
+    {
+      "id": "edge-serverless",
+      "title": "Edge Serverless Isolates",
+      "description": "Zero-cold-start Web Crypto isolates with built-in HTTP and cron triggers."
+    },
+    {
+      "id": "cloud-faas",
+      "title": "Cloud Function-as-a-Service (FaaS)",
+      "description": "Event-driven functions behind an HTTPS gateway/URL paired with a managed cloud scheduler and key-value/NoSQL idempotency store."
+    },
+    {
+      "id": "managed-containers",
+      "title": "Serverless & Managed Containers",
+      "description": "OCI/Docker containers scaled to zero or N instances behind managed TLS termination."
+    },
+    {
+      "id": "pull-only-and-tunnels",
+      "title": "Pull-Only Scheduled Jobs & Local Preview Tunnels",
+      "description": "Outbound-only cron jobs (no public webhook URL required) and local HTTPS tunnels for env=test preview stores."
+    }
+  ],
+  "providers": [
+    {
+      "id": "cloudflare-workers",
+      "provider": "Cloudflare",
+      "title": "Cloudflare Workers (fetch + Cron Triggers + KV / D1 / Durable Objects)",
+      "topology": "edge-serverless",
+      "path": "apps/private/hosting/cloudflare-workers/README.md",
+      "sampleCode": "apps/private/samples/fulfillment-connector/worker.js",
+      "tags": ["cloudflare", "workers", "wrangler", "kv", "d1", "edge"]
+    },
+    {
+      "id": "aws-lambda",
+      "provider": "Amazon Web Services (AWS)",
+      "title": "AWS Lambda (Function URL / API Gateway HTTP API v2 + EventBridge + DynamoDB)",
+      "topology": "cloud-faas",
+      "path": "apps/private/hosting/aws-lambda/README.md",
+      "tags": ["aws", "lambda", "api-gateway", "eventbridge", "dynamodb", "kms"]
+    },
+    {
+      "id": "google-cloud-run",
+      "provider": "Google Cloud (GCP)",
+      "title": "Google Cloud Run & Cloud Run functions (HTTPS + Cloud Scheduler + Firestore / Secret Manager)",
+      "topology": "managed-containers",
+      "path": "apps/private/hosting/google-cloud-run/README.md",
+      "tags": ["google-cloud", "gcp", "cloud-run", "cloud-functions", "cloud-scheduler", "firestore"]
+    },
+    {
+      "id": "microsoft-azure-functions",
+      "provider": "Microsoft Azure",
+      "title": "Azure Functions (v4) & Azure Container Apps (HTTP + Timer Trigger + Table/Cosmos DB + Key Vault)",
+      "topology": "cloud-faas",
+      "path": "apps/private/hosting/microsoft-azure-functions/README.md",
+      "tags": ["microsoft", "azure", "azure-functions", "container-apps", "cosmos-db", "key-vault"]
+    },
+    {
+      "id": "containers-and-tunnels",
+      "provider": "Portable OCI / Docker & Local Tunnels",
+      "title": "Docker Containers (Fly.io, Render, Railway, ECS, GKE, AKS), Pull-Only Cron Jobs, & Local Preview Tunnels",
+      "topology": "pull-only-and-tunnels",
+      "path": "apps/private/hosting/containers-and-tunnels/README.md",
+      "tags": ["docker", "containers", "fly-io", "railway", "render", "cloudflared", "ngrok", "devtunnel", "cron"]
+    }
+  ]
+}

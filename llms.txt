@@ -19,7 +19,11 @@
   apps are reserved and must not be inferred from this repository.
 - [apps/private/](./apps/private/): Canonical private-app contract (`v1.3.0`, 11 V1 scopes) for
   LLMs and developers: manifest schema, scope catalog, forbidden-scope denylist, OpenAPI/AsyncAPI,
-  safe fixtures, webhook/API guidance, and runnable reference implementations:
+  safe fixtures, webhook/API guidance, multi-tenant & cloud hosting fast-paths
+  ([apps/private/hosting/](./apps/private/hosting/README.md) and
+  [apps/private/hosting/index.json](./apps/private/hosting/index.json) for Cloudflare Workers, AWS
+  Lambda, Google Cloud Run, Microsoft Azure Functions, and Docker), and runnable reference
+  implementations:
   [hello-inventory](./apps/private/examples/hello-inventory/),
   [inventory-sync-skuvault](./apps/private/recipes/inventory-sync-skuvault/),
   [fulfillment-shipstation](./apps/private/recipes/fulfillment-shipstation/),

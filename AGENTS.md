@@ -14,7 +14,13 @@ publish.
    is ambiguous, the schema is authoritative.
 4. [`apps/`](./apps/) and [`apps/private/`](./apps/private/) when working on an app integration.
    The latter contains the canonical public schema (`v1.3.0`), 11-scope V1 catalog, denylist,
-   API/event definitions, safe fixtures, and runnable reference examples/recipes
+   API/event definitions, safe fixtures, extensible multi-tenant & cloud hosting guides
+   ([`apps/private/hosting/`](./apps/private/hosting/README.md) and
+   [`apps/private/hosting/index.json`](./apps/private/hosting/index.json) — always check
+   `apps/private/hosting/index.json` and list `apps/private/hosting/*` subdirectories for
+   cloud/runtime-specific deployment instructions such as Cloudflare Workers, AWS Lambda, Google
+   Cloud Run, Microsoft Azure Functions, or Docker containers), and runnable reference
+   examples/recipes
    ([`apps/private/examples/hello-inventory/`](./apps/private/examples/hello-inventory/),
    [`apps/private/recipes/inventory-sync-skuvault/`](./apps/private/recipes/inventory-sync-skuvault/),
    [`apps/private/recipes/fulfillment-shipstation/`](./apps/private/recipes/fulfillment-shipstation/),

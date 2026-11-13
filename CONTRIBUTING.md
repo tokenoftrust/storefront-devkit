@@ -52,10 +52,23 @@ strongly encouraged so consumers can pin compatibility.
 ## The hard boundary (what is NEVER accepted here)
 
 This repo is strictly **tenant-side** except for the public [`apps/`](./apps/) track: its
-source-safe private-app contract corpus and the self-contained reference examples, recipes, and
-samples under [`apps/private/examples/`](./apps/private/examples/),
+source-safe private-app contract corpus, its extensible cloud/runtime hosting guides under
+[`apps/private/hosting/`](./apps/private/hosting/), and the self-contained reference examples,
+recipes, and samples under [`apps/private/examples/`](./apps/private/examples/),
 [`apps/private/recipes/`](./apps/private/recipes/), and
-[`apps/private/samples/`](./apps/private/samples/). Do not add:
+[`apps/private/samples/`](./apps/private/samples/).
+
+### Contributing a Private App hosting guide or connector recipe
+
+Cloud providers, partner engineers, and niche runtime maintainers are invited to contribute
+runtime-specific hosting guides without modifying the core contract files:
+1. Add a self-contained directory at `apps/private/hosting/<provider-slug>/README.md` covering
+   raw-body `Content-Digest` + RFC 9421 verification, secret/key storage, 5-minute scheduled
+   reconciliation, durable `(tenantid, id)` deduplication, and multi-tenant routing.
+2. Register the guide in [`apps/private/hosting/index.json`](./apps/private/hosting/index.json) so
+   coding agents and developers discover it automatically.
+
+Do not add:
 
 - Any reference to platform source paths, build internals, deploy/runner mechanics, or private
   APIs.

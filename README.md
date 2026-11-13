@@ -46,10 +46,13 @@ come back and start from a template.
 Use the **[`apps/`](./apps/)** track when you are building software that integrates with a
 Storefront tenant rather than customizing its tenant-owned files.
 
-- **Private apps are available now.** They connect your independently hosted service to one
-  merchant tenant through a language-neutral, standards-based contract (`private-apps@1.3`, 11 V1
-  scopes). Start at [`apps/`](./apps/) and then read the canonical [`apps/private/`](./apps/private/)
-  contract, starter example ([`apps/private/examples/hello-inventory/`](./apps/private/examples/hello-inventory/)),
+- **Private apps are available now.** They connect your independently hosted service (single-tenant
+  or multi-tenant across many merchant stores via `tenantid`/`appinstallid`) to Storefront tenants
+  through a language-neutral, standards-based contract (`private-apps@1.3`, 11 V1 scopes). Start at
+  [`apps/`](./apps/) and then read the canonical [`apps/private/`](./apps/private/) contract,
+  multi-tenant & cloud hosting fast-paths ([`apps/private/hosting/`](./apps/private/hosting/README.md)
+  for Cloudflare Workers, AWS Lambda, Google Cloud Run, Microsoft Azure Functions, and Docker),
+  starter example ([`apps/private/examples/hello-inventory/`](./apps/private/examples/hello-inventory/)),
   and connector recipes ([`apps/private/recipes/inventory-sync-skuvault/`](./apps/private/recipes/inventory-sync-skuvault/),
   [`apps/private/recipes/fulfillment-shipstation/`](./apps/private/recipes/fulfillment-shipstation/),
   [`apps/private/recipes/dropship-split-duoplane/`](./apps/private/recipes/dropship-split-duoplane/)).

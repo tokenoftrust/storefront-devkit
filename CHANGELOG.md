@@ -20,6 +20,11 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
     `label-voided` recovery, `private_key_jwt` authentication, self-serve preview order generation
     (`POST /api/apps/admin/test-orders`), and production candidate staging (`POST
     /api/apps/admin/candidates`).
+  - `apps/private/hosting/` (`index.json`, `README.md`, `cloudflare-workers/`, `aws-lambda/`,
+    `google-cloud-run/`, `microsoft-azure-functions/`, `containers-and-tunnels/`) — extensible
+    multi-tenant routing guide (`tenantid`, `appinstallid`) and runtime deployment fast-paths across
+    Cloudflare Workers, AWS Lambda, Google Cloud Run & Functions, Microsoft Azure Functions &
+    Container Apps, Docker containers, pull-only scheduled jobs, and local preview tunnels.
   - `apps/private/examples/hello-inventory/` — starter private app demonstrating location
     registration, stock reads, idempotent movement writes, and synthetic preview orders.
   - `apps/private/recipes/inventory-sync-skuvault/` — multi-location WMS connector recipe (SkuVault,
