@@ -175,7 +175,7 @@ example from the devkit.
 | Commerce & checkout | `schemas/capabilities.schema.json`, `recipes/add-subscription-option/`, `snippets/checkout/` |
 | Compliance | `schemas/compliance.schema.json`, `snippets/compliance/`, `templates/regulated-vape/`, `recipes/enable-pact-compliance/` |
 | Performance & SEO | `snippets/seo/` + `docs/store-performance-seo.md` |
-| Widgets & extension | `widgets/`, `private-apps/` |
+| Widgets & extension | `widgets/`, `apps/private/` (`examples/hello-inventory`, `recipes/inventory-sync-skuvault`, `recipes/fulfillment-shipstation`, `recipes/dropship-split-duoplane`), `private-apps/` |
 | Migrate a store | `migration/` |
 | Publish & go live | `ci/` |
 | Build by industry | `industries/` |

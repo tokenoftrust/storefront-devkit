@@ -19,7 +19,7 @@
     },
     {
       "id": "orders:webhook",
-      "grants": "Subscribe to order lifecycle events (order.created, order.fulfilled) delivered as signed CloudEvents.",
+      "grants": "Subscribe to order lifecycle events (order.created, order.partially_fulfilled, order.fulfilled) delivered as signed CloudEvents.",
       "access": "read (event delivery)",
       "dataMinimization": "Same minimized order shape as orders:read:minimal, delivered in the event payload.",
       "pii": "minimal — customer hash only by default (stable per (tenant, app-install-id); not comparable across apps on the same tenant)."
@@ -33,16 +33,16 @@
     },
     {
       "id": "inventory:read",
-      "grants": "Read inventory availability/quantity for the tenant's catalog (GET /inventory) and subscribe to inventory.changed.",
+      "grants": "Read inventory availability/quantity for the tenant's catalog (GET /inventory), list the tenant's stock locations (GET /inventory/locations), and subscribe to inventory.changed.",
       "access": "read",
-      "dataMinimization": "Availability, quantity, and policy per variant/SKU only, plus the mirror-ledger reading (balance, asOf) for one location.",
+      "dataMinimization": "Availability, quantity, and policy per variant/SKU only, plus the mirror-ledger reading (balance, asOf) for one location. Locations are id, name, kind, fulfillable flag, status and update time. inventory.changed carries sku, locationId, balance, available and asOf only.",
       "pii": "none"
     },
     {
       "id": "inventory:write",
-      "grants": "Report a per-sku, per-location stock delta into the installed tenant's mirror ledger through the idempotent POST /inventory/movements endpoint, as an inventory-sync integration the merchant installed.",
-      "access": "write (mirror-ledger corrections only)",
-      "dataMinimization": "Body is exactly sku, locationId and a nonzero safe-integer quantityDelta. The platform derives the movement's asOf (receive time), source (the app's namespace), sourceEventId (from the idempotency key) and actorId (the install). The sku must be in the tenant catalog and the location must be unspecified or one the tenant's ledger already names. Cannot decrement for an order, reserve stock, alter price, tax, checkout or fulfillment, or become the authoritative inventory provider. A later source on-hand observation supersedes an earlier correction.",
+      "grants": "Report per-sku, per-location stock movements into the installed tenant's mirror ledger (POST /inventory/movements, one correction or a WMS batch of up to 250), reconcile absolute on-hand levels (PUT /inventory/levels, up to 250), and declare the tenant's stock locations (PUT /inventory/locations/{locationId}), as an inventory-sync integration the merchant installed.",
+      "access": "write (mirror-ledger corrections and the stock-location registry only)",
+      "dataMinimization": "Movement items are exactly sku, locationId, a nonzero safe-integer quantityDelta and a WMS reason; level items are exactly sku, locationId, onHand and observedAt; a location is exactly name, kind, isFulfillable and status. The platform derives each movement's asOf (receive time), source (the app's namespace), sourceEventId (from the idempotency key) and actorId (the install). Every sku must be in the tenant catalog and every location unspecified or declared active. Cannot decrement for an order, reserve stock, alter price, tax, checkout or fulfillment, or become the authoritative inventory provider. A later source on-hand observation supersedes an earlier correction.",
       "pii": "none — sku, location id and quantity only."
     },
     {

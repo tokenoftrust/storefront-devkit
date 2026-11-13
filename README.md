@@ -47,9 +47,13 @@ Use the **[`apps/`](./apps/)** track when you are building software that integra
 Storefront tenant rather than customizing its tenant-owned files.
 
 - **Private apps are available now.** They connect your independently hosted service to one
-  merchant tenant through a language-neutral, standards-based contract. Start at
-  [`apps/`](./apps/) and then read the canonical [`apps/private/`](./apps/private/) contract. The
-  stable [`private-apps/`](./private-apps/) guide remains available for existing links.
+  merchant tenant through a language-neutral, standards-based contract (`private-apps@1.3`, 11 V1
+  scopes). Start at [`apps/`](./apps/) and then read the canonical [`apps/private/`](./apps/private/)
+  contract, starter example ([`apps/private/examples/hello-inventory/`](./apps/private/examples/hello-inventory/)),
+  and connector recipes ([`apps/private/recipes/inventory-sync-skuvault/`](./apps/private/recipes/inventory-sync-skuvault/),
+  [`apps/private/recipes/fulfillment-shipstation/`](./apps/private/recipes/fulfillment-shipstation/),
+  [`apps/private/recipes/dropship-split-duoplane/`](./apps/private/recipes/dropship-split-duoplane/)).
+  The stable [`private-apps/`](./private-apps/) guide remains available for existing links.
 - **Public apps are reserved, not announced.** The devkit does not claim a public-app API,
   marketplace, installation flow, or review process. Do not infer one from this repository.
 - **No npm package is published from this devkit.** This GitHub repository is the canonical public

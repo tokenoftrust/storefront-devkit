@@ -14,9 +14,15 @@ standards-based private-app contract. Use them for backend integrations such as 
 inventory synchronization; signed lifecycle webhooks; app-owned records; and approved app UI
 placements.
 
-Start with [the canonical private-app contract](./private/README.md). It includes the public-safe
-schema, scope catalog, denylist, OpenAPI/AsyncAPI definitions, synthetic examples, and concise
-webhook/API guidance. [`private-apps/`](../private-apps/) remains the stable legacy guide.
+Start with [the canonical private-app contract (`v1.3.0`)](./private/README.md). It includes the
+public-safe schema, 11-scope V1 catalog, denylist, OpenAPI/AsyncAPI definitions, synthetic
+examples, concise webhook/API guidance, and runnable reference implementations:
+[`examples/hello-inventory/`](./private/examples/hello-inventory/),
+[`recipes/inventory-sync-skuvault/`](./private/recipes/inventory-sync-skuvault/),
+[`recipes/fulfillment-shipstation/`](./private/recipes/fulfillment-shipstation/),
+[`recipes/dropship-split-duoplane/`](./private/recipes/dropship-split-duoplane/), and
+[`samples/fulfillment-connector/`](./private/samples/fulfillment-connector/).
+[`private-apps/`](../private-apps/) remains the stable legacy guide.
 
 `private-apps/` remains the stable, direct URL for this current guide. This `apps/` directory is
 the broader front door; links to the existing private-app material are intentionally not broken.

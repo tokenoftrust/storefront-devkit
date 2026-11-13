@@ -1,0 +1,30 @@
+{
+  "contractVersion": "1",
+  "id": "com.example.hello-inventory",
+  "name": "Hello Inventory Starter App",
+  "version": "1.3.0",
+  "owner": {
+    "name": "Example Merchant Engineering",
+    "email": "apps@merchant.example.com",
+    "url": "https://merchant.example.com"
+  },
+  "description": "Starter Private App demonstrating stock location upsert, inventory availability reads, idempotent stock movements, and synthetic preview order verification.",
+  "installMode": "external",
+  "scopes": [
+    "catalog:read",
+    "inventory:read",
+    "inventory:write",
+    "orders:read:minimal"
+  ],
+  "webhooks": {
+    "endpoint": "https://inventory.merchant.example.com/webhooks/tot",
+    "topics": [
+      "inventory.changed"
+    ]
+  },
+  "telemetryMode": "sampled",
+  "retention": {
+    "eventLogDays": 30,
+    "piiRedaction": "strict"
+  }
+}

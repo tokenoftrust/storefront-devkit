@@ -54,7 +54,7 @@
       "maxLength": 500
     },
     "installMode": {
-      "description": "Where the app runs. 'external' apps are self-hosted and reach the gateway over the public contract. 'hosted' is platform-managed; availability and setup are outside this public contract. The same manifest shape applies to both.",
+      "description": "Where the app runs. 'external' apps are self-hosted and reach the gateway over the public contract. 'hosted' apps run in the optional ToT container runtime (D9); the SAME manifest works for both.",
       "type": "string",
       "enum": ["external", "hosted"]
     },
@@ -105,6 +105,7 @@
               "inventory.changed",
               "order.created",
               "order.fulfilled",
+              "order.partially_fulfilled",
               "customer.marketing_consent.updated",
               "attribution.finalized",
               "fulfillment.assignment.created",
@@ -206,6 +207,50 @@
           }
         }
       }
+    },
+    "clientAuth": {
+      "description": "Optional. Declares that the app authenticates to the token endpoint with an RFC 7523 private_key_jwt assertion signed by one of these public keys, never a client secret. Give the keys inline (`jwks`) or as an https URL the platform fetches (`jwksUri`), exactly one. Staging a production candidate reads the keys from here when the request names none.",
+      "type": "object",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "required": ["method", "jwks"],
+          "properties": {
+            "method": { "const": "private_key_jwt" },
+            "jwks": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["keys"],
+              "properties": {
+                "keys": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 10,
+                  "items": {
+                    "type": "object",
+                    "description": "RFC 7517 public JWK: RSA (2048+ bits, RS256) or EC P-256 (ES256). Each needs a unique kid; private members are refused.",
+                    "required": ["kty", "kid"],
+                    "properties": {
+                      "kty": { "type": "string", "enum": ["RSA", "EC"] },
+                      "kid": { "type": "string", "minLength": 1 },
+                      "alg": { "type": "string", "enum": ["RS256", "ES256"] },
+                      "use": { "const": "sig" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "required": ["method", "jwksUri"],
+          "properties": {
+            "method": { "const": "private_key_jwt" },
+            "jwksUri": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 }
+          }
+        }
+      ]
     }
   }
 }

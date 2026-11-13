@@ -5,6 +5,36 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Added
+- Private Apps contract 1.3.0 (minor, compatible) and 4 runnable reference recipes/examples:
+  - Machine contracts synced to `1.3.0` (`apps/private/contract/{openapi.yaml, asyncapi.yaml,
+    scopes.json, tot-app.schema.json, forbidden-scopes.json}`): 11 V1 scopes (`catalog:read`,
+    `orders:read:minimal`, `orders:webhook`, `customers:read:minimal`, `inventory:read`,
+    `inventory:write`, `reports:read`, `attribution:write`, `widgets:launch`,
+    `fulfillment:process`, `orders:read:recipient`), multi-location inventory (`GET/PUT
+    /inventory/locations/{locationId}`), compare-and-swap level reconciliation (`PUT
+    /inventory/levels` with `expectedVersion`), batch movement writes with WMS reason codes (`POST
+    /inventory/movements`), carrier capability discovery (`GET /fulfillment/carriers` with PACT and
+    adult-signature metadata), location-keyed fulfillment assignments with 1:N split shipments
+    (`POST /fulfillment/assignments/{assignmentId}/shipments`) and exception reporting (`POST
+    /fulfillment/assignments/{assignmentId}/exceptions`), `order.partially_fulfilled` and
+    `label-voided` recovery, `private_key_jwt` authentication, self-serve preview order generation
+    (`POST /api/apps/admin/test-orders`), and production candidate staging (`POST
+    /api/apps/admin/candidates`).
+  - `apps/private/examples/hello-inventory/` — starter private app demonstrating location
+    registration, stock reads, idempotent movement writes, and synthetic preview orders.
+  - `apps/private/recipes/inventory-sync-skuvault/` — multi-location WMS connector recipe (SkuVault,
+    Finale Inventory, ERP/WMS) demonstrating location upsert, `PUT /inventory/levels` CAS
+    reconciliation, batch WMS movement writes across all 7 reason codes, and `inventory.changed`
+    threshold transition handling (`low_stock`, `out_of_stock`, `back_in_stock`).
+  - `apps/private/recipes/fulfillment-shipstation/` — shipping & PACT label station connector recipe
+    (ShipStation, PirateShip, Shippo) demonstrating assignment webhooks/reconciliation, recipient
+    hydration, PACT carrier validation (refusing USPS with `422 pact_carrier_ineligible`), 1:N split
+    cartons, and `label-voided` recovery.
+  - `apps/private/recipes/dropship-split-duoplane/` — 3PL & multi-vendor routing connector recipe
+    (Duoplane, DSCO, multi-warehouse dropship) demonstrating Stone 1 location-keyed processor
+    coexistence, partial line shipments (`order.partially_fulfilled` → `order.fulfilled`), and
+    exception reporting (`backordered`, `cannot_fulfill`, `address_undeliverable`), plus Stone 2
+    multi-vendor cart auto-split planning.
 - Private Apps contract 1.2 (minor, compatible), mirrored from Storefront
   `ba07b4eb19c54e160277c2b086e6cba7510e20c2`: new `inventory:write` scope (`scopes.json`,
   `tot-app.schema.json`, `openapi.yaml`); idempotent `POST /inventory/movements` with closed
