@@ -29,15 +29,18 @@ the OpenAPI definition says so.
 | Scope | Available operation family |
 |---|---|
 | Token only | Read this app install (`GET /app`) and its delivery health (`GET /health`). |
-| `catalog:read` | Read published catalog products (`GET /catalog/products`, `GET /catalog/products/{handle}`), with keyset `cursor` and `updatedSince` pagination. |
-| `orders:read:minimal` | Read minimized order lists and details. |
-| `inventory:read` | Read availability, policy, and per-location mirror-ledger readings (`GET /inventory`), with keyset `cursor` and `updatedSince` pagination. |
-| `inventory:write` | Record idempotent per-SKU, per-location stock corrections in the tenant's mirror ledger (`POST /inventory/movements`). |
-| `reports:read` | Read aggregate report snapshots. |
-| `attribution:write` | Write idempotent, app-owned attribution records only. |
-| `fulfillment:process` | Read this install's active fulfillment assignments; report label outcome and handoff for an assigned order. |
-| `orders:read:recipient` | Read the ship-to recipient of one assigned order, consent-gated and audited. |
-| App-install ownership | List and replay this installation's webhook delivery records. |
+| `catalog:read` | Read published catalog products (`GET /catalog/products`, `GET /catalog/products/{handle}`), with keyset `cursor` and `updatedSince` pagination, and subscribe to `catalog.product.updated`. |
+| `orders:read:minimal` | Read minimized order lists and details (`GET /orders`, `GET /orders/{orderId}`). |
+| `orders:webhook` | Subscribe to `order.created`, `order.partially_fulfilled`, and `order.fulfilled` CloudEvents. |
+| `customers:read:minimal` | Read minimal marketing consent state keyed by opaque customer id and subscribe to `customer.marketing_consent.updated`. |
+| `inventory:read` | Read availability, policy, per-location mirror-ledger readings (`GET /inventory`), and inventory locations (`GET /inventory/locations`, `GET /inventory/locations/{locationId}`), plus subscribe to `inventory.changed`. |
+| `inventory:write` | Upsert inventory locations (`PUT /inventory/locations/{locationId}`), record single or batch stock movements (`POST /inventory/movements`, `POST /inventory/adjustments`), and reconcile absolute levels with compare-and-swap (`PUT /inventory/levels`). |
+| `reports:read` | Read aggregate report snapshots (`GET /reports`). |
+| `attribution:write` | Write idempotent, app-owned attribution records (`POST /attribution`) and subscribe to `attribution.finalized`. |
+| `widgets:launch` | Activate declared sandboxed widget placements and mint short-lived widget launch tokens. |
+| `fulfillment:process` | Read carrier capabilities (`GET /fulfillment/carriers`), read active fulfillment assignments (`GET /fulfillment/assignments`), report whole-order shipment evidence (`POST /fulfillment/orders/{orderId}/shipment-evidence`), record 1:N split shipments (`POST /fulfillment/assignments/{assignmentId}/shipments`), and report fulfillment exceptions (`POST /fulfillment/assignments/{assignmentId}/exceptions`). |
+| `orders:read:recipient` | Read the ship-to recipient of one assigned order (`GET /fulfillment/orders/{orderId}/recipient`), consent-gated and audited. |
+| App-install ownership | List and replay this installation's webhook delivery records, generate synthetic preview orders (`POST /api/apps/admin/test-orders` in `env=test`), and stage production candidate manifests (`POST /api/apps/admin/candidates`). |
 
 Catalog and inventory list endpoints (`GET /catalog/products` and `GET /inventory`) support opaque
 keyset `cursor` pagination (`nextCursor`), ISO-8601 `updatedSince` filtering, and `limit` /
@@ -267,8 +270,32 @@ are in [`contract/examples/`](./contract/examples/).
    `cancelled`. A release (processor changed or cleared, install suspended, uninstalled or
    descoped) emits no event: the next call is refused with `assignment-ended`.
 
-Orders are fulfilled whole. There is no split shipment, rate quote, label purchase, return or
-change to payment, tax, price or checkout.
+Orders may be fulfilled whole via `POST /fulfillment/orders/{orderId}/shipment-evidence` (including
+`label-voided` recovery that issues a fresh replacement `purchaseId`) or in 1:N cartons via
+`POST /fulfillment/assignments/{assignmentId}/shipments` (which emits `order.partially_fulfilled` on
+intermediate cartons and `order.fulfilled` once all assigned line quantities are covered). Use
+`GET /fulfillment/carriers` to validate carrier capabilities—including `pactEligible` and
+`adultSignature`—before purchasing labels for PACT-regulated vape/tobacco assignments (USPS is
+refused with `422 pact_carrier_ineligible`). Use
+`POST /fulfillment/assignments/{assignmentId}/exceptions` to report `backordered`, `cannot_fulfill`,
+or `address_undeliverable` line exceptions. There is no rate quote, platform label purchase, return,
+or change to payment, tax, price or checkout.
+
+### Runnable recipes and starter examples
+
+- [`examples/hello-inventory/`](./examples/hello-inventory/) — Starter app: location upsert, stock
+  read/write, and synthetic preview orders (`POST /api/apps/admin/test-orders`).
+- [`recipes/inventory-sync-skuvault/`](./recipes/inventory-sync-skuvault/) — Multi-location WMS sync
+  (SkuVault / Finale / ERP): `PUT /inventory/levels` CAS reconciliation, batch WMS movements, and
+  `inventory.changed` threshold transitions.
+- [`recipes/fulfillment-shipstation/`](./recipes/fulfillment-shipstation/) — Shipping & PACT label
+  station (ShipStation / PirateShip / Shippo): carrier eligibility checks, 1:N split cartons, and
+  `label-voided` recovery.
+- [`recipes/dropship-split-duoplane/`](./recipes/dropship-split-duoplane/) — 3PL & multi-vendor
+  routing (Duoplane / DSCO): location-keyed processor coexistence, partial line shipments,
+  exception reporting, and Stone 2 cart auto-split planning.
+- [`samples/fulfillment-connector/`](./samples/fulfillment-connector/) — Full HTTP and Cloudflare
+  Worker reference sample for whole-order webhook verification and shipment evidence.
 
 ### Idempotency
 

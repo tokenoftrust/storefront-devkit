@@ -16,6 +16,29 @@
           "sku": "PODS-MENTHOL-4PK",
           "quantity": 1
         }
+      ],
+      "locationId": "*",
+      "allowedCarriers": ["UPS", "FEDEX", "DHL", "ONTRAC", "LSO", "BETTER_TRUCKS", "GLS_US", "SPEE_DEE", "STAT_OVERNIGHT"],
+      "adultSignatureRequired": true,
+      "lines": [
+        {
+          "lineId": "line_01J9Z4A8L1",
+          "sku": "VAPE-KIT-STARTER",
+          "locationId": "unspecified",
+          "quantity": 1,
+          "shipped": 0,
+          "cancelled": 0,
+          "remaining": 1
+        },
+        {
+          "lineId": "line_01J9Z4A8L2",
+          "sku": "PODS-MENTHOL-4PK",
+          "locationId": "unspecified",
+          "quantity": 1,
+          "shipped": 0,
+          "cancelled": 0,
+          "remaining": 1
+        }
       ]
     }
   ],

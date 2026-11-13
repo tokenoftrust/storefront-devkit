@@ -1,19 +1,30 @@
 openapi: 3.1.0
 info:
   title: Storefront Private Apps API
-  version: "1.2.0"
-  license:
-    name: Apache-2.0
-    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: "1.3.0"
   x-contractVersion: "1"
   description: >
     Scoped, least-privilege API for installed Storefront Private Apps. All access is
     tenant-scoped from the app's JWT claims (never from caller-supplied tenant input),
     authenticated with a short-lived bearer JWT issued by the Storefront App Gateway
-    (OAuth2 client-credentials grant). Every endpoint documents the single scope it
-    requires. There is NO endpoint for any compliance-floor surface (see
-    forbidden-scopes.json): no checkout/tax/age-identity/warning/jurisdiction/
+    (OAuth2 client-credentials grant, `POST /api/apps/oauth/token`). Every endpoint
+    documents the single scope it requires. There is NO endpoint for any compliance-floor
+    surface (see forbidden-scopes.json): no checkout/tax/age-identity/warning/jurisdiction/
     signed-cart/promote mutation, and no DOM/cookie/checkout access.
+
+
+    Stage wall. Every host serves exactly one stage: a preview host is stage `preview`
+    (token and install env `test`), a publication host is stage `publication` (token and
+    install env `production`). A token is minted with the env of the host that issued it.
+    Every `/api/apps/v1/*` call refuses 403 `{"error":"stage_mismatch","code":"stage_mismatch"}`
+    when the token env or the install env does not match the host stage. Reads
+    (`/orders`, `/orders/{id}`) return preview-ledger orders on a preview host and live orders
+    on a publication host. Webhooks reach only installs whose env matches the event stage.
+
+
+    Operations and schemas marked `x-tot-wave: 2` with `x-tot-status: planned` are locked
+    wire shapes that are not implemented yet; a server answers 404 for a planned path.
+    Everything else is implemented.
   contact:
     name: Token of Trust Storefront
     url: https://storefront.tokenoftrust.com
@@ -24,9 +35,16 @@ servers:
       tenant:
         default: acme
   - url: https://tot-preview.tokenoftrust.store/api/apps/v1
-    description: Shared preview gateway (test env)
+    description: Shared preview gateway (stage preview, env test)
 
 tags:
+  - name: oauth
+    description: OAuth2 token endpoint for the client-credentials grant.
+  - name: admin
+    description: >
+      Developer and operator self-serve install lifecycle. Session-authed, never the app
+      JWT. Callers without owner capability (preview-access, ship-on-behalf) are limited to
+      env `test`; a production app needs an owner (403 `owner_required_for_production_app`).
   - name: metadata
     description: App install identity and health.
   - name: catalog
@@ -43,13 +61,13 @@ tags:
   - name: attribution
     description: App-owned idempotent attribution writes.
   - name: webhooks
-    description: Delivery health and app-owned replay.
+    description: Delivery health and admin replay.
   - name: fulfillment
     description: >
       Merchant-configured fulfillment processor. An install acts only on orders whose active
       assignment names it; assignment comes from the merchant's processor configuration and
-      an operator release, never from the app. Whole-order only. Refusal codes are listed on
-      `FulfillmentRefusal.code`.
+      an operator release, never from the app. Whole-order only. Design and refusal codes:
+      docs/private-apps/fulfillment-connector-design.md.
 
 security:
   - appJwt: []
@@ -110,9 +128,10 @@ paths:
       description: >
         Requires scope `catalog:read`. Public catalog data only. Supports opaque keyset
         `cursor` pagination and `updatedSince` filtering (ordered by `handle ASC`), stable
-        under concurrent writes. Enforces the per-install fixed-window rate limit (120
-        requests per 60-second window per install; returns 429 with `Retry-After`, and fails
-        closed with 503 when rate-limit state is unavailable).
+        under concurrent writes. Enforces the per-install KV fixed-window rate limit (120
+        requests per 60-second window per install, approximate across isolates under
+        last-write-wins KV increments; returns 429 with `Retry-After`, and fails closed with
+        503 when KV is unavailable).
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - name: collection
@@ -191,7 +210,10 @@ paths:
       description: >
         Requires scope `orders:read:minimal`. Returns the minimized order shape only —
         no raw checkout payload, no signed-cart material, no tax internals, customer as
-        opaque hash.
+        opaque hash. On a preview host (test install) the orders are the preview-ledger
+        orders, including synthetic orders from `POST /admin/test-orders`; on a publication
+        host (production install) they are live orders. A stage or env mismatch answers 403
+        `stage_mismatch`.
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - name: status
@@ -221,7 +243,10 @@ paths:
       operationId: getOrder
       summary: Read one minimal order
       x-requiredScope: orders:read:minimal
-      description: Requires scope `orders:read:minimal`.
+      description: >
+        Requires scope `orders:read:minimal`. Resolved against the host stage's ledger
+        (preview ledger on a preview host, live on a publication host); a stage or env
+        mismatch answers 403 `stage_mismatch`.
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - name: id
@@ -254,9 +279,10 @@ paths:
         mirror ledger for the routed stage and one location is applied the way storefront pages
         apply it; a SKU the ledger holds carries its `mirror` reading. The
         reservation-authority response header states that this projection is not reservation
-        authority. Enforces the per-install fixed-window rate limit (120 requests per
-        60-second window per install; returns 429 with `Retry-After`, and fails closed with
-        503 when rate-limit state is unavailable).
+        authority. Enforces the per-install KV fixed-window rate limit (120 requests per
+        60-second window per install, approximate across isolates under last-write-wins KV
+        increments; returns 429 with `Retry-After`, and fails closed with 503 when KV is
+        unavailable).
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - name: sku
@@ -302,21 +328,25 @@ paths:
     post:
       tags: [inventory]
       operationId: recordInventoryMovement
-      summary: Record one per-SKU, per-location stock correction (idempotent)
+      summary: Record one stock correction, or a WMS batch of up to 250 movements (idempotent)
       x-requiredScope: inventory:write
       description: >
         Requires scope `inventory:write` on an active install of the host tenant whose env
         matches the routed stage. Authority: the write is a merchant-consented mirror
-        correction in the tenant's ledger. It never decrements for an order, never
+        correction in the tenant's ledger (ADR 0033). It never decrements for an order, never
         reserves and never makes the app an authoritative provider. The install's consent is
         checked when the movement commits, so a suspend, uninstall or scope removal committed
         before the write refuses it.
+        Body: one `InventoryMovementWrite`, answered with `InventoryReceipt`, or an
+        `InventoryMovementBatchWrite` of 1..250 items, each with a WMS `reason`, answered with
+        `InventoryBatchReceipt`. A batch is one transaction: one refused item refuses the
+        request, records nothing, and names the item's `index`.
         Delta semantics: `quantityDelta` is a nonzero safe integer added to the ledger
         balance of (`sku`, `locationId`). The resulting balance must stay between 0 and
         2^53-1; a positive delta on a negative balance is accepted when it does not move the
         balance further below zero. Overflow is refused, never clamped. `sku` must be in
-        the tenant catalog; `locationId` is `unspecified` (the default) or a location that
-        already has movements in this tenant's ledger for this stage.
+        the tenant catalog; `locationId` is `unspecified` (the default) or an active location
+        declared through `PUT /inventory/locations/{locationId}`.
         Server-derived fields: `asOf` is the server receive time, `source` the app
         namespace, `actorId` the install, and the event id a digest of the idempotency key.
         A body naming any of them is refused with 400 `server-derived-field`.
@@ -328,8 +358,10 @@ paths:
         sets the balance to the observed value, and an app correction committed before it
         does not survive it. Every row remains in the ledger. Fulfilment progress is a
         separate write-back: `POST /fulfillment/orders/{orderId}/shipment-evidence`.
-        Commits emit `inventory.changed` to active installs holding `inventory:read`. Response
-        is always `cache-control: no-store`.
+        Each committed nonzero movement emits `inventory.changed` to active installs holding
+        `inventory:read`. A 2xx answer, replays included, rewrites the stage's availability
+        projection that static product pages hydrate from. Response is always
+        `cache-control: no-store`.
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -337,7 +369,10 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/InventoryMovementWrite' }
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/InventoryMovementWrite'
+                - $ref: '#/components/schemas/InventoryMovementBatchWrite'
       responses:
         '201':
           description: The correction is recorded, or this is the replay of the receipt under the same key.
@@ -345,7 +380,10 @@ paths:
             tot-request-id: { $ref: '#/components/headers/TotRequestId' }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/InventoryReceipt' }
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/InventoryReceipt'
+                  - $ref: '#/components/schemas/InventoryBatchReceipt'
         '400': { $ref: '#/components/responses/InventoryRefused' }
         '401': { $ref: '#/components/responses/InventoryRefused' }
         '403': { $ref: '#/components/responses/InventoryRefused' }
@@ -386,7 +424,8 @@ paths:
         mismatch) is rejected with 409. Writes only into the app's own attribution
         namespace — it cannot alter orders, price, tax, or checkout. The referenced
         `orderId` MUST belong to the calling tenant/install; an order that is not owned by
-        this tenant is rejected with 403 under the same tenant-ownership rule as reads.
+        this tenant is rejected with 403 (mirroring the cross-tenant read rule), so D3
+        inherits tenant-ownership of the referenced order as an enforced AC.
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -450,7 +489,7 @@ paths:
     post:
       tags: [webhooks]
       operationId: replayWebhookDelivery
-      summary: Replay a delivery for this app installation
+      summary: Replay a delivery (admin/app operation)
       x-requiredScope: null
       x-authorization: install-owns-delivery
       description: >
@@ -497,13 +536,16 @@ paths:
         (live is publication, test is preview), whose install is the calling install and
         whose state is `active`, joined to the order at its current event version with
         release eligibility recomputed live. An order that fails the recompute (not
-        releasable, or a release hold) is omitted
+        releasable, or a release hold such as a projection-raised source hold) is omitted
         while its assignment stays `active`, and reappears when the hold clears; no event
         fires for the omission. Held, cancelled, released, not-releasable, other-install,
         other-stage, other-tenant and nonexistent orders are absent, indistinguishably. This
         is the processor's recovery path when a `fulfillment.assignment.*` delivery is late
-        or lost. No customer identity. Response is `cache-control: no-store`. A `tenant`,
-        `tenantId` or `stage` query parameter answers 403 `denied`.
+        or lost. Each assignment carries the processor-config location it was routed
+        through, the carriers the order may ship with, whether a shipment needs an accepted
+        adult signature, and its lines with shipped, cancelled and remaining quantities. No
+        customer identity. Response is `cache-control: no-store`. A `tenant`, `tenantId` or
+        `stage` query parameter answers 403 `denied`.
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - name: cursor
@@ -542,7 +584,7 @@ paths:
         the path, no body, no list or search. Admission is one guarded insert into the
         append-only app contact-access audit (install active with the scope, active
         assignment at the evaluated order version, live consent, fewer than
-        the per-install hourly quota of admitted reads);
+        APP_CONTACT_READS_PER_HOUR admitted reads for this install in the last hour);
         nothing is decrypted before that row commits, and only the ship group is opened.
         Contact state is classified only after admission, so an unassigned order reveals
         nothing about its contact. Stage is the routed stage, and the stage the order's contact
@@ -571,19 +613,25 @@ paths:
     post:
       tags: [fulfillment]
       operationId: recordFulfillmentShipmentEvidence
-      summary: Report a label outcome or a confirmed handoff for an assigned order (idempotent)
+      summary: Report a label outcome, a label void or a confirmed handoff for an assigned order (idempotent)
       x-requiredScope: fulfillment:process
       description: >
         Requires scope `fulfillment:process` and an active assignment of the order naming the
         calling install, bound by `assignmentId` in the body. Whole-order only. The body is
-        one of two closed facts: `label-outcome` (the external label provider's result under
-        the platform purchase id) or `handoff` (the carrier accepted the parcel). Storefront
+        one of three closed facts: `label-outcome` (the external label provider's result under
+        the platform purchase id), `label-voided` (the processor voided that label before
+        handoff; the order moves to its next purchase attempt and the response names the next
+        attempt's purchase id) or `handoff` (the carrier accepted the parcel). Every fact
+        names the current attempt's purchase id; a fact naming an earlier attempt's id answers
+        409 `conflict` and changes nothing. Storefront
         never buys a label and never contacts a carrier. `Idempotency-Key` is REQUIRED and
         scoped to the calling install; its hash covers the canonical body, the assignment id
         and the order id. A same-key, same-body retry returns the original response; a
         same-key retry with another body or assignment answers 409 `idempotency-conflict`.
-        `order.fulfilled` is emitted only by an accepted handoff. Response is always the
-        minimized `AppShipmentView`, `cache-control: no-store`.
+        Whole-order evidence acts on the order's assignment: an accepted handoff records
+        every line the assignment still holds as one shipment under the label's carrier and
+        tracking number. `order.fulfilled` is emitted only by an accepted handoff. Response
+        is always the minimized `AppShipmentView`, `cache-control: no-store`.
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -610,6 +658,656 @@ paths:
         '409': { $ref: '#/components/responses/FulfillmentRefused' }
         '503': { $ref: '#/components/responses/FulfillmentRefused' }
 
+  /inventory/locations:
+    get:
+      tags: [inventory]
+      operationId: listInventoryLocations
+      summary: List the tenant's stock locations
+      x-requiredScope: inventory:read
+      description: >
+        Requires scope `inventory:read`. Returns the stock locations declared for the routed
+        stage, independent of any fulfillment processor configuration. `unspecified` is always
+        listed: it is the default active, fulfillable location until the tenant declares
+        otherwise. Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Declared locations for the routed stage.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryLocationList' }
+        '401': { $ref: '#/components/responses/InventoryRefused' }
+        '403': { $ref: '#/components/responses/InventoryRefused' }
+        '503': { $ref: '#/components/responses/InventoryRefused' }
+
+  /inventory/locations/{locationId}:
+    put:
+      tags: [inventory]
+      operationId: putInventoryLocation
+      summary: Declare or update one stock location
+      x-requiredScope: inventory:write
+      description: >
+        Requires scope `inventory:write`. Upserts the location for the routed stage. A location
+        is never deleted: `status: archived` keeps its ledger history, removes its stock from
+        availability, and refuses new movements to it. `isFulfillable: false` keeps it writable
+        but out of availability. `unspecified` cannot be archived (409 `location-protected`).
+        Availability for every SKU held there is recomputed in the same transaction and emits
+        `inventory.changed` where it changed; the stage's availability projection is rewritten
+        after a 2xx answer. The write is a full replacement of the location's fields, so
+        repeating it is idempotent without a key. Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: locationId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InventoryLocationWrite' }
+      responses:
+        '200':
+          description: The location after the write.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryLocation' }
+        '400': { $ref: '#/components/responses/InventoryRefused' }
+        '401': { $ref: '#/components/responses/InventoryRefused' }
+        '403': { $ref: '#/components/responses/InventoryRefused' }
+        '409': { $ref: '#/components/responses/InventoryRefused' }
+        '503': { $ref: '#/components/responses/InventoryRefused' }
+
+  /inventory/levels:
+    put:
+      tags: [inventory]
+      operationId: setInventoryLevels
+      summary: Reconcile absolute on-hand levels per SKU and location (idempotent)
+      x-requiredScope: inventory:write
+      description: >
+        Requires scope `inventory:write`. Each item is an on-hand observation: the ledger
+        balance of (`sku`, `locationId`) becomes `onHand`, recorded as one movement of the
+        difference with reason `reconcile` (a zero movement when already equal, which refreshes
+        freshness and emits nothing). 1..250 items, each (`sku`, `locationId`) at most once;
+        `observedAt` may not be more than five minutes in the future. Atomic: one refused item
+        refuses the request, records nothing, and names the item's `index`. Every location
+        must be `unspecified` or declared active. `Idempotency-Key` is REQUIRED and bound to
+        the canonical body. Each committed nonzero change emits `inventory.changed`; a 2xx
+        answer, replays included, rewrites the stage's availability projection. Response is
+        `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InventoryLevelsWrite' }
+      responses:
+        '200':
+          description: Resulting balances, one per entry in request order.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryLevelsReceipt' }
+        '400': { $ref: '#/components/responses/InventoryRefused' }
+        '401': { $ref: '#/components/responses/InventoryRefused' }
+        '403': { $ref: '#/components/responses/InventoryRefused' }
+        '409': { $ref: '#/components/responses/InventoryRefused' }
+        '422': { $ref: '#/components/responses/InventoryRefused' }
+        '503': { $ref: '#/components/responses/InventoryRefused' }
+
+  /fulfillment/assignments/{assignmentId}/shipments:
+    post:
+      tags: [fulfillment]
+      operationId: createAssignmentShipment
+      summary: Report one shipment covering some or all lines of an assignment (idempotent)
+      x-requiredScope: fulfillment:process
+      description: >
+        Requires scope `fulfillment:process` and an active assignment naming the calling
+        install on the host tenant and routed stage; any other assignment answers 404
+        `not-assigned`. A shipment names the lines (by sku, each at most once) and quantities
+        it carries; each quantity is at most the line's assigned minus shipped minus cancelled
+        quantity. Every release hold, the order's prohibited carriers, and its adult-signature
+        requirement refuse the shipment, as does a whole-order label in flight. Every
+        accepted shipment that leaves lines unshipped emits `order.partially_fulfilled`; the
+        shipment that ships the last line hands the order off and emits `order.fulfilled`
+        once. `Idempotency-Key` is REQUIRED and scoped to the install; a same-key, same-body
+        retry returns the original response and another body answers 409
+        `idempotency-conflict`. Response is the minimized `AssignmentShipmentView`,
+        `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/AssignmentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignmentShipmentWrite' }
+      responses:
+        '200':
+          description: The shipment is recorded, or this is the replay of the response under the same key.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssignmentShipmentView' }
+        '400': { $ref: '#/components/responses/FulfillmentRefused' }
+        '401': { $ref: '#/components/responses/FulfillmentRefused' }
+        '403': { $ref: '#/components/responses/FulfillmentRefused' }
+        '404': { $ref: '#/components/responses/FulfillmentRefused' }
+        '409': { $ref: '#/components/responses/FulfillmentRefused' }
+        '503': { $ref: '#/components/responses/FulfillmentRefused' }
+
+  /fulfillment/assignments/{assignmentId}/exceptions:
+    post:
+      tags: [fulfillment]
+      operationId: createAssignmentException
+      summary: Report lines of an assignment that cannot ship (idempotent)
+      x-requiredScope: fulfillment:process
+      description: >
+        Requires scope `fulfillment:process` and an active assignment naming the calling
+        install on the host tenant and routed stage; any other assignment answers 404
+        `not-assigned`. Records that the listed lines cannot ship and why; each quantity is
+        at most the line's remaining quantity. Every release hold refuses it. The merchant
+        desk resolves it. It never cancels, refunds or emits an event. `Idempotency-Key` is REQUIRED and scoped to
+        the install. Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/AssignmentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignmentExceptionWrite' }
+      responses:
+        '200':
+          description: The exception is recorded, or this is the replay of the response under the same key.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssignmentExceptionView' }
+        '400': { $ref: '#/components/responses/FulfillmentRefused' }
+        '401': { $ref: '#/components/responses/FulfillmentRefused' }
+        '403': { $ref: '#/components/responses/FulfillmentRefused' }
+        '404': { $ref: '#/components/responses/FulfillmentRefused' }
+        '409': { $ref: '#/components/responses/FulfillmentRefused' }
+        '503': { $ref: '#/components/responses/FulfillmentRefused' }
+
+  /oauth/token:
+    servers:
+      - url: https://{tenant}.tokenoftrust.store/api/apps
+        variables:
+          tenant:
+            default: acme
+      - url: https://tot-preview.tokenoftrust.store/api/apps
+        description: Shared preview gateway (mints env `test` tokens)
+    post:
+      tags: [oauth]
+      operationId: issueAppToken
+      summary: Exchange client credentials for a short-lived bearer token
+      x-requiredScope: null
+      security: []
+      description: >
+        RFC 6749 section 4.4 client-credentials grant. The request is
+        `application/x-www-form-urlencoded`. Client authentication is
+        `client_secret_basic` (HTTP Basic `client_id:client_secret`) or `client_secret_post`
+        (`client_id` and `client_secret` in the form body). The token's `tenant` is the
+        host's resolved tenant and its `env` is the host stage's env (`test` on a preview
+        host, `production` on a publication host); neither is ever read from the request.
+        The `scope` of the response is the install's granted scopes. Success and every error
+        carry `cache-control: no-store`. The install's env must equal the host stage's env,
+        otherwise the grant is refused.
+        A client bound to public keys authenticates with `private_key_jwt` (RFC 7523):
+        `client_assertion_type` `urn:ietf:params:oauth:client-assertion-type:jwt-bearer` and a
+        `client_assertion` signed (RS256 or ES256) by a key registered through
+        `PUT /admin/credentials/jwks` or an approved production candidate. Exactly one client
+        authentication method per request. Such a client has no usable secret: a
+        `client_secret` presented for it is `invalid_client`.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: '#/components/schemas/TokenRequest' }
+      responses:
+        '200':
+          description: Bearer access token.
+          headers:
+            cache-control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400':
+          description: >
+            `invalid_request` (not form-encoded; no credentials; both a Basic header and a
+            `client_secret` field; a `client_id` field that conflicts with the Basic client id;
+            a `client_assertion` together with a `client_secret` or an `Authorization` header;
+            a `client_assertion_type` other than jwt-bearer, or one without its assertion;
+            or a host that serves no app stage) or `unsupported_grant_type`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '401':
+          description: >
+            `invalid_client`: unknown client, wrong secret, a suspended or uninstalled install,
+            or an assertion that fails verification (signature, `iss`/`sub`/`aud`, `exp` more
+            than 300 seconds ahead, a replayed `jti`, an unreachable `jwksUri`, or an install
+            of another tenant or env). These causes are indistinguishable. A request that used
+            HTTP Basic (including a malformed Basic header) also carries
+            `WWW-Authenticate: Basic realm="storefront-app-gateway", charset="UTF-8"`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '403':
+          description: '`invalid_grant`: the credentials are valid but the install may not obtain a token on this host (env does not match the host stage).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+        '503':
+          description: '`temporarily_unavailable`: registry storage or the signing key is not configured.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OAuthError' }
+
+  /admin/install:
+    servers: &adminServers
+      - url: https://{tenant}.tokenoftrust.store/api/apps
+        variables:
+          tenant:
+            default: acme
+      - url: https://tot-preview.tokenoftrust.store/api/apps
+        description: Shared preview gateway (env test)
+    post:
+      tags: [admin]
+      operationId: adminInstallApp
+      summary: Install a private app for the resolved tenant and an env
+      x-requiredScope: null
+      security: [{ adminSession: [] }, { operatorBearer: [] }]
+      description: >
+        Session-authed. The tenant comes only from the resolved session, never the body. The
+        `credential.secret` in the response is the only time the plaintext secret is shown.
+        A caller without owner capability may install only env `test`; env `production`
+        answers 403 `owner_required_for_production_app`. Operator calls may carry
+        `X-Tot-Caller-Capability`. A requested scope outside the V1 catalog answers 400
+        `scope_denied`; re-installing the same (app, tenant, env) answers 409
+        `already_installed`. Emits `app.installed` to the new install.
+      parameters:
+        - $ref: '#/components/parameters/CallerCapability'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminInstallRequest' }
+      responses:
+        '201':
+          description: Install created with its one-time credential.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminInstallResult' }
+        '400': { $ref: '#/components/responses/AdminError' }
+        '401': { $ref: '#/components/responses/AdminError' }
+        '403': { $ref: '#/components/responses/AdminError' }
+        '409': { $ref: '#/components/responses/AdminError' }
+
+  /admin/update:
+    servers: *adminServers
+    post:
+      tags: [admin]
+      operationId: adminUpdateInstall
+      summary: Bump version, replace the manifest snapshot, or re-scope an install
+      x-requiredScope: null
+      security: [{ adminSession: [] }, { operatorBearer: [] }]
+      description: >
+        Session-authed. Only the fields present are changed; scopes are re-validated like
+        install. Refused with 409 `invalid_state` once uninstalled. A non-owner caller may
+        update only a `test` install (403 `owner_required_for_production_app` otherwise).
+      parameters:
+        - $ref: '#/components/parameters/CallerCapability'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminUpdateRequest' }
+      responses:
+        '200':
+          description: The updated install.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminInstallEnvelope' }
+        '400': { $ref: '#/components/responses/AdminError' }
+        '401': { $ref: '#/components/responses/AdminError' }
+        '403': { $ref: '#/components/responses/AdminError' }
+        '404': { $ref: '#/components/responses/AdminError' }
+        '409': { $ref: '#/components/responses/AdminError' }
+
+  /admin/suspend:
+    servers: *adminServers
+    post:
+      tags: [admin]
+      operationId: adminSuspendInstall
+      summary: Suspend an active install
+      x-requiredScope: null
+      security: [{ adminSession: [] }, { operatorBearer: [] }]
+      description: >
+        Session-authed. Immediately disables tokens, webhook delivery and widget placements.
+        Accepts only an `active` install (409 `invalid_state` otherwise). A non-owner caller
+        may suspend only a `test` install.
+      parameters:
+        - $ref: '#/components/parameters/CallerCapability'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminInstallRef' }
+      responses:
+        '200':
+          description: The suspended install.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminInstallEnvelope' }
+        '400': { $ref: '#/components/responses/AdminError' }
+        '401': { $ref: '#/components/responses/AdminError' }
+        '403': { $ref: '#/components/responses/AdminError' }
+        '404': { $ref: '#/components/responses/AdminError' }
+        '409': { $ref: '#/components/responses/AdminError' }
+
+  /admin/resume:
+    servers: *adminServers
+    post:
+      tags: [admin]
+      operationId: adminResumeInstall
+      summary: Resume a suspended install
+      x-requiredScope: null
+      security: [{ adminSession: [] }, { operatorBearer: [] }]
+      description: >
+        Session-authed. Accepts only a `suspended` install (409 `invalid_state` otherwise).
+        A non-owner caller may resume only a `test` install.
+      parameters:
+        - $ref: '#/components/parameters/CallerCapability'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminInstallRef' }
+      responses:
+        '200':
+          description: The resumed install.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminInstallEnvelope' }
+        '400': { $ref: '#/components/responses/AdminError' }
+        '401': { $ref: '#/components/responses/AdminError' }
+        '403': { $ref: '#/components/responses/AdminError' }
+        '404': { $ref: '#/components/responses/AdminError' }
+        '409': { $ref: '#/components/responses/AdminError' }
+
+  /admin/uninstall:
+    servers: *adminServers
+    post:
+      tags: [admin]
+      operationId: adminUninstallApp
+      summary: Uninstall an install and revoke its credentials
+      x-requiredScope: null
+      security: [{ adminSession: [] }, { operatorBearer: [] }]
+      description: >
+        Session-authed. Marks the install `uninstalled`, revokes credentials, stops webhooks
+        and placements; the row and its audit entries are retained. Emits a final
+        `app.uninstalled` delivery. A non-owner caller may uninstall only a `test` install.
+      parameters:
+        - $ref: '#/components/parameters/CallerCapability'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminInstallRef' }
+      responses:
+        '200':
+          description: The uninstalled install.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminInstallEnvelope' }
+        '400': { $ref: '#/components/responses/AdminError' }
+        '401': { $ref: '#/components/responses/AdminError' }
+        '403': { $ref: '#/components/responses/AdminError' }
+        '404': { $ref: '#/components/responses/AdminError' }
+        '409': { $ref: '#/components/responses/AdminError' }
+
+  /admin/credentials/rotate:
+    servers: *adminServers
+    post:
+      tags: [admin]
+      operationId: adminRotateCredentials
+      summary: Issue a new client secret for an install, keeping the client id
+      x-requiredScope: null
+      security: [{ adminSession: [] }, { operatorBearer: [] }]
+      description: >
+        Session-authed. The new secret is returned once. A non-owner caller may rotate only
+        a `test` install.
+      parameters:
+        - $ref: '#/components/parameters/CallerCapability'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminInstallRef' }
+      responses:
+        '200':
+          description: The one-time credential.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminCredentialEnvelope' }
+        '400': { $ref: '#/components/responses/AdminError' }
+        '401': { $ref: '#/components/responses/AdminError' }
+        '403': { $ref: '#/components/responses/AdminError' }
+        '404': { $ref: '#/components/responses/AdminError' }
+        '409': { $ref: '#/components/responses/AdminError' }
+
+  /admin/credentials/jwks:
+    servers: *adminServers
+    put:
+      tags: [admin]
+      operationId: adminRegisterClientJwks
+      summary: Register the public keys a private_key_jwt client signs assertions with
+      x-requiredScope: null
+      x-tot-wave: 2
+      x-tot-status: implemented
+      security: [{ adminSession: [] }, { operatorBearer: [] }]
+      description: >
+        Session-authed. Binds the install's client to `private_key_jwt`: replaces its client
+        keys with the given public JWKS or `jwksUri`, and replaces its stored secret hash with
+        the hash of discarded random bytes, so the former secret stops working. Invalid keys
+        (a private member, an unsupported key type, algorithm or curve, an RSA modulus under
+        2048 bits, a duplicate `kid`) or an unsafe `jwksUri` are 400 `invalid_jwks` with
+        nothing stored. A non-owner caller may register keys only for a `test` install; a
+        `production` install also needs a verified human owner, so the operator Bearer gets
+        403 `owner_required_for_production_app` with or without a caller capability. A
+        foreign or missing install is 404; an uninstalled one is 409 `invalid_state`.
+      parameters:
+        - $ref: '#/components/parameters/CallerCapability'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminClientJwksWrite' }
+      responses:
+        '200':
+          description: The registered key ids (empty for a `jwksUri`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminClientJwksReceipt' }
+        '400': { $ref: '#/components/responses/AdminError' }
+        '401': { $ref: '#/components/responses/AdminError' }
+        '403': { $ref: '#/components/responses/AdminError' }
+        '404': { $ref: '#/components/responses/AdminError' }
+        '409': { $ref: '#/components/responses/AdminError' }
+
+  /admin/candidates:
+    servers: *adminServers
+    get:
+      tags: [admin]
+      operationId: adminListAppCandidates
+      summary: List the tenant's production app candidates
+      x-requiredScope: null
+      x-tot-wave: 2
+      x-tot-status: implemented
+      security: [{ adminSession: [] }, { operatorBearer: [] }]
+      description: >
+        Session-authed. Key ids and algorithms or the `jwksHost` only; no manifest and no key
+        material.
+      responses:
+        '200':
+          description: The candidates.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminAppCandidateList' }
+        '401': { $ref: '#/components/responses/AdminError' }
+    post:
+      tags: [admin]
+      operationId: adminStageAppCandidate
+      summary: Stage a production app candidate for owner approval
+      x-requiredScope: null
+      x-tot-wave: 2
+      x-tot-status: implemented
+      security: [{ adminSession: [] }, { operatorBearer: [] }]
+      description: >
+        Session-authed. An owner, a console member, or the operator Bearer (with or without a
+        caller capability) stages the exact production snapshot an owner later approves. It
+        writes the candidate and its client keys only: no install and no credential exist, so
+        no token can be minted until approval. The `clientId` is fixed now so the app can set
+        its assertion `iss`/`sub` ahead of approval. Keys come from `jwks` or `jwksUri`, or
+        from the manifest's `clientAuth` when the body names neither. 409 `already_installed`
+        when the app is installed for production; 409 `candidate_pending` when it already has
+        a pending candidate.
+      parameters:
+        - $ref: '#/components/parameters/CallerCapability'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminAppCandidateStage' }
+      responses:
+        '201':
+          description: The staged candidate.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminAppCandidateStaged' }
+        '400': { $ref: '#/components/responses/AdminError' }
+        '401': { $ref: '#/components/responses/AdminError' }
+        '409': { $ref: '#/components/responses/AdminError' }
+
+  /admin/candidates/decide:
+    servers: *adminServers
+    post:
+      tags: [admin]
+      operationId: adminDecideAppCandidate
+      summary: Approve or reject a pending production app candidate
+      x-requiredScope: null
+      x-tot-wave: 2
+      x-tot-status: implemented
+      security: [{ adminSession: [] }]
+      description: >
+        Session-authed, verified human owner only: a console member and the operator Bearer
+        (with or without a caller capability) get 403 `owner_required_for_production_app` with
+        no state change. A foreign or missing candidate is 404. A decided candidate or a
+        `snapshotDigest` that does not match the staged snapshot is 409 `invalid_state` with no
+        row written. Approve creates the key-bound production install, its credential, retained
+        version, client keys, the shipping-contact consent (only when requested and
+        `grantConsent` is true) and the audit row in one atomic batch. No secret is returned,
+        because none exists for the client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminAppCandidateDecision' }
+      responses:
+        '200':
+          description: The decision.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminAppCandidateDecisionResult' }
+        '400': { $ref: '#/components/responses/AdminError' }
+        '401': { $ref: '#/components/responses/AdminError' }
+        '403': { $ref: '#/components/responses/AdminError' }
+        '404': { $ref: '#/components/responses/AdminError' }
+        '409': { $ref: '#/components/responses/AdminError' }
+
+  /admin/list:
+    servers: *adminServers
+    get:
+      tags: [admin]
+      operationId: adminListInstalls
+      summary: List the resolved tenant's installs
+      x-requiredScope: null
+      security: [{ adminSession: [] }, { operatorBearer: [] }]
+      description: Session-authed and read-only. Lists installs of every status for the resolved tenant.
+      parameters:
+        - $ref: '#/components/parameters/CallerCapability'
+      responses:
+        '200':
+          description: The tenant's installs.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminInstallList' }
+        '401': { $ref: '#/components/responses/AdminError' }
+        '403': { $ref: '#/components/responses/AdminError' }
+
+  /admin/test-orders:
+    servers: *adminServers
+    post:
+      tags: [admin]
+      operationId: adminTestOrders
+      summary: Drive synthetic preview orders for a test install
+      x-requiredScope: null
+      security: [{ adminSession: [] }, { operatorBearer: [] }]
+      description: >
+        Session-authed or operator Bearer. Served only on a preview host (a publication or
+        unrouted host answers 409 `preview_stage_required`); the resolved tenant must be the
+        routed host's tenant (403 `tenant_mismatch`) and the install must be env `test`
+        (403 `test_install_required`). A non-owner caller is limited to env `test`
+        (403 `owner_required_for_production_app`). The request is an `action` union.
+        `bind` binds the caller's own test install as the tenant's preview fulfillment
+        processor and, as part of that action, grants it preview recipient consent. `create`
+        writes one synthetic order to the preview partition of the commerce ledger with its
+        source authority and a sealed recipient built only from RFC-reserved values
+        (example.com mail domain, a 555-01xx number, a placeholder street), never real
+        contact data. `release` claims and releases one synthetic order to the bound
+        processor, which emits `fulfillment.assignment.created` to the install. Synthetic
+        orders appear only in the preview ledger, so `GET /orders` on a preview host returns
+        them and a publication host never does.
+      parameters:
+        - $ref: '#/components/parameters/CallerCapability'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminTestOrderRequest' }
+      responses:
+        '200':
+          description: '`bind` or `release` completed.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminTestOrderResult' }
+        '201':
+          description: '`create` wrote one synthetic preview order.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminTestOrderResult' }
+        '400': { $ref: '#/components/responses/AdminError' }
+        '401': { $ref: '#/components/responses/AdminError' }
+        '403': { $ref: '#/components/responses/AdminError' }
+        '404': { $ref: '#/components/responses/AdminError' }
+        '409': { $ref: '#/components/responses/AdminError' }
+        '503': { $ref: '#/components/responses/AdminError' }
+
 components:
   securitySchemes:
     appJwt:
@@ -618,15 +1316,32 @@ components:
       bearerFormat: JWT
       description: >
         Short-lived JWT access token issued by the Storefront App Gateway via the OAuth2
-        client-credentials grant. The client secret is server-side only and never
-        returned after creation. Tokens are verified against the gateway JWKS at
-        `/.well-known/jwks.json`; authorization metadata (issuer, supported scopes,
-        HTTP Message Signature keys) is published at
+        client-credentials grant (`POST /api/apps/oauth/token`). The client secret is
+        server-side only and never returned after creation. Tokens are verified against the
+        gateway JWKS at `/.well-known/jwks.json`; authorization metadata (issuer, supported
+        scopes, token endpoint auth methods, HTTP Message Signature keys) is published at
         `/.well-known/tot-app-authorization-metadata`. Required claims: `iss`, `aud`,
-        `sub` (app-install-id), `tenant`, `env`, `scopes`, `iat`, `exp`, `jti`.
-        The token-issuance endpoint is documented separately from this app API. Use only the
-        installation credentials supplied through the approved setup flow. JWKS and
-        authorization-metadata discovery belong here.
+        `sub` (app-install-id), `tenant`, `env`, `scopes`, `iat`, `exp`, `jti`. `env` is
+        `test` for a token minted on a preview host and `production` for one minted on a
+        publication host; every `/api/apps/v1/*` call refuses a token whose env does not
+        match the host stage.
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: session
+      description: >
+        Console or tenant admin session (owner, admin, or a member acting on `test` installs).
+        A console session names its tenant with `?tenant=`; a host-bound session uses the
+        routed host's tenant. Not the app JWT.
+    operatorBearer:
+      type: http
+      scheme: bearer
+      description: >
+        Headless operator principal: `Authorization: Bearer <APPS_ADMIN_SECRET>` with the
+        tenant named by `X-Tot-Tenant` (or fixed by `APPS_ADMIN_TENANT`). Unconfigured secret
+        answers 503, a missing or wrong Bearer 401, an unresolvable tenant 400. Without
+        `X-Tot-Caller-Capability` it holds owner authority; with it, developer authority.
+        Not the app JWT.
 
   parameters:
     Traceparent:
@@ -654,6 +1369,24 @@ components:
       required: true
       description: Opaque platform order id, as carried by `fulfillment.assignment.*` and the reconciliation read.
       schema: { type: string, minLength: 1, maxLength: 128 }
+    AssignmentId:
+      name: assignmentId
+      in: path
+      required: true
+      description: Opaque assignment id, as carried by `fulfillment.assignment.*` and the reconciliation read.
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    CallerCapability:
+      name: X-Tot-Caller-Capability
+      in: header
+      required: false
+      description: >
+        Honored only on operator Bearer requests: the capability the operator acts with. A
+        caller declaring `preview-access` or `ship-on-behalf` is limited to env `test`
+        (403 `owner_required_for_production_app` otherwise). Any other value answers
+        400 `invalid_caller_capability`.
+      schema:
+        type: string
+        enum: [preview-access, ship-on-behalf]
 
   headers:
     TotRequestId:
@@ -684,12 +1417,29 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     Forbidden:
-      description: Token valid but lacks the required scope, or tenant claim mismatch.
+      description: >
+        Token valid but lacks the required scope, or tenant claim mismatch, or the token env
+        or install env does not match the host stage (`stage_mismatch`).
       headers:
         tot-request-id: { $ref: '#/components/headers/TotRequestId' }
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/Error'
+              - $ref: '#/components/schemas/StageMismatchRefusal'
+    AdminError:
+      description: >
+        A refusal from `/admin/*`. 401 not signed in; 403 not authorized,
+        `owner_required_for_production_app`, or on `test-orders` `tenant_mismatch` or
+        `test_install_required`; 404 `not_found` (an install of another tenant is
+        indistinguishable from a missing one); 409 `already_installed` or `invalid_state`,
+        and on `test-orders` `preview_stage_required`; 400 `invalid_caller_capability` or
+        otherwise; 503 `unavailable` or `vault_unavailable` on `test-orders`. Never echoes
+        internals.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminErrorBody' }
     NotFound:
       description: Resource not found for this tenant.
       headers:
@@ -706,8 +1456,10 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     TooManyRequests:
       description: >
-        Per-install fixed-window rate limit exceeded (120 requests per 60-second window per
-        install). Back off for at least `Retry-After` seconds before retrying.
+        Per-install KV fixed-window rate limit exceeded (120 requests per 60-second window per
+        install, keyed `app-api:<installId>:<bucket>` in KV; soft/approximate throttle under
+        concurrent last-write-wins KV increments). Back off for at least `Retry-After` seconds
+        before retrying.
       headers:
         tot-request-id: { $ref: '#/components/headers/TotRequestId' }
         Retry-After: { $ref: '#/components/headers/RetryAfter' }
@@ -719,8 +1471,8 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     ServiceUnavailable:
       description: >
-        Backing storage or rate-limit state is unconfigured or unavailable (`unavailable` /
-        `unconfigured`).
+        Backing storage (D1) or the fail-closed KV rate-limiter binding (`TENANT_CACHE`) is
+        unconfigured or unavailable (`unavailable` / `unconfigured`).
       headers:
         tot-request-id: { $ref: '#/components/headers/TotRequestId' }
       content:
@@ -810,7 +1562,7 @@ components:
                 description: HTTPS URL that serves the sandboxed widget's content. Must be https.
               title:
                 type: string
-                description: Label shown near the widget in approved placement controls.
+                description: Label shown near the widget in admin placement controls.
 
     InstallHealth:
       type: object
@@ -957,6 +1709,7 @@ components:
           not: { const: 0 }
           minimum: -9007199254740991
           maximum: 9007199254740991
+        reason: { $ref: '#/components/schemas/InventoryMovementReason' }
 
     InventoryReceipt:
       type: object
@@ -983,17 +1736,26 @@ components:
             - invalid_token
             - scope_denied
             - denied
+            - stage_mismatch
             - unknown-sku
             - unknown-location
+            - location-protected
             - balance-out-of-range
             - idempotency-conflict
             - unavailable
           description: >
             400 malformed (body, key or query outside the contract), 400 server-derived-field,
             401 invalid_token (also a suspended or uninstalled install), 403 scope_denied,
-            403 denied (tenant or stage mismatch), 422 unknown-sku, 422 unknown-location,
-            409 balance-out-of-range, 409 idempotency-conflict, 503 unavailable.
+            403 denied (tenant mismatch), 403 stage_mismatch (token env or install env differs
+            from the host stage), 422 unknown-sku, 422 unknown-location (undeclared or
+            archived), 409 location-protected, 409 balance-out-of-range,
+            409 idempotency-conflict, 503 unavailable.
         error: { type: string }
+        index:
+          type: integer
+          minimum: 0
+          maximum: 249
+          description: The batch item the refusal names, when it names one.
 
     ReportList:
       type: object
@@ -1071,7 +1833,8 @@ components:
             Stable refusal code; the only field a client branches on. Every /fulfillment/*
             route: 401 invalid_token (missing, invalid or expired token, another tenant's
             install, a suspended or uninstalled install; byte-identical, no detail); 403
-            scope_denied; 403 denied (a tenant, tenantId or stage query parameter); 409
+            scope_denied; 403 stage_mismatch (token env or install env differs from the host
+            stage); 403 denied (a tenant, tenantId or stage query parameter); 409
             stage-unknown (unresolvable routed stage, or on the recipient read an order
             stage that is unresolvable or differs from it; nothing read or written); 503
             unconfigured (app gateway) or unavailable (storage).
@@ -1091,7 +1854,15 @@ components:
             or a purchase id other than the platform's); 409 carrier-prohibited; 409
             carrier-mismatch; 409 with a readiness handoff-refusal code (a release hold such
             as operator-hold or payment-not-captured, or adult-signature, label, reconcile,
-            fulfillment, evidence, payment, stock, ship-to) and `holds`.
+            fulfillment, evidence, payment, stock, ship-to) and `holds`. Assignment shipments
+            and exceptions: 404 not-assigned (an assignment the calling install does not hold on
+            this tenant and stage); 400 malformed (body outside the closed schema, a repeated
+            sku, a quantity that is not a positive integer, a tracking URL off the carrier's
+            hosts, missing Idempotency-Key); 409 idempotency-conflict; 409 line-unknown (a sku
+            the assignment does not carry); 409 quantity-exceeded; 409 conflict (a concurrent
+            write to the order); 409 a release hold code and `holds`; 409 fulfillment.
+            Shipments also: 409 carrier-prohibited; 409 carrier-unsupported; 409 adult-signature;
+            409 whole-order-label (a whole-order label is in flight for the order).
         error:
           type: string
           description: >
@@ -1120,7 +1891,8 @@ components:
         One active assignment whose order is releasable at `eventVersion`. No customer
         identity; the recipient is a separate, consent-gated read.
       additionalProperties: false
-      required: [assignmentId, orderId, stage, eventVersion, assignedAt, purchaseId, lineItems]
+      required:
+        [assignmentId, orderId, stage, eventVersion, assignedAt, purchaseId, lineItems, locationId, allowedCarriers, adultSignatureRequired, lines]
       properties:
         assignmentId: { type: string }
         orderId: { type: string }
@@ -1142,6 +1914,33 @@ components:
             properties:
               sku: { type: string }
               quantity: { type: integer, minimum: 1 }
+        locationId:
+          type: string
+          pattern: '^(?:\*|[A-Za-z0-9._:-]{1,128})$'
+          description: The processor-config location the assignment was routed through; `*` is the tenant's catch-all processor.
+        allowedCarriers:
+          type: array
+          items: { $ref: '#/components/schemas/CarrierCode' }
+          description: Carriers this order may ship with, after the tenant's and the order's prohibited carriers.
+        adultSignatureRequired: { type: boolean, description: A shipment needs `adultSignature` `accepted`. }
+        lines:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/AssignmentReadLine' }
+
+    AssignmentReadLine:
+      type: object
+      description: One assignment line. `remaining` is `quantity` minus `shipped` minus `cancelled`.
+      additionalProperties: false
+      required: [lineId, sku, locationId, quantity, shipped, cancelled, remaining]
+      properties:
+        lineId: { type: string }
+        sku: { type: string }
+        locationId: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        shipped: { type: integer, minimum: 0 }
+        cancelled: { type: integer, minimum: 0 }
+        remaining: { type: integer, minimum: 0 }
 
     FulfillmentRecipient:
       type: object
@@ -1164,11 +1963,13 @@ components:
     ShipmentEvidence:
       oneOf:
         - $ref: '#/components/schemas/LabelOutcomeEvidence'
+        - $ref: '#/components/schemas/LabelVoidedEvidence'
         - $ref: '#/components/schemas/HandoffEvidence'
       discriminator:
         propertyName: kind
         mapping:
           label-outcome: '#/components/schemas/LabelOutcomeEvidence'
+          label-voided: '#/components/schemas/LabelVoidedEvidence'
           handoff: '#/components/schemas/HandoffEvidence'
 
     LabelOutcomeEvidence:
@@ -1176,10 +1977,12 @@ components:
       description: >
         The external label provider's result for the whole-order label. Allowed label moves:
         intent to purchased, unknown or voided; unknown to purchased or voided; purchased to
-        purchased only with identical facts. No move leaves voided. `unknown` is reconciled
-        under the same purchase id and never re-purchased. A voided or unresolved label is
-        finished by the merchant desk once the assignment is released. The adult-signature
-        result is attested by the install.
+        purchased only with identical facts. No move leaves an outcome of voided. `unknown` is
+        reconciled under the same purchase id and never re-purchased. To buy a replacement
+        label, report `label-voided` first; the next attempt's first outcome is reported under
+        its new purchase id. The adult-signature result is attested by the install; a carrier
+        the tenant's compliance refuses answers 409 carrier-prohibited, while a recorded
+        purchase is never refused for its adult-signature result (the handoff gate is).
       additionalProperties: false
       required: [kind, assignmentId, purchaseId, outcome]
       properties:
@@ -1223,14 +2026,43 @@ components:
         carrier: { $ref: '#/components/schemas/CarrierCode' }
         expectedVersion: { type: integer, minimum: 0 }
 
+    LabelVoidedEvidence:
+      type: object
+      description: >
+        The processor voided the whole-order label it bought under `purchaseId`, before
+        handoff. The label returns to `none`, the label operation is kept as voided history,
+        and the assignment stays active. The response is the AppShipmentView with label
+        `none` and the next attempt's purchase id. A void naming the just-voided id while no
+        newer attempt is open answers done with no new write. Refused: 409 fulfillment after
+        handoff; 409 label when no label is recorded; 409 conflict for any other purchase id.
+      additionalProperties: false
+      required: [kind, assignmentId, purchaseId]
+      properties:
+        kind: { type: string, const: label-voided }
+        assignmentId: { type: string }
+        purchaseId: { type: string }
+        expectedVersion: { type: integer, minimum: 0 }
+
     CarrierCode:
       type: string
       description: >
-        Closed set of canonical uppercase carrier codes. Input is trimmed and uppercased
-        before comparison; any other value answers 400 malformed. A code in the tenant's
-        prohibited set (current policy or the order's label-intent snapshot) answers 409
-        carrier-prohibited.
-      enum: [UPS, FEDEX, USPS, DHL]
+        Closed set of canonical uppercase carrier codes, one per `CarrierProfile` in the
+        platform carrier catalog. Input is trimmed and uppercased before comparison; any other
+        value answers 400 malformed. A code in the tenant's prohibited set (current policy or
+        the order's label-intent snapshot), a carrier that is not `pactEligible` for a tenant
+        whose compliance enables PACT, or a carrier without adult-signature support where the
+        tenant requires it answers 409 carrier-prohibited.
+      enum:
+        - UPS
+        - FEDEX
+        - USPS
+        - DHL
+        - ONTRAC
+        - LSO
+        - BETTER_TRUCKS
+        - GLS_US
+        - SPEE_DEE
+        - STAT_OVERNIGHT
 
     AppShipmentView:
       type: object
@@ -1277,6 +2109,7 @@ components:
             - inventory.changed
             - order.created
             - order.fulfilled
+            - order.partially_fulfilled
             - customer.marketing_consent.updated
             - attribution.finalized
             - fulfillment.assignment.created
@@ -1286,3 +2119,672 @@ components:
         lastStatus: { type: integer }
         lastTraceId: { type: string }
         updatedAt: { type: string, format: date-time }
+
+    StageMismatchRefusal:
+      type: object
+      description: >
+        403 from any `/api/apps/v1/*` call whose token env or install env does not match the
+        host stage (preview host: `test`; publication host: `production`).
+      additionalProperties: false
+      required: [error, code]
+      properties:
+        error: { type: string, const: stage_mismatch }
+        code: { type: string, const: stage_mismatch }
+
+    TokenRequest:
+      type: object
+      description: >
+        Form body of the client-credentials grant. With `client_secret_basic` the credentials
+        are in the `Authorization` header and `client_id` / `client_secret` are omitted from
+        the body. With `client_secret_post` both are required in the body. With
+        `private_key_jwt` the body carries `client_assertion_type` and `client_assertion`, an
+        optional `client_id` equal to the assertion's `iss`, and no `client_secret`.
+      additionalProperties: false
+      required: [grant_type]
+      properties:
+        grant_type: { type: string, const: client_credentials }
+        client_id: { type: string }
+        client_secret: { type: string }
+        client_assertion_type:
+          type: string
+          const: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+          x-tot-wave: 2
+          x-tot-status: implemented
+          description: Present with `client_assertion` for `private_key_jwt` (RFC 7523).
+        client_assertion:
+          type: string
+          maxLength: 16384
+          x-tot-wave: 2
+          x-tot-status: implemented
+          description: >
+            A JWT signed with RS256 or ES256 by a key registered for the client. `iss` and `sub`
+            are the client id; `aud` is this host's token endpoint URL (a single value); `exp` is
+            required and at most 300 seconds ahead; `iat` and `nbf` are honoured when present;
+            `jti` (1-128 printable ASCII characters) is single-use per client.
+
+    TokenResponse:
+      type: object
+      additionalProperties: false
+      required: [access_token, token_type, expires_in, scope]
+      properties:
+        access_token: { type: string, description: RS256 JWT carrying the `appJwt` claims. }
+        token_type: { type: string, const: Bearer }
+        expires_in: { type: integer, minimum: 1, description: Lifetime in seconds. }
+        scope: { type: string, description: Space-separated granted scopes of the install. }
+
+    OAuthError:
+      type: object
+      description: RFC 6749 section 5.2 error body.
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: invalid_request, unsupported_grant_type, invalid_client, invalid_grant or temporarily_unavailable.
+        error_description: { type: string }
+
+    AdminErrorBody:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: { type: string, description: Human-readable text. }
+        code:
+          type: string
+          description: >
+            scope_denied, not_found, already_installed, invalid_state, invalid_webhook_endpoint,
+            invalid_widget_placement, unknown_version, invalid_version_facets, invalid_manifest,
+            owner_required_for_production_app, invalid_caller_capability, preview_stage_required,
+            tenant_mismatch, test_install_required, unavailable, vault_unavailable, invalid_json,
+            invalid_action, install_id_required, order_id_required, invalid_jwks or
+            candidate_pending.
+        denials:
+          type: array
+          items: { type: string }
+          description: Present with `scope_denied`; the refused scopes.
+
+    AdminInstallRef:
+      type: object
+      additionalProperties: false
+      required: [installId]
+      properties:
+        installId: { type: string }
+
+    AdminInstallRequest:
+      type: object
+      additionalProperties: false
+      required: [appId, appVersion, env, scopes, manifest]
+      properties:
+        appId: { type: string, minLength: 1 }
+        appVersion: { type: string, minLength: 1 }
+        env: { type: string, description: 'Install env. A non-owner caller is limited to `test`.' }
+        scopes:
+          type: array
+          items: { type: string }
+        manifest: { type: object, description: The tot-app.json snapshot. }
+        webhookEndpoint: { type: [string, 'null'], description: 'HTTPS endpoint, or null for none.' }
+        widgetPlacements: { type: array, items: { type: object } }
+
+    AdminUpdateRequest:
+      type: object
+      description: '`installId` plus any of the fields to change.'
+      additionalProperties: false
+      required: [installId]
+      properties:
+        installId: { type: string }
+        appVersion: { type: string, minLength: 1 }
+        scopes:
+          type: array
+          items: { type: string }
+        manifest: { type: object }
+        webhookEndpoint: { type: [string, 'null'] }
+        widgetPlacements: { type: array, items: { type: object } }
+
+    AdminInstall:
+      type: object
+      description: The registry's install record.
+      additionalProperties: false
+      required: [installId, appId, appVersion, tenantId, env, status, scopes, createdAt, updatedAt]
+      properties:
+        installId: { type: string }
+        appId: { type: string }
+        appVersion: { type: string }
+        tenantId: { type: string }
+        env: { type: string }
+        status: { type: string, enum: [active, suspended, uninstalled] }
+        scopes:
+          type: array
+          items: { type: string }
+        manifest: { type: object }
+        webhookEndpoint: { type: [string, 'null'] }
+        widgetPlacements: { type: array, items: { type: object } }
+        installActor: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AdminInstallEnvelope:
+      type: object
+      additionalProperties: false
+      required: [install]
+      properties:
+        install: { $ref: '#/components/schemas/AdminInstall' }
+
+    AdminInstallList:
+      type: object
+      additionalProperties: false
+      required: [installs]
+      properties:
+        installs:
+          type: array
+          items: { $ref: '#/components/schemas/AdminInstall' }
+
+    AdminInstallResult:
+      type: object
+      additionalProperties: false
+      required: [install, credential]
+      properties:
+        install: { $ref: '#/components/schemas/AdminInstall' }
+        credential: { $ref: '#/components/schemas/AdminCredential' }
+
+    AdminCredential:
+      type: object
+      description: The one time the plaintext secret is shown.
+      additionalProperties: false
+      required: [clientId, secret]
+      properties:
+        clientId: { type: string }
+        secret: { type: string }
+
+    AdminCredentialEnvelope:
+      type: object
+      additionalProperties: false
+      required: [credential]
+      properties:
+        credential: { $ref: '#/components/schemas/AdminCredential' }
+
+    AdminClientJwksWrite:
+      type: object
+      x-tot-wave: 2
+      x-tot-status: implemented
+      description: Exactly one of `jwks` or `jwksUri`.
+      oneOf:
+        - additionalProperties: false
+          required: [installId, jwks]
+          properties:
+            installId: { type: string }
+            jwks: { $ref: '#/components/schemas/ClientPublicJwks' }
+        - additionalProperties: false
+          required: [installId, jwksUri]
+          properties:
+            installId: { type: string }
+            jwksUri: { $ref: '#/components/schemas/ClientJwksUri' }
+
+    ClientPublicJwks:
+      type: object
+      x-tot-wave: 2
+      x-tot-status: implemented
+      additionalProperties: false
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: object
+            description: >
+              RFC 7517 public JWK; each member needs a unique `kid`. RSA needs `n` and `e` with a
+              2048-8192 bit modulus (RS256); EC needs `crv` P-256, `x` and `y` (ES256). Any private
+              member (`d`, `p`, `q`, `dp`, `dq`, `qi`, `oth`, `k`) is refused. Only the public
+              members are stored.
+            required: [kty, kid]
+            properties:
+              kty: { type: string, enum: [RSA, EC] }
+              kid: { type: string }
+              alg: { type: string, enum: [RS256, ES256] }
+              use: { type: string, const: sig }
+
+    ClientJwksUri:
+      type: string
+      x-tot-wave: 2
+      x-tot-status: implemented
+      format: uri
+      maxLength: 2048
+      description: >
+        https URL with a DNS host name: no IP literal, localhost, `.local`/`.internal` suffix,
+        single-label host, userinfo, port or fragment. Fetched with no redirects followed, a
+        3-second timeout and a 64 KiB body cap, and cached for 5 minutes per client; a failed
+        fetch makes the assertion `invalid_client`.
+
+    AdminClientJwksReceipt:
+      type: object
+      x-tot-wave: 2
+      x-tot-status: implemented
+      additionalProperties: false
+      required: [installId, kids]
+      properties:
+        installId: { type: string }
+        kids:
+          type: array
+          items: { type: string }
+
+    AppCandidateStatus:
+      type: string
+      x-tot-wave: 2
+      x-tot-status: implemented
+      description: A production app candidate is decided once; `pending_approval` holds no install.
+      enum: [pending_approval, approved, rejected]
+
+    AdminAppCandidateStage:
+      type: object
+      x-tot-wave: 2
+      x-tot-status: implemented
+      description: >
+        The production snapshot to stage. Client keys are `jwks` or `jwksUri`, or the manifest's
+        `clientAuth` when both are absent.
+      required: [appId, appVersion, scopes, manifest]
+      properties:
+        appId: { type: string }
+        appVersion: { type: string }
+        scopes: { type: array, items: { type: string } }
+        manifest: { type: object }
+        webhookEndpoint: { type: [string, 'null'] }
+        widgetPlacements: { type: array, items: { type: object } }
+        jwks: { $ref: '#/components/schemas/ClientPublicJwks' }
+        jwksUri: { $ref: '#/components/schemas/ClientJwksUri' }
+        requestConsent:
+          type: boolean
+          description: Ask the approving owner to grant the fulfillment shipping-contact consent.
+
+    AdminAppCandidateStaged:
+      type: object
+      x-tot-wave: 2
+      x-tot-status: implemented
+      additionalProperties: false
+      required: [candidateId, clientId, status, snapshotDigest]
+      properties:
+        candidateId: { type: string }
+        clientId: { type: string }
+        status: { $ref: '#/components/schemas/AppCandidateStatus' }
+        snapshotDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+
+    AdminAppCandidate:
+      type: object
+      x-tot-wave: 2
+      x-tot-status: implemented
+      additionalProperties: false
+      required: [candidateId, appId, appVersion, env, scopes, clientId, keys, jwksHost, requestConsent, snapshotDigest, status, stagedAt, decidedAt, installId]
+      properties:
+        candidateId: { type: string }
+        appId: { type: string }
+        appVersion: { type: string }
+        env: { type: string, const: production }
+        scopes: { type: array, items: { type: string } }
+        clientId: { type: string }
+        keys:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [kid, alg]
+            properties:
+              kid: { type: string }
+              alg: { type: string, enum: [RS256, ES256] }
+        jwksHost: { type: [string, 'null'] }
+        requestConsent: { type: boolean }
+        snapshotDigest:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: sha256 over the canonical staged snapshot; a decision must echo it.
+        status: { $ref: '#/components/schemas/AppCandidateStatus' }
+        stagedAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        installId: { type: [string, 'null'] }
+
+    AdminAppCandidateList:
+      type: object
+      x-tot-wave: 2
+      x-tot-status: implemented
+      additionalProperties: false
+      required: [candidates]
+      properties:
+        candidates:
+          type: array
+          items: { $ref: '#/components/schemas/AdminAppCandidate' }
+
+    AdminAppCandidateDecision:
+      type: object
+      x-tot-wave: 2
+      x-tot-status: implemented
+      additionalProperties: false
+      required: [candidateId, snapshotDigest, decision]
+      properties:
+        candidateId: { type: string }
+        snapshotDigest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        decision: { type: string, enum: [approve, reject] }
+        grantConsent:
+          type: boolean
+          description: Grants the shipping-contact consent on approve, only when the candidate requested it.
+
+    AdminAppCandidateDecisionResult:
+      type: object
+      x-tot-wave: 2
+      x-tot-status: implemented
+      additionalProperties: false
+      required: [candidateId, status, installId, appId, appVersion, consentGranted]
+      properties:
+        candidateId: { type: string }
+        status: { type: string, enum: [approved, rejected] }
+        installId: { type: [string, 'null'] }
+        appId: { type: string }
+        appVersion: { type: string }
+        consentGranted: { type: boolean }
+
+    AdminTestOrderRequest:
+      description: One of the `bind`, `create` or `release` actions.
+      oneOf:
+        - $ref: '#/components/schemas/AdminTestOrderBind'
+        - $ref: '#/components/schemas/AdminTestOrderCreate'
+        - $ref: '#/components/schemas/AdminTestOrderRelease'
+      discriminator:
+        propertyName: action
+        mapping:
+          bind: '#/components/schemas/AdminTestOrderBind'
+          create: '#/components/schemas/AdminTestOrderCreate'
+          release: '#/components/schemas/AdminTestOrderRelease'
+
+    AdminTestOrderBind:
+      type: object
+      additionalProperties: false
+      required: [action, installId]
+      properties:
+        action: { type: string, const: bind }
+        installId: { type: string, description: 'The caller''s own `test` install.' }
+
+    AdminTestOrderCreate:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action: { type: string, const: create }
+
+    AdminTestOrderRelease:
+      type: object
+      additionalProperties: false
+      required: [action, orderId]
+      properties:
+        action: { type: string, const: release }
+        orderId: { type: string, description: A synthetic preview order id from `create`. }
+
+    AdminTestOrderResult:
+      description: >
+        `bind` answers 200 `{processor}`; `create` answers 201 `{order}`; `release` answers
+        200 `{order}`.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [processor]
+          properties:
+            processor:
+              type: object
+              additionalProperties: false
+              required: [installId, notifiable, consentGranted]
+              properties:
+                installId: { type: string }
+                notifiable: { type: boolean }
+                consentGranted: { type: boolean }
+        - type: object
+          additionalProperties: false
+          required: [order]
+          properties:
+            order:
+              type: object
+              required: [orderId]
+              properties:
+                orderId: { type: string }
+                stage: { type: string, const: preview, description: Present on `create`. }
+                fulfillment: { type: string, description: Present on `release`. }
+                assignedInstallId: { type: [string, 'null'], description: Present on `release`. }
+
+    InventoryMovementReason:
+      type: string
+      description: >
+        WMS reason recorded on a movement as ledger metadata; it never changes the arithmetic.
+        `reconcile` is reserved for `PUT /inventory/levels` and is not accepted here.
+      enum:
+        - received
+        - picked
+        - restock
+        - cycle_count
+        - damaged
+        - transfer
+        - adjustment
+
+    InventoryMovementBatchWrite:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 250
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, quantityDelta, reason]
+            properties:
+              sku: { type: string, minLength: 1 }
+              locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$', default: unspecified }
+              quantityDelta:
+                type: integer
+                not: { const: 0 }
+                minimum: -9007199254740991
+                maximum: 9007199254740991
+              reason: { $ref: '#/components/schemas/InventoryMovementReason' }
+
+    InventoryBatchReceipt:
+      type: object
+      additionalProperties: false
+      required: [receiptId, asOf, items]
+      properties:
+        receiptId: { type: string }
+        asOf: { type: string, format: date-time, description: Server receive time. }
+        items:
+          type: array
+          maxItems: 250
+          description: One entry per request item, in request order.
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, locationId, quantityDelta, reason, balance]
+            properties:
+              sku: { type: string, description: The catalog's stored form of the SKU. }
+              locationId: { type: string }
+              quantityDelta: { type: integer }
+              reason: { $ref: '#/components/schemas/InventoryMovementReason' }
+              balance: { type: integer, description: The location's balance after the whole batch. }
+
+    InventoryLocationWrite:
+      type: object
+      additionalProperties: false
+      required: [name, kind]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        kind: { $ref: '#/components/schemas/InventoryLocationKind' }
+        isFulfillable: { type: boolean, default: true }
+        status: { type: string, enum: [active, archived], default: active }
+
+    InventoryLocationKind:
+      type: string
+      enum: [warehouse, 3pl, dropship_vendor, retail]
+
+    InventoryLocation:
+      type: object
+      additionalProperties: false
+      required: [locationId, name, kind, isFulfillable, status, updatedAt]
+      properties:
+        locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        name: { type: string, maxLength: 200 }
+        kind: { $ref: '#/components/schemas/InventoryLocationKind' }
+        isFulfillable: { type: boolean }
+        status: { type: string, enum: [active, archived] }
+        updatedAt: { type: string, format: date-time }
+
+    InventoryLocationList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/InventoryLocation' }
+
+    InventoryLevelsWrite:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 250
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, onHand, observedAt]
+            properties:
+              sku: { type: string, minLength: 1 }
+              locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$', default: unspecified }
+              onHand: { type: integer, minimum: 0, maximum: 9007199254740991 }
+              observedAt: { type: string, format: date-time, maxLength: 64 }
+
+    InventoryLevelsReceipt:
+      type: object
+      additionalProperties: false
+      required: [receiptId, asOf, items]
+      properties:
+        receiptId: { type: string }
+        asOf: { type: string, format: date-time, description: Server receive time. }
+        items:
+          type: array
+          maxItems: 250
+          description: One entry per request item, in request order.
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, locationId, onHand, observedAt, quantityDelta, balance]
+            properties:
+              sku: { type: string }
+              locationId: { type: string }
+              onHand: { type: integer }
+              observedAt: { type: string, format: date-time }
+              quantityDelta: { type: integer, description: The reconcile movement written; 0 when already equal. }
+              balance: { type: integer }
+
+    AssignmentLine:
+      type: object
+      additionalProperties: false
+      required: [sku, quantity]
+      properties:
+        sku: { type: string }
+        quantity: { type: integer, minimum: 1 }
+
+    CarrierProfile:
+      type: object
+      x-tot-wave: 2
+      x-tot-status: implemented
+      description: >
+        One entry of the platform carrier catalog; the catalog's codes are exactly
+        `CarrierCode`. `pactEligible` is statutory eligibility only: whether the carrier may
+        carry regulated parcels at all (USPS may not). Carrier contract terms belong to the
+        tenant's carrier account. A tenant whose compliance enables PACT refuses a carrier
+        where it is false, and a tenant requiring adult signature refuses a carrier whose
+        `adultSignature` is `unsupported`. `trackingHosts` is the fail-closed allowlist for
+        `trackingUrl`.
+      additionalProperties: false
+      required: [code, name, region, pactEligible, adultSignature, trackingHosts]
+      properties:
+        code: { $ref: '#/components/schemas/CarrierCode' }
+        name: { type: string }
+        region: { type: string, enum: [US], description: ISO 3166-1 alpha-2 country the carrier serves. }
+        pactEligible: { type: boolean }
+        adultSignature: { type: string, enum: [required, supported, unsupported] }
+        trackingHosts:
+          type: array
+          minItems: 1
+          items: { type: string }
+
+    ShipmentCandidateStatus:
+      type: string
+      x-tot-wave: 2
+      x-tot-status: planned
+      description: >
+        Planned (PA). Status of a shipment or label candidate. `pending_approval` holds the
+        candidate until the merchant approves it; nothing ships and no label is bought while
+        it is pending.
+      enum: [pending_approval, approved, rejected]
+
+    LabelVoidedData:
+      type: object
+      x-tot-wave: 2
+      x-tot-status: implemented
+      description: >
+        Mirrors the asyncapi `LabelVoidedData`: the assignment, order and voided purchase id
+        of an accepted `label-voided`. The REST view then reports label `none` and the next
+        attempt's purchase id.
+      additionalProperties: false
+      required: [assignmentId, orderId, purchaseId]
+      properties:
+        assignmentId: { type: string }
+        orderId: { type: string }
+        purchaseId: { type: string }
+
+    AssignmentShipmentWrite:
+      type: object
+      additionalProperties: false
+      required: [lines, carrier, trackingNumber]
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/AssignmentLine' }
+        carrier: { type: string, pattern: '^[A-Z0-9_]{2,40}$', description: A `CarrierProfile.code`. }
+        service: { type: string, pattern: '^[A-Z0-9_]{1,40}$' }
+        trackingNumber: { type: string, pattern: '^[A-Z0-9]{6,40}$' }
+        trackingUrl: { type: string, format: uri, maxLength: 2048 }
+        adultSignature: { type: string, enum: [accepted, refused, absent] }
+
+    AssignmentShipmentView:
+      type: object
+      additionalProperties: false
+      required: [assignmentId, shipmentId, fulfilledLines, complete]
+      properties:
+        assignmentId: { type: string }
+        shipmentId: { type: string }
+        candidateStatus: { $ref: '#/components/schemas/ShipmentCandidateStatus' }
+        fulfilledLines:
+          type: array
+          items: { $ref: '#/components/schemas/AssignmentLine' }
+        complete: { type: boolean, description: True when this shipment shipped the last line and handed the order off. }
+
+    AssignmentExceptionWrite:
+      type: object
+      additionalProperties: false
+      required: [lines, code]
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/AssignmentLine' }
+        code: { type: string, enum: [vendor_rejected, backordered, out_of_stock, damaged, address_undeliverable, carrier_refused, other] }
+        note: { type: string, minLength: 1, maxLength: 500, description: Free text; never contact data. }
+
+    AssignmentExceptionView:
+      type: object
+      additionalProperties: false
+      required: [assignmentId, exceptionId, code]
+      properties:
+        assignmentId: { type: string }
+        exceptionId: { type: string }
+        code: { type: string }

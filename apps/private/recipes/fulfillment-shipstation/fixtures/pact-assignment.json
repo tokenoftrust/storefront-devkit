@@ -1,0 +1,78 @@
+{
+  "assignmentEvent": {
+    "specversion": "1.0",
+    "id": "evt_01J9Z8SHIP1K2V3B4N5X6Y7Z8C",
+    "source": "/tenants/acme-vape/storefront",
+    "type": "com.tokenoftrust.storefront.fulfillment.assignment.created",
+    "time": "2026-11-13T15:00:00.000Z",
+    "datacontenttype": "application/json",
+    "dataschemaversion": "1",
+    "tenantid": "acme-vape",
+    "appinstallid": "inst_shipstation_01",
+    "retrycount": 0,
+    "totrequestid": "req_ship_01J9Z8",
+    "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    "data": {
+      "assignmentId": "asg_pact_01J9Z8",
+      "orderId": "ord_pact_9001",
+      "stage": "preview",
+      "state": "active",
+      "eventVersion": 4,
+      "occurredAt": "2026-11-13T15:00:00.000Z"
+    }
+  },
+  "assignment": {
+    "assignmentId": "asg_pact_01J9Z8",
+    "orderId": "ord_pact_9001",
+    "stage": "preview",
+    "eventVersion": 4,
+    "assignedAt": "2026-11-13T15:00:00.000Z",
+    "purchaseId": "pur_PACT9001_A1",
+    "lineItems": [
+      { "sku": "VAPE-KIT-STARTER", "quantity": 2 },
+      { "sku": "PODS-MENTHOL-4PK", "quantity": 3 }
+    ],
+    "locationId": "*",
+    "allowedCarriers": [
+      "UPS",
+      "FEDEX",
+      "DHL",
+      "ONTRAC",
+      "LSO",
+      "BETTER_TRUCKS",
+      "GLS_US",
+      "SPEE_DEE",
+      "STAT_OVERNIGHT"
+    ],
+    "adultSignatureRequired": true,
+    "lines": [
+      {
+        "lineId": "line_pact_1",
+        "sku": "VAPE-KIT-STARTER",
+        "locationId": "unspecified",
+        "quantity": 2,
+        "shipped": 0,
+        "cancelled": 0,
+        "remaining": 2
+      },
+      {
+        "lineId": "line_pact_2",
+        "sku": "PODS-MENTHOL-4PK",
+        "locationId": "unspecified",
+        "quantity": 3,
+        "shipped": 0,
+        "cancelled": 0,
+        "remaining": 3
+      }
+    ]
+  },
+  "recipient": {
+    "orderId": "ord_pact_9001",
+    "name": "Alex Example",
+    "line1": "100 Regulated Commerce Way",
+    "city": "Austin",
+    "region": "TX",
+    "postalCode": "78701",
+    "country": "US"
+  }
+}

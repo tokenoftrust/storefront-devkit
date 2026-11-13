@@ -52,7 +52,9 @@ strongly encouraged so consumers can pin compatibility.
 ## The hard boundary (what is NEVER accepted here)
 
 This repo is strictly **tenant-side** except for the public [`apps/`](./apps/) track: its
-source-safe private-app contract corpus and the self-contained reference samples under
+source-safe private-app contract corpus and the self-contained reference examples, recipes, and
+samples under [`apps/private/examples/`](./apps/private/examples/),
+[`apps/private/recipes/`](./apps/private/recipes/), and
 [`apps/private/samples/`](./apps/private/samples/). Do not add:
 
 - Any reference to platform source paths, build internals, deploy/runner mechanics, or private

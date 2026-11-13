@@ -1,0 +1,38 @@
+{
+  "contractVersion": "1",
+  "id": "com.example.fulfillment-shipstation",
+  "name": "ShipStation & PACT Label Station Connector",
+  "version": "1.3.0",
+  "owner": {
+    "name": "Example Shipping Integrations",
+    "email": "shipping-ops@integrations.example.com",
+    "url": "https://integrations.example.com"
+  },
+  "description": "Shipping and label station connector supporting PACT Act & adult-signature carrier validation, 1:N split-carton assignment shipments, and whole-order shipment evidence (label-purchased, label-voided, handed-off).",
+  "installMode": "external",
+  "scopes": [
+    "orders:read:minimal",
+    "orders:read:recipient",
+    "orders:webhook",
+    "fulfillment:process"
+  ],
+  "webhooks": {
+    "endpoint": "https://shipstation.integrations.example.com/webhooks/tot-fulfillment",
+    "topics": [
+      "fulfillment.assignment.created",
+      "fulfillment.assignment.updated",
+      "order.created",
+      "order.partially_fulfilled",
+      "order.fulfilled"
+    ]
+  },
+  "clientAuth": {
+    "method": "private_key_jwt",
+    "jwksUri": "https://shipstation.integrations.example.com/.well-known/jwks.json"
+  },
+  "telemetryMode": "sampled",
+  "retention": {
+    "eventLogDays": 30,
+    "piiRedaction": "strict"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "storefront-private-app-hello-inventory",
+  "private": true,
+  "type": "module",
+  "description": "Starter reference app for Storefront Private Apps v1.3: locations, stock read/write, and synthetic preview orders.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node index.mjs",
+    "self-test": "node index.mjs --self-test",
+    "test": "node --test test/*.test.mjs"
+  }
+}

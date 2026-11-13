@@ -1,0 +1,34 @@
+{
+  "contractVersion": "1",
+  "id": "com.example.wms-skuvault-sync",
+  "name": "SkuVault Multi-Location WMS Sync",
+  "version": "1.3.0",
+  "owner": {
+    "name": "Example WMS Integrations",
+    "email": "wms-ops@integrations.example.com",
+    "url": "https://integrations.example.com"
+  },
+  "description": "Multi-location WMS inventory connector synchronizing warehouse locations, absolute on-hand levels (CAS reconciliation), batch WMS movements, and inventory.changed threshold transitions.",
+  "installMode": "external",
+  "scopes": [
+    "catalog:read",
+    "inventory:read",
+    "inventory:write"
+  ],
+  "webhooks": {
+    "endpoint": "https://wms.integrations.example.com/webhooks/tot-inventory",
+    "topics": [
+      "inventory.changed",
+      "catalog.product.updated"
+    ]
+  },
+  "clientAuth": {
+    "method": "private_key_jwt",
+    "jwksUri": "https://wms.integrations.example.com/.well-known/jwks.json"
+  },
+  "telemetryMode": "sampled",
+  "retention": {
+    "eventLogDays": 30,
+    "piiRedaction": "strict"
+  }
+}

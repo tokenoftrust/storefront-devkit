@@ -13,9 +13,15 @@ publish.
 3. [`schemas/`](./schemas/) — the machine-checkable shape of every tenant-owned file. When shape
    is ambiguous, the schema is authoritative.
 4. [`apps/`](./apps/) and [`apps/private/`](./apps/private/) when working on an app integration.
-   The latter contains the canonical public schema, scopes, denylist, API/event definitions, and
-   safe fixtures. [`private-apps/`](./private-apps/) remains a stable compatibility guide. The ToT
-   MCP recipe `recipe://storefront-private-apps-devbook` is only a discovery index.
+   The latter contains the canonical public schema (`v1.3.0`), 11-scope V1 catalog, denylist,
+   API/event definitions, safe fixtures, and runnable reference examples/recipes
+   ([`apps/private/examples/hello-inventory/`](./apps/private/examples/hello-inventory/),
+   [`apps/private/recipes/inventory-sync-skuvault/`](./apps/private/recipes/inventory-sync-skuvault/),
+   [`apps/private/recipes/fulfillment-shipstation/`](./apps/private/recipes/fulfillment-shipstation/),
+   [`apps/private/recipes/dropship-split-duoplane/`](./apps/private/recipes/dropship-split-duoplane/),
+   and [`apps/private/samples/fulfillment-connector/`](./apps/private/samples/fulfillment-connector/)).
+   [`private-apps/`](./private-apps/) remains a stable compatibility guide. The ToT MCP recipe
+   `recipe://storefront-private-apps-devbook` is only a discovery index.
 
 ## The mental model
 

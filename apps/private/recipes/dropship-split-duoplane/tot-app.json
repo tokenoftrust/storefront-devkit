@@ -1,0 +1,41 @@
+{
+  "contractVersion": "1",
+  "id": "com.example.dropship-duoplane-router",
+  "name": "Duoplane 3PL & Dropship Vendor Router",
+  "version": "1.3.0",
+  "owner": {
+    "name": "Example Dropship & 3PL Ops",
+    "email": "3pl-ops@integrations.example.com",
+    "url": "https://integrations.example.com"
+  },
+  "description": "Location-keyed 3PL and dropship fulfillment connector handling vendor stock feeds, partial PO shipments (order.partially_fulfilled -> order.fulfilled), and line-level processor exceptions.",
+  "installMode": "external",
+  "scopes": [
+    "orders:read:minimal",
+    "orders:read:recipient",
+    "orders:webhook",
+    "fulfillment:process",
+    "inventory:read",
+    "inventory:write"
+  ],
+  "webhooks": {
+    "endpoint": "https://duoplane.integrations.example.com/webhooks/tot-routing",
+    "topics": [
+      "fulfillment.assignment.created",
+      "fulfillment.assignment.updated",
+      "order.created",
+      "order.partially_fulfilled",
+      "order.fulfilled",
+      "inventory.changed"
+    ]
+  },
+  "clientAuth": {
+    "method": "private_key_jwt",
+    "jwksUri": "https://duoplane.integrations.example.com/.well-known/jwks.json"
+  },
+  "telemetryMode": "sampled",
+  "retention": {
+    "eventLogDays": 30,
+    "piiRedaction": "strict"
+  }
+}

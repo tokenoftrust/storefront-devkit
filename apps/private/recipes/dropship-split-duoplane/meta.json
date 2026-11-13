@@ -1,0 +1,9 @@
+{
+  "id": "private-app-recipe-dropship-split-duoplane",
+  "kind": "recipe",
+  "title": "3PL & Multi-Vendor Dropship Routing Connector (Duoplane / DSCO)",
+  "description": "Runnable Private App connector recipe for 3PL and multi-vendor dropship routing: Stone 1 location-keyed processor coexistence ((tenant_id, stage, location_id)), partial line shipments emitting order.partially_fulfilled -> order.fulfilled, processor line exceptions (backordered, cannot_fulfill, address_undeliverable), and Stone 2 multi-vendor cart auto-split contract shape.",
+  "tags": ["private-apps", "fulfillment", "inventory", "duoplane", "dsco", "dropship", "3pl", "multi-warehouse", "recipe"],
+  "contract": "private-apps@1.3",
+  "requires": { "node": ">=20", "cli": ">=6.12.2" }
+}

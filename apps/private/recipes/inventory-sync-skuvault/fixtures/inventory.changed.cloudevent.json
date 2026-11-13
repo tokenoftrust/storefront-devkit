@@ -1,0 +1,21 @@
+{
+  "specversion": "1.0",
+  "id": "evt_01J9Z7WMS1K2V3B4N5X6Y7Z8A1",
+  "source": "/tenants/acme/storefront",
+  "type": "com.tokenoftrust.storefront.inventory.changed",
+  "time": "2026-11-13T14:10:00.000Z",
+  "datacontenttype": "application/json",
+  "dataschemaversion": "1",
+  "tenantid": "acme",
+  "appinstallid": "inst_01J9Z7WMS00000000000000001",
+  "retrycount": 0,
+  "totrequestid": "req_wms_01J9Z7",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+  "data": {
+    "sku": "VAPE-MOD-PRO-200",
+    "locationId": "wh-east-nj",
+    "balance": 4,
+    "available": 4,
+    "asOf": "2026-11-13T14:09:59.000Z"
+  }
+}

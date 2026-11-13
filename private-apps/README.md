@@ -51,13 +51,30 @@ repository.
 ## Quickstart
 
 1. **Author `tot-app.json`** — declare `id`, `owner`, `installMode`, and the fewest **scopes** you
-   need (from the 8-scope V1 catalog). Validate against `tot-app.schema.json`.
-2. **Get it installed** — installation is operator-run in V1 (no self-service). Send your validated
-   manifest to your ToT contact; ask for an install with `env: test` on the preview gateway.
-   Capture the client id + secret shown **once**.
-3. **Exchange credentials for a short-lived JWT** (`POST /oauth/token`, client-credentials).
+   need (from the 11-scope V1 catalog in `apps/private/contract/scopes.json`). Validate against
+   `tot-app.schema.json`.
+2. **Self-serve in `preview` (`env: "test"`)** — seed a realistic preview catalog
+   (`tot catalog seed --store <tenant> --preset=general|regulated-vape|multi-warehouse`), install
+   your app into the `test` stage (`tot app install --store <tenant> --manifest ./tot-app.json`),
+   and generate synthetic preview orders (`POST /api/apps/admin/test-orders`) without touching live
+   merchant inventory or customer data.
+3. **Exchange credentials for a short-lived JWT** (`POST /oauth/token`, `client_credentials` with
+   `client_secret_post` or `private_key_jwt`).
 4. **Call scoped APIs** (`/api/apps/v1/...`) and **verify + dedupe** signed webhook deliveries.
-5. **Scaffold + iterate locally** with `tot app scaffold` / `tot app dev emit <topic>`.
+5. **Stage for production Owner approval** — when your connector passes verification in `test`,
+   stage a production candidate (`POST /api/apps/admin/candidates` with `clientAuth.method =
+   "private_key_jwt"`) so the Merchant Owner can approve it in one click.
+6. **Start from a runnable reference recipe** under [`../apps/private/`](../apps/private/):
+   - [`../apps/private/examples/hello-inventory/`](../apps/private/examples/hello-inventory/) —
+     locations, stock read/write, and synthetic preview orders
+   - [`../apps/private/recipes/inventory-sync-skuvault/`](../apps/private/recipes/inventory-sync-skuvault/) —
+     multi-location WMS sync, CAS reconciliation, and `inventory.changed` threshold transitions
+   - [`../apps/private/recipes/fulfillment-shipstation/`](../apps/private/recipes/fulfillment-shipstation/) —
+     ShipStation/PirateShip/Shippo connector, PACT carrier validation, and 1:N split cartons
+   - [`../apps/private/recipes/dropship-split-duoplane/`](../apps/private/recipes/dropship-split-duoplane/) —
+     Duoplane/3PL location-keyed routing, partial shipments, and fulfillment exceptions
+   - [`../apps/private/samples/fulfillment-connector/`](../apps/private/samples/fulfillment-connector/) —
+     full HTTP and Cloudflare Worker webhook/reconciliation reference sample
 
 ## The hard line (forbidden scopes)
 

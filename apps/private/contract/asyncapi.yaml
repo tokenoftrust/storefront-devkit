@@ -2,18 +2,27 @@ asyncapi: 2.6.0
 id: 'urn:com:tokenoftrust:storefront:private-apps:webhooks'
 info:
   title: Storefront Private Apps Webhook Spine
-  version: "1.1.0"
-  license:
-    name: Apache-2.0
-    url: https://www.apache.org/licenses/LICENSE-2.0
+  version: "1.3.0"
   description: >
     Outbound webhook events delivered to installed Storefront Private Apps. Every event
     is a CloudEvents 1.0 JSON envelope delivered over HTTPS POST and signed with HTTP
     Message Signatures (RFC 9421). The app verifies the signature against the gateway's
     published keys (JWKS / `/.well-known/tot-app-authorization-metadata`). Delivery is
-    at-least-once with retries, dead-lettering, and app-owned replay; receivers dedupe on
+    at-least-once with retries, dead-lettering, and admin/app replay; receivers dedupe on
     the CloudEvents `id`. No event grants an app the ability to approve restricted sales
     or change any compliance obligation (see forbidden-scopes.json).
+
+
+    Stage routing. Every event belongs to one stage: `preview` (events from the preview
+    ledger, including synthetic test orders) or `publication` (live). An event is delivered
+    only to installs whose env matches that stage: env `test` receives preview events and env
+    `production` receives publication events. A test install never receives a live event and
+    a production install never receives a preview event.
+
+
+    Channels marked `x-tot-wave: 2` with `x-tot-status: planned` are locked wire shapes that
+    no emitter produces yet. Their types are listed in `components.x-tot-planned-event-types`
+    and are not part of the `CloudEventEnvelope.type` enum until implemented.
 
 defaultContentType: application/cloudevents+json
 
@@ -63,7 +72,8 @@ channels:
       Emitted once on every committed inventory ledger movement (app correction, source
       on-hand observation, catalog import, and order decrement). Requires scope
       inventory:read. Carries SKU, location, the resulting balance and as-of stamp, with no
-      customer identity.
+      customer identity. Planned (Wave 2, PB): `PUT /inventory/levels` and the batch form of
+      `POST /inventory/movements` emit one event per committed (sku, location) change.
     subscribe:
       operationId: onInventoryChanged
       message:
@@ -77,7 +87,9 @@ channels:
         $ref: '#/components/messages/OrderCreated'
 
   order.fulfilled:
-    description: Emitted when an order is fulfilled. Requires scope orders:webhook.
+    description: >
+      Emitted when an order is fulfilled. Requires scope orders:webhook. With per-assignment
+      shipments it is emitted once, by the shipment that ships the last unshipped line.
     subscribe:
       operationId: onOrderFulfilled
       message:
@@ -122,7 +134,32 @@ channels:
       message:
         $ref: '#/components/messages/FulfillmentAssignmentUpdated'
 
+  order.partially_fulfilled:
+    description: >
+      Emitted for every accepted assignment shipment that leaves at least one assignment
+      line unshipped. Requires scope orders:webhook. Same minimized order payload as
+      order.created, with `status` `created` until the last line ships.
+    subscribe:
+      operationId: onOrderPartiallyFulfilled
+      message:
+        $ref: '#/components/messages/OrderPartiallyFulfilled'
+
+  fulfillment.label.voided:
+    x-tot-wave: 2
+    x-tot-status: planned
+    description: >
+      Planned (PA). Emitted when the label of an assignment moves to `voided`, so the
+      processor learns of a voided label without polling. Requires scope fulfillment:process.
+      Delivered only to the assigned install. Carries no customer identity.
+    subscribe:
+      operationId: onFulfillmentLabelVoided
+      message:
+        $ref: '#/components/messages/FulfillmentLabelVoided'
+
 components:
+  x-tot-planned-event-types:
+    - com.tokenoftrust.storefront.fulfillment.label.voided
+
   messageTraits:
     cloudEventEnvelope:
       headers:
@@ -170,6 +207,7 @@ components:
             - com.tokenoftrust.storefront.inventory.changed
             - com.tokenoftrust.storefront.order.created
             - com.tokenoftrust.storefront.order.fulfilled
+            - com.tokenoftrust.storefront.order.partially_fulfilled
             - com.tokenoftrust.storefront.customer.marketing_consent.updated
             - com.tokenoftrust.storefront.attribution.finalized
             - com.tokenoftrust.storefront.fulfillment.assignment.created
@@ -212,7 +250,7 @@ components:
         id: { type: string }
         status: { type: string, enum: [created, fulfilled, cancelled] }
         currency: { type: string }
-        customerHash: { type: string, description: "Reserved. V1 order.created and order.fulfilled events do not populate this field. Apps must not infer or reconstruct customer identity from order webhook data." }
+        customerHash: { type: string, description: "Reserved; NOT populated by V1's order.created/order.fulfilled fan-out. order.* is a tenant-wide fan-out to every subscribed install at once, so there is no single install to salt a per-install customerHash against — and a coarser, per-tenant-only hash was deliberately rejected rather than reused as a substitute, so V1 events carry no customer hash at all. Kept optional (not removed) only in case a differently-scoped mechanism is added later; see docs/private-apps/order-forward-contract.md." }
         subtotal: { type: number }
         total: { type: number }
         lineItems:
@@ -239,14 +277,23 @@ components:
       type: object
       additionalProperties: false
       description: >
-        Closed four-key payload emitted on every committed inventory ledger movement. Carries
-        only SKU, location, the resulting balance and as-of stamp — no customer identity or
-        order fields.
-      required: [sku, locationId, balance, asOf]
+        Closed five-key payload, scoped to one commerce stage. Emitted on every committed
+        inventory ledger movement, and whenever a sku's available quantity changes (a
+        reservation, release, expiry, or a location's status or fulfillability changing). Carries
+        only SKU, location, that location's balance, the sku's available quantity and the as-of
+        stamp — no customer identity or order fields.
+      required: [sku, locationId, balance, available, asOf]
       properties:
         sku: { type: string, minLength: 1 }
         locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
-        balance: { type: integer }
+        balance:
+          type: integer
+          description: On-hand at locationId, net of confirmed allocations there.
+        available:
+          type: integer
+          description: >
+            Sum of on-hand over the tenant's active fulfillable locations, minus active
+            (reserved or confirmed) allocations at those locations. Zero or below means sold out.
         asOf: { type: string, format: date-time }
 
     CustomerMarketingConsentUpdatedData:
@@ -284,13 +331,28 @@ components:
       required: [assignmentId, orderId, stage, state, eventVersion, occurredAt]
       properties:
         assignmentId: { type: string, description: Opaque assignment id; one per operator release. }
-        orderId: { type: string, description: Opaque platform order id. }
+        orderId: { type: string, description: Opaque platform order id (scrappy_commerce_orders.order_id). }
         stage: { type: string, enum: [preview, publication] }
         state:
           type: string
           enum: [active, held, cancelled]
           description: Always active on fulfillment.assignment.created.
         eventVersion: { type: integer, minimum: 0, description: The order event_version the transition committed at. }
+        occurredAt: { type: string, format: date-time }
+
+    LabelVoidedData:
+      type: object
+      additionalProperties: false
+      x-tot-wave: 2
+      x-tot-status: planned
+      description: >
+        Closed four-key payload of fulfillment.label.voided. No customer identity, contact or
+        address.
+      required: [assignmentId, orderId, purchaseId, occurredAt]
+      properties:
+        assignmentId: { type: string }
+        orderId: { type: string }
+        purchaseId: { type: string, description: The platform purchase id of the voided label. }
         occurredAt: { type: string, format: date-time }
 
   messages:
@@ -411,6 +473,36 @@ components:
           - type: object
             properties:
               data: { $ref: '#/components/schemas/AttributionFinalizedData' }
+
+    OrderPartiallyFulfilled:
+      name: orderPartiallyFulfilled
+      messageId: orderPartiallyFulfilled
+      title: order.partially_fulfilled
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/OrderData' }
+
+    FulfillmentLabelVoided:
+      name: fulfillmentLabelVoided
+      messageId: fulfillmentLabelVoided
+      title: fulfillment.label.voided
+      x-tot-wave: 2
+      x-tot-status: planned
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/LabelVoidedData' }
 
     FulfillmentAssignmentCreated:
       name: fulfillmentAssignmentCreated

@@ -2,13 +2,15 @@
 
 This directory is the canonical, public, language-neutral contract for Storefront private apps.
 Use it to build a service that connects to one merchant tenant through scoped APIs and signed
-webhooks. It contains documentation, machine-readable specifications and self-contained reference
-samples under [`samples/`](./samples/)—no platform runtime, credentials, tenant data or operator
-procedures.
+webhooks. It contains documentation, machine-readable specifications, starter examples under
+[`examples/`](./examples/), runnable connector recipes under [`recipes/`](./recipes/), and
+self-contained reference samples under [`samples/`](./samples/)—no platform runtime, credentials,
+tenant data or operator procedures.
 
 Private apps are available today. They are not public apps: do not infer a marketplace, a
-multi-tenant distribution model, a self-service installation flow, or any public-app API from
-these files.
+multi-tenant distribution model, or any public-app API from these files. Developers can self-serve
+installation and end-to-end verification in the `preview` (`env="test"`) sandbox, and stage
+production candidate manifests (`pending_approval`) for 1-click Merchant Owner approval.
 
 ## Read in this order
 
@@ -46,40 +48,56 @@ overrides this repository.
 | [`contract/examples/inventory.movement.request.json`](./contract/examples/inventory.movement.request.json), [`...response.json`](./contract/examples/inventory.movement.response.json), [`inventory.refusal.response.json`](./contract/examples/inventory.refusal.response.json) | Synthetic `POST /inventory/movements` request, `InventoryReceipt` response, and `InventoryRefusal` body. |
 | [`contract/examples/inventory.changed.cloudevent.json`](./contract/examples/inventory.changed.cloudevent.json) | Synthetic `inventory.changed` CloudEvent fixture. |
 
-## Reference samples
+## Reference examples, recipes, and samples
 
-Each directory under [`samples/`](./samples/) is one self-contained, runnable reference app with
-its own `README.md` and `meta.json`. A sample is built only on the published contract in this
-directory, uses no dependencies beyond its language's standard library, is configured by
-environment variables, and carries synthetic placeholder data only. It is code to read and copy,
-not a published library, not a ToT-hosted service, and never authoritative over the contract.
+Each directory under [`examples/`](./examples/), [`recipes/`](./recipes/), and
+[`samples/`](./samples/) is one self-contained, runnable reference app with its own `README.md`,
+`meta.json`, `tot-app.json`, and `node:test` verification suite. Every reference implementation is
+built only on the published contract in this directory, uses no dependencies beyond Node's standard
+library, is configured by environment variables, and carries synthetic placeholder data only. It is
+code to read and copy, not a published library, not a ToT-hosted service, and never authoritative
+over the contract.
 
-| Sample | What it shows |
-|---|---|
-| [`samples/fulfillment-connector/`](./samples/fulfillment-connector/) | Webhook verification (Content-Digest, RFC 9421), CloudEvents dedupe, reconciliation, recipient read, a simulated label provider, and idempotent label-outcome and handoff evidence. |
+| Asset | Archetype | Scopes | What it shows |
+|---|---|---|---|
+| [`examples/hello-inventory/`](./examples/hello-inventory/) | Starter app | `catalog:read`, `inventory:read`, `inventory:write`, `orders:read:minimal` | Location registration (`GET/PUT /inventory/locations/{locationId}`), stock reads (`GET /inventory`), idempotent movement writes (`POST /inventory/movements`), and self-serve preview order verification (`POST /api/apps/admin/test-orders`). |
+| [`recipes/inventory-sync-skuvault/`](./recipes/inventory-sync-skuvault/) | Multi-Location WMS Connector (SkuVault, Finale, ERP/WMS) | `catalog:read`, `inventory:read`, `inventory:write` | Multi-location upsert, `PUT /inventory/levels` CAS reconciliation (`expectedVersion` + `409 version_conflict` recovery), batch WMS `POST /inventory/movements` across all 7 reason codes, `inventory.changed` threshold transitions (`low_stock`, `out_of_stock`, `back_in_stock`), and `private_key_jwt` candidate staging. |
+| [`recipes/fulfillment-shipstation/`](./recipes/fulfillment-shipstation/) | Shipping & Label Station Connector (ShipStation, PirateShip, Shippo) | `orders:read:minimal`, `orders:read:recipient`, `orders:webhook`, `fulfillment:process` | Assignment webhooks and reconciliation, recipient hydration (`GET /fulfillment/orders/{orderId}/recipient`), PACT & `adultSignature` carrier validation via `GET /fulfillment/carriers` (refusing USPS with `422 pact_carrier_ineligible`), 1:N split cartons (`POST /fulfillment/assignments/{assignmentId}/shipments`), and whole-order `label-voided` recovery. |
+| [`recipes/dropship-split-duoplane/`](./recipes/dropship-split-duoplane/) | 3PL & Multi-Vendor Routing Connector (Duoplane, DSCO, multi-warehouse) | `orders:read:minimal`, `orders:read:recipient`, `orders:webhook`, `fulfillment:process`, `inventory:read`, `inventory:write` | **Stone 1 (Live):** Location-keyed processor coexistence `(tenant_id, stage, location_id)`, partial line shipments emitting `order.partially_fulfilled` → `order.fulfilled`, and `POST /fulfillment/assignments/{assignmentId}/exceptions` (`backordered`, `cannot_fulfill`, `address_undeliverable`). **Stone 2 (Contract Locked):** Multi-vendor cart auto-split across distinct `(appInstallId, locationId)` pairs. |
+| [`samples/fulfillment-connector/`](./samples/fulfillment-connector/) | Full HTTP/Worker fulfillment sample | `fulfillment:process`, `orders:read:recipient` | End-to-end webhook verification (Content-Digest, RFC 9421), CloudEvents dedupe, reconciliation, recipient read, simulated label provider, and both `node:http` and Cloudflare Worker entrypoints. |
 
 ## Safety boundary
 
 An app may read only granted, minimized data; receive its subscribed events; and write only to the
 narrowly scoped app surfaces its install grants (`attribution:write` in its own namespace,
-`inventory:write` for mirror-ledger stock corrections, and `fulfillment:process` for assigned
-whole-order shipment evidence). It may not change or bypass age/identity checks, tax, jurisdiction,
-required warnings, content-security policy, go-live, signed carts, or checkout totals. The
-denylist is normative: if a requested capability is not in the scope catalog—or is listed as
-forbidden—do not try to recreate it through a widget, webhook response, or undocumented endpoint.
+`inventory:write` for mirror-ledger stock corrections, location upserts, and CAS level
+reconciliation, and `fulfillment:process` for assigned whole-order shipment evidence, split-carton
+shipments, and assignment exceptions). It may not change or bypass age/identity checks, tax,
+jurisdiction, required warnings, content-security policy, go-live, signed carts, or checkout
+totals. The denylist is normative: if a requested capability is not in the scope catalog—or is
+listed as forbidden—do not try to recreate it through a widget, webhook response, or undocumented
+endpoint.
 
 Use the language and framework appropriate to your service. The devkit intentionally publishes no
-npm library or platform runtime; the reference samples are copyable source, not packages. Keep
-installation credentials server-side and use the CLI fixtures or the synthetic examples here for
-local tests.
+npm library or platform runtime; the reference examples, recipes, and samples are copyable source,
+not packages. Keep installation credentials server-side and use the CLI fixtures or the synthetic
+examples here for local tests.
 
 ## Versioning
 
-This is contract major version 1 (currently 1.2: `inventory:write`, `POST /inventory/movements`,
-and keyset cursor/`updatedSince` pagination with per-install rate-limit headers on
-`GET /catalog/products` and `GET /inventory` were added as a compatible minor, mirrored from
-Storefront `ba07b4eb19c54e160277c2b086e6cba7510e20c2`, following 1.1's fulfillment connector
-scopes, routes and topics). `contractVersion: "1"` in a manifest and
+This is contract major version 1 (currently **1.3.0**, with 11 V1 scopes in `scopes.json`:
+`catalog:read`, `orders:read:minimal`, `orders:webhook`, `customers:read:minimal`,
+`inventory:read`, `inventory:write`, `reports:read`, `attribution:write`, `widgets:launch`,
+`fulfillment:process`, and `orders:read:recipient`). Version 1.3.0 adds multi-location
+inventory (`GET/PUT /inventory/locations/{locationId}`), compare-and-swap level reconciliation
+(`PUT /inventory/levels` with `expectedVersion`), batch movement writes with WMS reason codes,
+carrier capability discovery (`GET /fulfillment/carriers` with PACT/adult-signature metadata),
+location-keyed fulfillment assignments with 1:N split shipments
+(`POST /fulfillment/assignments/{assignmentId}/shipments`) and exception reporting
+(`POST /fulfillment/assignments/{assignmentId}/exceptions`), `order.partially_fulfilled` and
+`label-voided` recovery, `private_key_jwt` authentication, and self-serve preview order testing
+(`POST /api/apps/admin/test-orders`) plus production candidate staging
+(`POST /api/apps/admin/candidates`). `contractVersion: "1"` in a manifest and
 `dataschemaversion: "1"` in a CloudEvent pin that line. Additive compatible changes are minor;
 removing or narrowing a field or changing a scope meaning requires a new major line. Do not fork
 scope strings, event names, widget placements, or the forbidden-scope list.
