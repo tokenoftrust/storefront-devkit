@@ -5,6 +5,17 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Added
+- Private Apps contract 1.2 (minor, compatible), mirrored from Storefront
+  `ba07b4eb19c54e160277c2b086e6cba7510e20c2`: new `inventory:write` scope (`scopes.json`,
+  `tot-app.schema.json`, `openapi.yaml`); idempotent `POST /inventory/movements` with closed
+  `InventoryMovementWrite`, `InventoryReceipt`, and `InventoryRefusal` schemas; per-location
+  `mirror` ledger readings on `GET /inventory`; opaque keyset `cursor` (`nextCursor`),
+  `updatedSince`, and `limit` / `pageSize` pagination plus `429` (`Retry-After`,
+  `X-RateLimit-*`) and `503` rate-limit responses on `GET /catalog/products` and `GET /inventory`;
+  clarified `inventory.changed` emission boundary in `asyncapi.yaml`; new synthetic examples under
+  `apps/private/contract/examples/inventory.*`; and an "Inventory corrections" guide in
+  `apps/private/webhooks-and-api.md` covering delta, replay, conflict, refusal semantics, a
+  runnable `curl` example, and the fulfillment write-back boundary.
 - `apps/private/samples/fulfillment-connector/` — the first private-app reference sample: a
   runnable, dependency-free Node connector for the fulfillment contract (Content-Digest and
   RFC 9421 webhook verification, CloudEvents dedupe, reconciliation, recipient read, a simulated

@@ -42,6 +42,9 @@ overrides this repository.
 | [`contract/examples/fulfillment.recipient.response.json`](./contract/examples/fulfillment.recipient.response.json) | Synthetic placeholder recipient for `GET /fulfillment/orders/{orderId}/recipient`. |
 | [`contract/examples/fulfillment.shipment-evidence.label-outcome.request.json`](./contract/examples/fulfillment.shipment-evidence.label-outcome.request.json), [`...handoff.request.json`](./contract/examples/fulfillment.shipment-evidence.handoff.request.json), [`...response.json`](./contract/examples/fulfillment.shipment-evidence.response.json) | Synthetic shipment-evidence requests and the minimized response. |
 | [`contract/examples/fulfillment.refusal.response.json`](./contract/examples/fulfillment.refusal.response.json) | Synthetic refusal body carrying a stable `code`. |
+| [`contract/examples/inventory.list.response.json`](./contract/examples/inventory.list.response.json) | Synthetic `GET /inventory` response with a per-location `mirror` ledger reading and `nextCursor`. |
+| [`contract/examples/inventory.movement.request.json`](./contract/examples/inventory.movement.request.json), [`...response.json`](./contract/examples/inventory.movement.response.json), [`inventory.refusal.response.json`](./contract/examples/inventory.refusal.response.json) | Synthetic `POST /inventory/movements` request, `InventoryReceipt` response, and `InventoryRefusal` body. |
+| [`contract/examples/inventory.changed.cloudevent.json`](./contract/examples/inventory.changed.cloudevent.json) | Synthetic `inventory.changed` CloudEvent fixture. |
 
 ## Reference samples
 
@@ -57,8 +60,10 @@ not a published library, not a ToT-hosted service, and never authoritative over 
 
 ## Safety boundary
 
-An app may read only granted, minimized data; receive its subscribed events; and write only to its
-own attribution namespace. It may not change or bypass age/identity checks, tax, jurisdiction,
+An app may read only granted, minimized data; receive its subscribed events; and write only to the
+narrowly scoped app surfaces its install grants (`attribution:write` in its own namespace,
+`inventory:write` for mirror-ledger stock corrections, and `fulfillment:process` for assigned
+whole-order shipment evidence). It may not change or bypass age/identity checks, tax, jurisdiction,
 required warnings, content-security policy, go-live, signed carts, or checkout totals. The
 denylist is normative: if a requested capability is not in the scope catalog—or is listed as
 forbidden—do not try to recreate it through a widget, webhook response, or undocumented endpoint.
@@ -70,8 +75,11 @@ local tests.
 
 ## Versioning
 
-This is contract major version 1 (currently 1.1: the fulfillment connector scopes, routes and
-topics were added as a compatible minor). `contractVersion: "1"` in a manifest and
+This is contract major version 1 (currently 1.2: `inventory:write`, `POST /inventory/movements`,
+and keyset cursor/`updatedSince` pagination with per-install rate-limit headers on
+`GET /catalog/products` and `GET /inventory` were added as a compatible minor, mirrored from
+Storefront `ba07b4eb19c54e160277c2b086e6cba7510e20c2`, following 1.1's fulfillment connector
+scopes, routes and topics). `contractVersion: "1"` in a manifest and
 `dataschemaversion: "1"` in a CloudEvent pin that line. Additive compatible changes are minor;
 removing or narrowing a field or changing a scope meaning requires a new major line. Do not fork
 scope strings, event names, widget placements, or the forbidden-scope list.

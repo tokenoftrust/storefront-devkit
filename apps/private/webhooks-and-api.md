@@ -29,17 +29,130 @@ the OpenAPI definition says so.
 | Scope | Available operation family |
 |---|---|
 | Token only | Read this app install (`GET /app`) and its delivery health (`GET /health`). |
-| `catalog:read` | Read published catalog products. |
+| `catalog:read` | Read published catalog products (`GET /catalog/products`, `GET /catalog/products/{handle}`), with keyset `cursor` and `updatedSince` pagination. |
 | `orders:read:minimal` | Read minimized order lists and details. |
-| `inventory:read` | Read availability and inventory policy. |
+| `inventory:read` | Read availability, policy, and per-location mirror-ledger readings (`GET /inventory`), with keyset `cursor` and `updatedSince` pagination. |
+| `inventory:write` | Record idempotent per-SKU, per-location stock corrections in the tenant's mirror ledger (`POST /inventory/movements`). |
 | `reports:read` | Read aggregate report snapshots. |
 | `attribution:write` | Write idempotent, app-owned attribution records only. |
 | `fulfillment:process` | Read this install's active fulfillment assignments; report label outcome and handoff for an assigned order. |
 | `orders:read:recipient` | Read the ship-to recipient of one assigned order, consent-gated and audited. |
 | App-install ownership | List and replay this installation's webhook delivery records. |
 
+Catalog and inventory list endpoints (`GET /catalog/products` and `GET /inventory`) support opaque
+keyset `cursor` pagination (`nextCursor`), ISO-8601 `updatedSince` filtering, and `limit` /
+`pageSize` bounds (`1..100`), and enforce a per-install fixed-window rate limit of 120 requests per
+60-second window (answering `429` with `Retry-After` and `X-RateLimit-*` headers when exceeded, and
+failing closed with `503` when rate-limit state is unavailable).
+
 There is deliberately no API for checkout, tax, age/identity, jurisdiction, required warnings,
 go-live, signed carts, or compliance decisions.
+
+## Inventory corrections
+
+An installed inventory-sync app uses `GET /inventory` (`inventory:read`) to read availability and
+the mirror-ledger reading per location ([example](./contract/examples/inventory.list.response.json)),
+and `POST /inventory/movements` (`inventory:write`) to record stock deltas it observed
+([request example](./contract/examples/inventory.movement.request.json),
+[response example](./contract/examples/inventory.movement.response.json)).
+
+### Authority boundary
+
+`POST /inventory/movements` records a merchant-consented stock observation in the tenant's mirror
+ledger. It never decrements for an order, never reserves stock, never alters price, tax, checkout
+or compliance decisions, and never makes the app an authoritative inventory provider. Consent is
+the active install on the host tenant in the environment the routed stage admits, with
+`inventory:write` in both the install grant and the bearer token. That consent is verified as a
+condition of the ledger insert, so a suspend, uninstall, or scope removal committed first refuses
+the write.
+
+Fulfillment progress is a separate write-back:
+`POST /fulfillment/orders/{orderId}/shipment-evidence` under `fulfillment:process` (see
+[Fulfillment connector](#fulfillment-connector) below). An inventory app never reports shipments
+through `POST /inventory/movements`, and an inventory correction never advances an order.
+
+### Delta semantics and keys
+
+- **Closed body.** The request body carries only `sku`, optional `locationId` (default
+  `unspecified`), and `quantityDelta`.
+- **Delta bounds.** `quantityDelta` is a nonzero safe integer (`-9007199254740991..9007199254740991`,
+  excluding `0`) added to the ledger balance of (`sku`, `locationId`) for the routed stage. The
+  resulting balance must stay between `0` and `2^53 - 1`. A positive delta on a negative balance is
+  accepted when it does not move the balance further below zero. Overflow or underflow is refused
+  with `409 balance-out-of-range`, never clamped. Of two concurrent deltas that would each
+  underflow, at most one applies.
+- **SKU and location.** `sku` must belong to the host tenant's catalog and is recorded in the
+  catalog's stored form (unknown or another tenant's SKU answers `422 unknown-sku`). `locationId`
+  is `unspecified` or a location that already has movements in this tenant's ledger for the stage
+  (an unseeded location answers `422 unknown-location`).
+- **Server-derived fields.** `asOf` (server receive time), `source` (the app namespace), `actorId`
+  (the install id), and `sourceEventId` (derived from `Idempotency-Key`) are set by the platform. A
+  request body naming any of them is refused with `400 server-derived-field`.
+
+### Replay, conflict, and reconciliation
+
+- **Idempotency and replay.** `Idempotency-Key` (`8..128` characters) is required on every
+  `POST /inventory/movements` call, scoped to `(install, tenant, stage, operation)` and bound to the
+  canonical request body. Retrying the same key with the same body replays the original `201`
+  `InventoryReceipt` (same `receiptId`, `asOf`, and `balance`) without inserting a duplicate ledger
+  movement. Reusing a key with a different body answers `409 idempotency-conflict`. Concurrent
+  duplicates under the same key apply once.
+- **Conflict and reconciliation.** Ledger ordering is server commit order, never a caller clock. A
+  source on-hand observation committed after an app correction sets the balance to the observed
+  value, superseding the earlier correction; every row remains in the append-only ledger so the
+  history stays auditable. Refused writes leave no movement, no audit row, and no receipt.
+- **Webhook notifications.** Every committed inventory ledger movement (app correction, source
+  on-hand observation, catalog import, and order decrement) emits `inventory.changed`
+  ([example](./contract/examples/inventory.changed.cloudevent.json)) once to active installs
+  holding `inventory:read`, carrying the closed four-key payload (`sku`, `locationId`, `balance`,
+  `asOf`) with no customer identity or order fields. Refused or replayed writes emit no duplicate
+  event.
+
+### Inventory refusal codes
+
+Every refusal from `POST /inventory/movements` returns JSON matching `InventoryRefusal`
+([example](./contract/examples/inventory.refusal.response.json)) with `cache-control: no-store`.
+Branch on `code`, never on `error`.
+
+| Status and code | Meaning |
+|---|---|
+| 400 `malformed` | Body, `Idempotency-Key`, or query outside the closed contract (e.g. `quantityDelta: 0`, missing `Idempotency-Key`, unknown field). |
+| 400 `server-derived-field` | Request body supplied `asOf`, `source`, `actorId`, or `sourceEventId`. |
+| 401 `invalid_token` | Token missing, invalid, or expired, or install suspended/uninstalled or owned by another tenant. |
+| 403 `scope_denied` | `inventory:write` absent from the install grant or bearer token. |
+| 403 `denied` | Tenant or stage mismatch, or a forbidden `tenant`, `tenantId`, or `stage` query parameter. |
+| 422 `unknown-sku` | `sku` is not in the host tenant's catalog. |
+| 422 `unknown-location` | `locationId` is neither `unspecified` nor an existing ledger location for this tenant and stage. |
+| 409 `balance-out-of-range` | Applying `quantityDelta` would underflow below `0` or overflow `2^53 - 1`. |
+| 409 `idempotency-conflict` | `Idempotency-Key` was already used by this install with a different request body. |
+| 503 `unavailable` | Gateway or backing ledger storage is unconfigured or unavailable. |
+
+### Runnable example
+
+Set `TOT_GATEWAY_URL` (for example `https://tot-preview.tokenoftrust.store/api/apps/v1`) and
+`TOT_APP_TOKEN` (a bearer token carrying `inventory:read` and `inventory:write`), then record a
+delta, replay the same `Idempotency-Key` to confirm the identical `receiptId`, and read back the
+mirror balance:
+
+```sh
+# 1. Record a -2 stock correction for VAPE-KIT-STARTER at the default location
+curl -sS -X POST "${TOT_GATEWAY_URL}/inventory/movements" \
+  -H "Authorization: Bearer ${TOT_APP_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: inv-corr-20260721-0001" \
+  -d '{"sku":"VAPE-KIT-STARTER","locationId":"unspecified","quantityDelta":-2}'
+
+# 2. Replay the exact same Idempotency-Key and body -> 201 with the identical receiptId and balance
+curl -sS -X POST "${TOT_GATEWAY_URL}/inventory/movements" \
+  -H "Authorization: Bearer ${TOT_APP_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: inv-corr-20260721-0001" \
+  -d '{"sku":"VAPE-KIT-STARTER","locationId":"unspecified","quantityDelta":-2}'
+
+# 3. Read back the SKU's mirror ledger balance for the location
+curl -sS "${TOT_GATEWAY_URL}/inventory?sku=VAPE-KIT-STARTER&locationId=unspecified&limit=50" \
+  -H "Authorization: Bearer ${TOT_APP_TOKEN}"
+```
 
 ## Receive webhooks safely
 
