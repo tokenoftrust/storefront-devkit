@@ -632,7 +632,17 @@ paths:
         '404': { $ref: '#/components/responses/FulfillmentRefused' }
         '409': { $ref: '#/components/responses/FulfillmentRefused' }
         '410': { $ref: '#/components/responses/FulfillmentRefused' }
-        '429': { $ref: '#/components/responses/FulfillmentRefused' }
+        '429':
+          description: >
+            `quota`: this install has used its APP_CONTACT_READS_PER_HOUR admitted reads in the
+            last hour. `Retry-After` is the whole seconds until the oldest counted read leaves
+            the window. Nothing is read or decrypted, and the refusal adds no audit row.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            Retry-After: { schema: { type: integer, minimum: 1 }, description: Seconds until a read is admitted again. }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FulfillmentRefusal' }
         '503': { $ref: '#/components/responses/FulfillmentRefused' }
 
   /fulfillment/orders/{orderId}/shipment-evidence:
@@ -719,7 +729,8 @@ paths:
         Requires scope `inventory:write`. Upserts the location for the routed stage. A location
         is never deleted: `status: archived` keeps its ledger history, removes its stock from
         availability, and refuses new movements to it. `isFulfillable: false` keeps it writable
-        but out of availability. `unspecified` cannot be archived (409 `location-protected`).
+        but out of availability. A quarantine location is any location of any `kind` with
+        `isFulfillable: false`; there is no separate quarantine kind or flag. `unspecified` cannot be archived (409 `location-protected`).
         Availability for every SKU held there is recomputed in the same transaction and emits
         `inventory.changed` where it changed; the stage's availability projection is rewritten
         after a 2xx answer. The write is a full replacement of the location's fields, so
@@ -801,7 +812,10 @@ paths:
         `not-assigned`. A shipment names the lines (by sku, each at most once) and quantities
         it carries; each quantity is at most the line's assigned minus shipped minus cancelled
         quantity. Every release hold, the order's prohibited carriers, and its adult-signature
-        requirement refuse the shipment, as does a whole-order label in flight. Every
+        requirement refuse the shipment, as does a whole-order label in flight. Each shipment
+        names its own carrier, so the shipments of one assignment may use different carriers; a
+        carrier the order may not ship with answers 409 `carrier-prohibited`, and a quantity
+        above the line's remainder (over-ship) answers 409 `quantity-exceeded`. Every
         accepted shipment that leaves lines unshipped emits `order.partially_fulfilled`; the
         shipment that ships the last line hands the order off and emits `order.fulfilled`
         once. `Idempotency-Key` is REQUIRED and scoped to the install; a same-key, same-body
@@ -1899,6 +1913,14 @@ components:
             write to the order); 409 a release hold code and `holds`; 409 fulfillment.
             Shipments also: 409 carrier-prohibited; 409 carrier-unsupported; 409 adult-signature;
             409 whole-order-label (a whole-order label is in flight for the order).
+            Refusals of a well-formed request are 409, never 422: an over-ship
+            (`quantity-exceeded`), a missing or refused adult signature (`adult-signature`),
+            a carrier the order may not use, which includes USPS under a regulated profile
+            (`carrier-prohibited`), and a stale write are all 409. A stale write is an
+            assignment that has ended (409 `assignment-ended`: cancelled, released, switched to
+            another processor, or superseded by a newer assignment) or an order that moved
+            since it was read (409 `conflict`, including an `expectedVersion` that is no longer
+            current). Only the recipient read is rate limited: 429 `quota` carries `Retry-After`.
         error:
           type: string
           description: >
