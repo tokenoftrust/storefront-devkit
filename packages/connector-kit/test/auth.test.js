@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AuthError, CLIENT_ASSERTION_TYPE, ConnectorAuthClient } from '../src/index.js';
+import util from 'node:util';
+import { ApiClient, AuthError, CLIENT_ASSERTION_TYPE, ConnectorAuthClient } from '../src/index.js';
 
 const ORIGIN = 'https://acme.example.com';
 const TOKEN_ENDPOINT = `${ORIGIN}/api/apps/oauth/token`;
@@ -132,6 +133,28 @@ test('concurrent callers share one token request; invalidate drops only the stal
   assert.equal(await auth.getAccessToken(), 'tok-1');
   auth.invalidate('tok-1');
   assert.equal(await auth.getAccessToken(), 'tok-2');
+});
+
+test('logging, inspecting or serializing either client never prints a token or a credential', async () => {
+  const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+  const privateJwk = { ...(await crypto.subtle.exportKey('jwk', pair.privateKey)), kid: 'k1' };
+  const secret = 'client-secret-value-123';
+  const token = 'live-bearer-token-xyz';
+  const fetch = async () => new Response(JSON.stringify({ access_token: token, token_type: 'Bearer', expires_in: 600, scope: '' }));
+  const secretClient = new ConnectorAuthClient({ origin: ORIGIN, clientId: 'cid', clientSecret: secret, fetch });
+  const jwtClient = new ConnectorAuthClient({ origin: ORIGIN, clientId: 'cid', privateKey: privateJwk, fetch });
+  const api = new ApiClient({ origin: ORIGIN, auth: secretClient, fetch });
+  const dump = () =>
+    [secretClient, jwtClient, api]
+      .flatMap((o) => [util.inspect(o, { depth: Infinity, showHidden: true }), JSON.stringify(o), String(o), Object.values(o).map(String).join(' ')])
+      .join('\n');
+  const pending = secretClient.getAccessToken();
+  assert.ok(!dump().includes(secret), 'no secret, even while a token request is in flight');
+  assert.equal(await pending, token);
+  await jwtClient.getAccessToken();
+  const after = dump();
+  for (const leaked of [token, secret, privateJwk.d]) assert.ok(!after.includes(leaked), 'no token, secret or private key material');
+  assert.equal(await secretClient.getAccessToken(), token, 'the cached token still works');
 });
 
 test('a refusal throws AuthError with the OAuth code and no remote text', async () => {
