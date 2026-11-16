@@ -172,6 +172,39 @@ test('method, size, missing headers, alg and envelope refusals', async () => {
   assert.equal((await r.verify(delivery({ headers: { ...VECTOR.headers, 'signature-input': narrow } }))).code, 'signature_coverage');
 });
 
+test('malformed base64 in Content-Digest or Signature is a refusal, never a throw', async () => {
+  const r = receiver();
+  const badDigest = await r.verify(delivery({ headers: { ...VECTOR.headers, 'content-digest': 'sha-256=:a:' } }));
+  assert.deepEqual([badDigest.ok, badDigest.status], [false, 400]);
+  const badSignature = await r.verify(delivery({ headers: { ...VECTOR.headers, signature: 'sig1=:abcde:' } }));
+  assert.deepEqual([badSignature.ok, badSignature.status, badSignature.code], [false, 401, 'signature_malformed']);
+});
+
+test('an unrelated label or member carrying a decimal is ignored and the delivery accepted', async () => {
+  const headers = {
+    ...VECTOR.headers,
+    'signature-input': `${VECTOR.headers['signature-input']}, sig2=("@method");created=1;q=1.5`,
+    signature: `${VECTOR.headers.signature}, sig2=:AAAA:`,
+  };
+  assert.equal((await receiver().verify(delivery({ headers }))).ok, true);
+});
+
+test('handleRequest refuses an oversize streamed body with no Content-Length before buffering it', async () => {
+  let pulled = 0;
+  const stream = new ReadableStream({
+    pull(controller) {
+      if (++pulled > 20) return controller.close();
+      controller.enqueue(new Uint8Array(64));
+    },
+  });
+  const request = new Request(VECTOR.targetUri, { method: 'POST', headers: VECTOR.headers, body: stream, duplex: 'half' });
+  assert.equal(request.headers.get('content-length'), null);
+  const res = await receiver({ maxBodyBytes: 256 }).handleRequest(request, async () => assert.fail('handler must not run'));
+  assert.equal(res.status, 413);
+  assert.deepEqual(await res.json(), { accepted: false, code: 'body_too_large' });
+  assert.ok(pulled <= 6, `stopped reading once past the cap (pulled ${pulled} chunks)`);
+});
+
 test('handleRequest answers a fetch Request', async () => {
   const request = new Request(VECTOR.targetUri, { method: 'POST', headers: VECTOR.headers, body: VECTOR.body });
   const seen = [];

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ApiClient, ApiError, deriveIdempotencyKey } from '../src/index.js';
+import { ApiClient, ApiError, AuthError, deriveIdempotencyKey } from '../src/index.js';
 
 const ORIGIN = 'https://acme.example.com';
 
@@ -90,6 +90,41 @@ test('a Retry-After longer than the in-process cap is returned to the caller, no
   assert.equal(gw.requests.length, 1);
 });
 
+test('a failed write carries the key it was sent under, so a scheduled retry resends under it', async () => {
+  const gw = gateway({ status: 429, headers: { 'retry-after': '3600' }, body: { code: 'quota' } });
+  const err = await client(gw).api.post('/inventory/movements', { sku: 'SKU-1' }).catch((e) => e);
+  const sent = gw.requests[0].headers['idempotency-key'];
+  assert.match(sent, /^ck-/);
+  assert.equal(err.idempotencyKey, sent);
+  assert.equal(err.toJSON().idempotencyKey, sent);
+
+  let calls = 0;
+  const down = async () => {
+    calls++;
+    throw new TypeError('fetch failed');
+  };
+  const netErr = await client({ fetch: down }, { retry: { maxAttempts: 2 } }).api.put('/inventory/levels', {}, { idempotencyKey: 'lvl-00000001' }).catch((e) => e);
+  assert.equal(netErr.code, 'network');
+  assert.equal(netErr.idempotencyKey, 'lvl-00000001');
+  assert.equal(calls, 2);
+});
+
+test('a token failure is not retried again by the API client', async () => {
+  let tokenCalls = 0;
+  const auth = {
+    getAccessToken: async () => {
+      tokenCalls++;
+      throw new AuthError({ code: 'temporarily_unavailable', status: 503, retryable: true });
+    },
+  };
+  const gw = gateway({ body: {} });
+  const { api, sleeps } = client(gw, { auth });
+  assert.equal((await api.get('/app').catch((e) => e)).code, 'temporarily_unavailable');
+  assert.equal(tokenCalls, 1);
+  assert.deepEqual(sleeps, []);
+  assert.equal(gw.requests.length, 0);
+});
+
 test('retries are bounded, with full-jitter exponential backoff under the cap', async () => {
   const gw = gateway({ status: 503, body: { code: 'unavailable' } });
   const { api, sleeps } = client(gw, { retry: { maxAttempts: 4, baseDelayMs: 100, maxDelayMs: 300 }, random: () => 0.999 });
@@ -168,6 +203,12 @@ test('pagination reports truncation, resumes from a cursor, and refuses a stalle
   const err = await client(stalled).api.collect('/inventory', { cursor: 'same' }).catch((e) => e);
   assert.equal(err.code, 'pagination_stalled');
 
+  const cycle = { '': 'A', A: 'B', B: 'A' };
+  const cyclic = gateway((req) => ({ body: { items: [1], nextCursor: cycle[req.url.searchParams.get('cursor') ?? ''] } }));
+  // maxPages only bounds this test if the guard is broken; the guard must fire first.
+  assert.equal((await client(cyclic).api.collect('/inventory', { maxPages: 10 }).catch((e) => e)).code, 'pagination_stalled');
+  assert.equal(cyclic.requests.length, 3, 'A→B→A is caught on the first repeat');
+
   const ambiguous = gateway({ body: { a: [], b: [] } });
   await assert.rejects(client(ambiguous).api.collect('/x'), /pass itemsKey/);
   assert.deepEqual((await client(ambiguous).api.collect('/x', { itemsKey: 'a' })).items, []);
@@ -176,7 +217,7 @@ test('pagination reports truncation, resumes from a cursor, and refuses a stalle
 test('the error model: body code, holds, request id; a shapeless code becomes unexpected', async () => {
   const held = gateway({ status: 409, headers: { 'tot-request-id': 'req_123' }, body: { code: 'assignment-held', holds: ['label', 'Not A Code'] } });
   const err = await client(held).api.post('/fulfillment/orders/o1/shipment-evidence', {}, { idempotencyKey: 'ev-00000001' }).catch((e) => e);
-  assert.deepEqual(err.toJSON(), { kind: 'api', code: 'assignment-held', status: 409, requestId: 'req_123', retryable: false, holds: ['label', 'unexpected'] });
+  assert.deepEqual(err.toJSON(), { kind: 'api', code: 'assignment-held', status: 409, requestId: 'req_123', retryable: false, holds: ['label', 'unexpected'], idempotencyKey: 'ev-00000001' });
   assert.equal(err.message, 'api:assignment-held (409)');
 
   const weird = gateway({ status: 400, body: { code: 'Some <script> text' } });

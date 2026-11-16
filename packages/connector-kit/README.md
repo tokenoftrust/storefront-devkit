@@ -151,14 +151,17 @@ Success resolves `{ status, body, headers, requestId, idempotencyKey? }`.
   (default 5). `Retry-After` (seconds or HTTP-date) is waited exactly; otherwise backoff is full
   jitter from `retry.baseDelayMs` (250) doubling to `retry.maxDelayMs` (20 000). A `Retry-After`
   longer than `retry.maxRetryAfterMs` (120 000) is not waited in-process: the error is thrown with
-  `retryAfterMs` so you can schedule the retry.
-- **Auth.** One 401 invalidates the token, fetches a new one and repeats the call.
+  `retryAfterMs` so you can schedule the retry. A failed write's error carries the
+  `idempotencyKey` it was sent under (it may have committed): resend under that key, never a new one.
+- **Auth.** One 401 invalidates the token, fetches a new one and repeats the call. A token
+  failure is thrown as-is; `ConnectorAuthClient` has already retried it.
+- **Pagination** refuses a cursor it has already seen (`pagination_stalled`) instead of looping.
 - **Redirects** are refused, never followed.
 
 ## Error model
 
 Every failure is a `ConnectorError` with `kind`, `code`, and when known `status`, `requestId`
-(`tot-request-id`), `retryable`, `retryAfterMs` and `holds`. `message` is `kind:code (status)`;
+(`tot-request-id`), `retryable`, `retryAfterMs`, `holds` and, for a write, `idempotencyKey`. `message` is `kind:code (status)`;
 `toJSON()` returns only those fields, so an error is safe to log.
 
 | Class | `kind` | `code` |

@@ -200,17 +200,40 @@ export class WebhookReceiver {
 
   /** `receive` for a fetch-style Request; resolves a Response. */
   async handleRequest(request, onEvent) {
-    const declared = Number(request.headers.get('content-length'));
-    let result;
-    if (Number.isFinite(declared) && declared > this.maxBodyBytes) {
-      result = { status: 413, body: { accepted: false, code: 'body_too_large' } };
-    } else {
-      const body = new Uint8Array(await request.arrayBuffer());
-      result = await this.receive({ method: request.method, headers: request.headers, body }, onEvent);
-    }
+    const body = await readCapped(request, this.maxBodyBytes);
+    const result = body === null
+      ? { status: 413, body: { accepted: false, code: 'body_too_large' } }
+      : await this.receive({ method: request.method, headers: request.headers, body }, onEvent);
     return new Response(JSON.stringify(result.body), {
       status: result.status,
       headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
     });
   }
+}
+
+/** The request body, or null once it exceeds maxBytes (declared or streamed); never buffers past the cap. */
+async function readCapped(request, maxBytes) {
+  const declared = Number(request.headers.get('content-length'));
+  if (request.headers.has('content-length') && Number.isFinite(declared) && declared > maxBytes) return null;
+  if (!request.body) return new Uint8Array(0);
+  const reader = request.body.getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
 }

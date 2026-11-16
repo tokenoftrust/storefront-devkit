@@ -5,7 +5,7 @@
 // bounded backoff; `Retry-After` is honored exactly. One 401 refreshes the
 // token and repeats the call. Cursor pagination (`cursor` / `nextCursor`, with
 // `limit` and `updatedSince`) drains every page.
-import { ApiError, ConnectorError, TransportError, safeCode, safeRequestId } from './errors.js';
+import { ApiError, AuthError, ConnectorError, TransportError, safeCode, safeRequestId } from './errors.js';
 import { hex, sha256, utf8 } from './encoding.js';
 import { API_PREFIX, normalizeOrigin } from './metadata.js';
 import { RETRYABLE_STATUS, backoffDelay, defaultSleep, parseRetryAfter, retryPolicy } from './retry.js';
@@ -163,6 +163,10 @@ export class ApiClient {
         if (!(err instanceof ConnectorError)) throw err;
         error = err;
       }
+      // A failed write may still have committed: the caller resends under this key.
+      if (key) error.idempotencyKey = key;
+      // The auth client already retried its own token request.
+      if (error instanceof AuthError) throw error;
       if (error instanceof ApiError && error.status === 401 && !refreshedAfter401) {
         refreshedAfter401 = true;
         this.auth.invalidate?.(token);
@@ -230,12 +234,15 @@ export class ApiClient {
    */
   async *pages(path, { query, limit, updatedSince, cursor, itemsKey, maxPages = Infinity, signal } = {}) {
     let next = cursor;
+    const seen = new Set(cursor === undefined ? [] : [cursor]);
     for (let page = 0; page < maxPages; page++) {
       const res = await this.get(path, { query: { ...query, limit, updatedSince, cursor: next }, signal });
       const nextCursor = typeof res.body?.nextCursor === 'string' && res.body.nextCursor !== '' ? res.body.nextCursor : undefined;
       yield { items: itemsOf(res.body, itemsKey), nextCursor, truncated: res.body?.truncated === true, body: res.body, requestId: res.requestId };
       if (nextCursor === undefined) return;
-      if (nextCursor === next) throw new TransportError({ code: 'pagination_stalled', requestId: res.requestId });
+      // A repeated cursor (A→A or A→B→A) would page forever.
+      if (seen.has(nextCursor)) throw new TransportError({ code: 'pagination_stalled', requestId: res.requestId });
+      seen.add(nextCursor);
       next = nextCursor;
     }
   }

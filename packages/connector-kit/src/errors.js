@@ -25,9 +25,10 @@ export class ConnectorError extends Error {
    * @param {boolean} [fields.retryable] Whether retrying the same request can succeed.
    * @param {number} [fields.retryAfterMs] The server's `Retry-After`, in milliseconds.
    * @param {string[]} [fields.holds] Hold codes a refusal listed.
+   * @param {string} [fields.idempotencyKey] The key a failed write was sent under; resend under it.
    * @param {unknown} [fields.cause]
    */
-  constructor({ kind, code, status, requestId, retryable = false, retryAfterMs, holds, cause }) {
+  constructor({ kind, code, status, requestId, retryable = false, retryAfterMs, holds, idempotencyKey, cause }) {
     super(status === undefined ? `${kind}:${code}` : `${kind}:${code} (${status})`, cause === undefined ? undefined : { cause });
     this.name = 'ConnectorError';
     this.kind = kind;
@@ -37,12 +38,13 @@ export class ConnectorError extends Error {
     this.retryable = retryable;
     this.retryAfterMs = retryAfterMs;
     this.holds = holds;
+    this.idempotencyKey = idempotencyKey;
   }
 
   /** The loggable fields. Never includes a cause, a body or a credential. */
   toJSON() {
     const out = { kind: this.kind, code: this.code };
-    for (const key of ['status', 'requestId', 'retryable', 'retryAfterMs', 'holds']) {
+    for (const key of ['status', 'requestId', 'retryable', 'retryAfterMs', 'holds', 'idempotencyKey']) {
       if (this[key] !== undefined) out[key] = this[key];
     }
     return out;

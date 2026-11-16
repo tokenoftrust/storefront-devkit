@@ -88,7 +88,7 @@ function parseBareItem(p) {
   if (c === '"') return parseString(p);
   if (c === ':') return parseBytes(p);
   if (c === '?') return parseBoolean(p);
-  if (c === '-' || /[0-9]/.test(c ?? '')) return parseInteger(p);
+  if (c === '-' || /[0-9]/.test(c ?? '')) return parseNumber(p);
   if (TOKEN_START.test(c ?? '')) return parseToken(p);
   throw new StructuredFieldError('bad item');
 }
@@ -118,9 +118,13 @@ function parseBytes(p) {
   const end = p.s.indexOf(':', p.i);
   if (end < 0) throw new StructuredFieldError('unterminated byte sequence');
   const b64 = p.s.slice(p.i, end);
-  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(b64)) throw new StructuredFieldError('bad base64');
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(b64) || b64.length % 4 !== 0) throw new StructuredFieldError('bad base64');
   p.i = end + 1;
-  return { bytes: base64Decode(b64) };
+  try {
+    return { bytes: base64Decode(b64) };
+  } catch {
+    throw new StructuredFieldError('bad base64');
+  }
 }
 
 function parseBoolean(p) {
@@ -130,10 +134,19 @@ function parseBoolean(p) {
   return v === '1';
 }
 
-function parseInteger(p) {
-  const m = /^-?[0-9]{1,15}/.exec(p.s.slice(p.i));
-  if (!m) throw new StructuredFieldError('bad integer');
-  if (p.s[p.i + m[0].length] === '.') throw new StructuredFieldError('decimals are not accepted here');
+// RFC 8941 §4.2.4: an Integer (up to 15 digits) or a Decimal (up to 12
+// integer and 1-3 fractional digits). Decimals parse so that unrelated members
+// carrying one never make the whole dictionary unreadable; the verifier only
+// reads the Integer parameters it needs.
+function parseNumber(p) {
+  const rest = p.s.slice(p.i);
+  const decimal = /^-?[0-9]{1,12}\.[0-9]{1,3}/.exec(rest);
+  if (decimal && !/[0-9.]/.test(rest[decimal[0].length] ?? '')) {
+    p.i += decimal[0].length;
+    return { decimal: Number(decimal[0]) };
+  }
+  const m = /^-?[0-9]{1,15}/.exec(rest);
+  if (!m || /[0-9.]/.test(rest[m[0].length] ?? '')) throw new StructuredFieldError('bad number');
   p.i += m[0].length;
   return Number(m[0]);
 }
