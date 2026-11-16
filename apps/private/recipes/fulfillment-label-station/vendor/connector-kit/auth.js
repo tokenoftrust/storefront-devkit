@@ -49,6 +49,13 @@ function jwsAlgFor(key) {
 }
 
 export class ConnectorAuthClient {
+  // The token, the in-flight token request and every credential are #private,
+  // so logging, inspecting or serializing the client prints none of them.
+  #token = null;
+  #inflight = null;
+  #secret;
+  #signer;
+
   /**
    * @param {object} options
    * @param {string} options.origin The storefront origin, e.g. https://acme.tokenoftrust.store.
@@ -107,14 +114,9 @@ export class ConnectorAuthClient {
     this.sleep = sleep;
     this.random = random;
     this.randomId = randomId;
-    this.token = null;
-    this.inflight = null;
-    // Secrets live in closures, not on enumerable properties, so logging the client prints none.
-    const secret = clientSecret;
-    this.secret = () => secret;
-    const signer = resolved === 'private_key_jwt' ? importSigningKey(privateKey) : null;
-    signer?.catch(() => {});
-    this.signer = () => signer;
+    this.#secret = clientSecret ?? null;
+    this.#signer = resolved === 'private_key_jwt' ? importSigningKey(privateKey) : null;
+    this.#signer?.catch(() => {});
     this.keyId = keyId;
   }
 
@@ -125,11 +127,11 @@ export class ConnectorAuthClient {
 
   /** The cached token, its expiry (ms since epoch) and granted scopes, refreshing when needed. */
   async getToken({ forceRefresh = false } = {}) {
-    if (!forceRefresh && this.token && !this.needsRefresh(this.token)) return this.token;
-    this.inflight ??= this.requestToken().finally(() => {
-      this.inflight = null;
+    if (!forceRefresh && this.#token && !this.needsRefresh(this.#token)) return this.#token;
+    this.#inflight ??= this.requestToken().finally(() => {
+      this.#inflight = null;
     });
-    return this.inflight;
+    return this.#inflight;
   }
 
   /**
@@ -137,7 +139,7 @@ export class ConnectorAuthClient {
    * concurrent caller's newer token is not discarded.
    */
   invalidate(accessToken) {
-    if (accessToken === undefined || this.token?.accessToken === accessToken) this.token = null;
+    if (accessToken === undefined || this.#token?.accessToken === accessToken) this.#token = null;
   }
 
   needsRefresh(token) {
@@ -148,7 +150,7 @@ export class ConnectorAuthClient {
 
   /** A fresh, signed RFC 7523 client assertion. Exposed for diagnostics and tests. */
   async createClientAssertion() {
-    const signer = this.signer();
+    const signer = this.#signer;
     if (!signer) throw new TypeError('createClientAssertion requires private_key_jwt');
     const { key, kid: jwkKid } = await signer;
     const alg = jwsAlgFor(key);
@@ -166,10 +168,10 @@ export class ConnectorAuthClient {
     const form = new URLSearchParams({ grant_type: 'client_credentials' });
     const headers = { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' };
     if (this.method === 'client_secret_basic') {
-      headers.authorization = `Basic ${base64Encode(utf8(`${formEncode(this.clientId)}:${formEncode(this.secret())}`))}`;
+      headers.authorization = `Basic ${base64Encode(utf8(`${formEncode(this.clientId)}:${formEncode(this.#secret)}`))}`;
     } else if (this.method === 'client_secret_post') {
       form.set('client_id', this.clientId);
-      form.set('client_secret', this.secret());
+      form.set('client_secret', this.#secret);
     } else {
       form.set('client_id', this.clientId);
       form.set('client_assertion_type', CLIENT_ASSERTION_TYPE);
@@ -219,8 +221,8 @@ export class ConnectorAuthClient {
   async requestToken() {
     for (let attempt = 1; ; attempt++) {
       try {
-        this.token = await this.requestOnce();
-        return this.token;
+        this.#token = await this.requestOnce();
+        return this.#token;
       } catch (err) {
         if (!err.retryable || attempt >= this.retry.maxAttempts) throw err;
         if (err.retryAfterMs !== undefined && err.retryAfterMs > this.retry.maxRetryAfterMs) throw err;
