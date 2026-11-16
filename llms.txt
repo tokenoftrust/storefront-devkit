@@ -29,6 +29,12 @@
   [fulfillment-label-station](./apps/private/recipes/fulfillment-label-station/),
   [dropship-multi-supplier](./apps/private/recipes/dropship-multi-supplier/), and
   [fulfillment-connector](./apps/private/samples/fulfillment-connector/).
+- [packages/connector-kit/](./packages/connector-kit/): Vendored source kit for private-app
+  connectors (copy it, never install it): `ConnectorAuthClient` (client_secret_basic,
+  client_secret_post, private_key_jwt; early refresh), `WebhookReceiver` (Content-Digest, RFC 9421,
+  created window, published-key lookup, replay guard) and `ApiClient` (Idempotency-Key reused on
+  retry, Retry-After, bounded backoff, cursor pagination), with one error model. Build connectors
+  on it instead of re-implementing auth, signatures, retries or pagination.
 - [private-apps/](./private-apps/): Stable compatibility guide for the current, language-neutral
   private-app path. The MCP recipe `recipe://storefront-private-apps-devbook` is a pointer/index,
   not a source of truth.

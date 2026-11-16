@@ -9,8 +9,8 @@ export function utf8(text) {
 }
 
 /**
- * The exact bytes of a request body. Accepts Uint8Array (including Node
- * Buffer), ArrayBuffer, an ArrayBuffer view, or a string (encoded as UTF-8).
+ * The exact bytes of a request body. Accepts Uint8Array (and its Node
+ * subclass), ArrayBuffer, an ArrayBuffer view, or a string (encoded as UTF-8).
  */
 export function toBytes(body) {
   if (body instanceof Uint8Array) return body;

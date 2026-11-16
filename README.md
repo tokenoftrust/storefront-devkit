@@ -57,11 +57,15 @@ Storefront tenant rather than customizing its tenant-owned files.
   [`apps/private/recipes/fulfillment-label-station/`](./apps/private/recipes/fulfillment-label-station/),
   [`apps/private/recipes/dropship-multi-supplier/`](./apps/private/recipes/dropship-multi-supplier/)).
   The stable [`private-apps/`](./private-apps/) guide remains available for existing links.
+- **Building a connector in JavaScript?** Vendor [`packages/connector-kit/`](./packages/connector-kit/):
+  zero-dependency source for client auth (secret or `private_key_jwt`, early refresh), RFC 9421
+  webhook verification with a replay guard, and an API client that reuses `Idempotency-Key` on
+  retry, honors `Retry-After` and drains cursor pagination.
 - **Public apps are reserved, not announced.** The devkit does not claim a public-app API,
   marketplace, installation flow, or review process. Do not infer one from this repository.
 - **No npm package is published from this devkit.** This GitHub repository is the canonical public
   material for developers and LLMs, including the source-safe private-app contract; the ToT MCP
-  recipe is a pointer/index. Developers may use the language and framework appropriate to their
+  recipe is a pointer/index. The connector kit is copied as source, never installed. Developers may use the language and framework appropriate to their
   service.
 
 ## Quick start (coding agents / LLMs)
@@ -147,6 +151,8 @@ storefront-devkit/
 │
 ├── private-apps/          ← stable private-app guide (current, language-neutral contract)
 │
+├── packages/connector-kit/ ← vendored source kit for private-app connectors (auth, webhooks, API client)
+│
 ├── industries/            ← by-vertical guides (vape, alcohol, hemp/CBD, firearms, marketplaces)
 │
 ├── tools/                 ← single-page checks: validate-page, browser gates, perf audit, style-concept audit
@@ -170,6 +176,7 @@ storefront-devkit/
 | `migration/` | Port a client's existing store onto the platform |
 | `apps/` | Find the app-developer path: private apps today, public apps reserved |
 | `private-apps/` | Connect your own backend service to a store (stable private-app guide) |
+| `packages/connector-kit/` | Vendor tested auth, webhook verification and API-client code into a connector |
 | `industries/` | Build for a specific regulated vertical (vape, alcohol, hemp/CBD, firearms, marketplaces) |
 | `tools/` | Check one page or one store: HTTP/SEO gates, browser gates, performance, style-concept audit |
 | `docs/` | Read the dev-loop reference, the long-form developer books (`docs/books/`), and the discoverability checklist |

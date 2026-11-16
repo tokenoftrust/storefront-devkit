@@ -82,6 +82,9 @@ Do not add:
   beyond its language's standard library, configured by environment variables, carrying synthetic
   placeholder data only, and runnable with its own tests. A sample is copyable source: never
   published as a package, never hosted by ToT, never authoritative over the contract.
+  The **connector kit** (`packages/connector-kit/`) is the one shared-source exception: the same
+  rules as a sample, plus `private: true`, no publish workflow, no vendor names, and tests that run
+  in the root `npm run check`. Recipes and the app scaffold vendor it by copying it.
 - Credentials, private keys, real tenant data, operator-only runbooks, order-forward/operations
   internals, or any document that instructs a developer to bypass the published app contract.
 - Any example that weakens the compliance floor (disabling age/ID verification or excise, hiding

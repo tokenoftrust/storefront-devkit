@@ -1,0 +1,18 @@
+{
+  "jwk": {
+    "kty": "RSA",
+    "kid": "kit-vector-key-1",
+    "alg": "RS256",
+    "use": "sig",
+    "e": "AQAB",
+    "n": "5DRJYh9Qiv4O3-M1CWdpHAifWOTgUQrEmlJtpZz7SBVcJT3pdSTuYMEOz36exI4sTvSI4pdb_e3Ev0nK_4Zx7AZPcX5JvPsXVCzL0_WmJa0jSHOKOvQSWCwvze2m-CPLiRXUKtmcfql8ekwYgUeVD_n-PWKa3cl6CBuk2pAVM3YHF_Ao4puQlcMnSoQbbO9RzmjUty_bLrIYXhl7fQy5S9KdwYu2ykjoVvAPNiEZ2cdslJICxRY-wRl5CiE3RFO-vKUdcOs16sGuurFj2t7hYIJqRzyZkIZiYJLhW0qrf8XVrRDteBb4kyZCC7SvEKL8qGe-nw1bGMtl8uONzoGl_Q"
+  },
+  "targetUri": "https://connector.example.com/webhooks/tot",
+  "body": "{\"specversion\":\"1.0\",\"id\":\"evt_KITVECTOR0001\",\"source\":\"/tenants/acme/storefront\",\"type\":\"com.tokenoftrust.storefront.inventory.changed\",\"time\":\"2026-11-16T12:00:00.000Z\",\"datacontenttype\":\"application/json\",\"tenantid\":\"acme\",\"appinstallid\":\"inst_vector_0001\",\"dataschemaversion\":\"1\",\"retrycount\":0,\"data\":{\"sku\":\"SKU-VECTOR-1\",\"locationId\":\"unspecified\",\"balance\":12,\"available\":12,\"asOf\":\"2026-11-16T12:00:00.000Z\"}}",
+  "created": 1794830400,
+  "headers": {
+    "content-digest": "sha-256=:wPzNYsLKoQ7QkAT+TUZL6bo+EEKwm9Xd1+0PhCc6fYI=:",
+    "signature-input": "sig1=(\"@method\" \"@target-uri\" \"content-digest\");created=1794830400;keyid=\"kit-vector-key-1\";alg=\"rsa-v1_5-sha256\"",
+    "signature": "sig1=:0olNQl1HM63aag380bsmCZNBznIGMoeKNGNKSpir+zCFU97B6mihkfpJV+DVV9/yrnyUIqYPyqMjKccRGIXwnhUYn2aMleRqEKJDZhLN7LV1/tFLGjmUyJBzQQHSMo+IDR7dnnI0NdplAPw68HZv7bewPBnA8C8f0CWD1ZfyPuzodoxv+EZJLJdOLbNR2U8Eu3nQsR+EqBhXvIYSSLpCA//fR1X265BAnbMmX71wQUVZJn+PVe3dHFAeptg+cGJ3QGV9q9OYl/gQXZeu+AXLC5fohcIL0mT+5iNs9qWc0zxiLiEzZmN0YlLEasUbDO6blVF4l5KgthiIieW519unFQ==:"
+  }
+}
