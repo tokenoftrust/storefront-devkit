@@ -1,0 +1,12 @@
+{
+  "name": "storefront-private-app-recipe-dropship-multi-supplier",
+  "private": true,
+  "type": "module",
+  "description": "3PL & multi-supplier routing connector recipe (location-keyed processors, partial shipments, and line exceptions) for Storefront Private Apps v1.3.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node index.mjs",
+    "self-test": "node index.mjs --self-test",
+    "test": "node --test test/*.test.mjs"
+  }
+}

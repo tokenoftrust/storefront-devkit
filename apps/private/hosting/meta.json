@@ -1,0 +1,8 @@
+{
+  "id": "private-apps-hosting-guides",
+  "kind": "guide",
+  "title": "Private Apps — Multi-Tenant Architecture & Hosting Fast-Paths (Cloudflare, AWS, Google Cloud, Azure, Containers)",
+  "description": "How to run a single-tenant or multi-tenant Storefront Private App service, with extensible hosting guides for Cloudflare Workers, AWS Lambda, Google Cloud Run, Microsoft Azure Functions/Container Apps, Docker containers, and local preview tunnels.",
+  "tags": ["private-apps", "hosting", "multitenant", "cloudflare-workers", "aws-lambda", "google-cloud-run", "azure-functions", "docker", "webhooks"],
+  "contract": "private-apps@1.3"
+}

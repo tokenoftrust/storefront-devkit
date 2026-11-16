@@ -1,0 +1,37 @@
+{
+  "location": {
+    "locationId": "loc-main-warehouse",
+    "name": "Main Warehouse (Austin)",
+    "kind": "warehouse",
+    "isFulfillable": true,
+    "status": "active"
+  },
+  "catalogSku": "GEN-TEE-BLK-M",
+  "initialInventory": {
+    "items": [
+      {
+        "sku": "GEN-TEE-BLK-M",
+        "available": true,
+        "quantity": 20,
+        "policy": "deny",
+        "mirror": {
+          "locationId": "loc-main-warehouse",
+          "balance": 20,
+          "asOf": "2026-11-13T12:00:00.000Z"
+        }
+      }
+    ],
+    "pageSize": 50,
+    "total": 1,
+    "nextCursor": null
+  },
+  "movementWrite": {
+    "sku": "GEN-TEE-BLK-M",
+    "locationId": "loc-main-warehouse",
+    "quantityDelta": 5,
+    "reason": "adjustment"
+  },
+  "testOrderCreate": {
+    "action": "create"
+  }
+}

@@ -15,6 +15,7 @@
     "sku": "VAPE-KIT-STARTER",
     "locationId": "unspecified",
     "balance": 18,
+    "available": 18,
     "asOf": "2026-07-21T19:12:04.000Z"
   }
 }

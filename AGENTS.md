@@ -13,9 +13,21 @@ publish.
 3. [`schemas/`](./schemas/) — the machine-checkable shape of every tenant-owned file. When shape
    is ambiguous, the schema is authoritative.
 4. [`apps/`](./apps/) and [`apps/private/`](./apps/private/) when working on an app integration.
-   The latter contains the canonical public schema, scopes, denylist, API/event definitions, and
-   safe fixtures. [`private-apps/`](./private-apps/) remains a stable compatibility guide. The ToT
-   MCP recipe `recipe://storefront-private-apps-devbook` is only a discovery index.
+   The latter contains the canonical public schema (`v1.3.0`), 11-scope V1 catalog, denylist,
+   API/event definitions, safe fixtures, extensible multi-tenant & cloud hosting guides
+   ([`apps/private/hosting/`](./apps/private/hosting/README.md) and
+   [`apps/private/hosting/index.json`](./apps/private/hosting/index.json) — always check
+   `apps/private/hosting/index.json` and list `apps/private/hosting/*` subdirectories for
+   cloud/runtime-specific deployment instructions such as Cloudflare Workers, AWS Lambda, Google
+   Cloud Run, Microsoft Azure Functions, or Docker containers), and runnable reference
+   examples/recipes
+   ([`apps/private/examples/hello-inventory/`](./apps/private/examples/hello-inventory/),
+   [`apps/private/recipes/inventory-sync-wms/`](./apps/private/recipes/inventory-sync-wms/),
+   [`apps/private/recipes/fulfillment-label-station/`](./apps/private/recipes/fulfillment-label-station/),
+   [`apps/private/recipes/dropship-multi-supplier/`](./apps/private/recipes/dropship-multi-supplier/),
+   and [`apps/private/samples/fulfillment-connector/`](./apps/private/samples/fulfillment-connector/)).
+   [`private-apps/`](./private-apps/) remains a stable compatibility guide. The ToT MCP recipe
+   `recipe://storefront-private-apps-devbook` is only a discovery index.
 
 ## The mental model
 

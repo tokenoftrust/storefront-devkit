@@ -9,14 +9,25 @@ choose. The devkit does not ship an npm package or platform runtime.
 
 ## Available now: private apps
 
-[Private apps](../private-apps/) connect one merchant tenant to your service through the
-standards-based private-app contract. Use them for backend integrations such as catalog, order, or
-inventory synchronization; signed lifecycle webhooks; app-owned records; and approved app UI
-placements.
+[Private apps](../private-apps/) connect merchant tenants to your service through the
+standards-based private-app contract. Each install is authorized per merchant store and stage, while
+your deployed service can be single-tenant or multi-tenant (routing on the `tenantid` and
+`appinstallid` included in every webhook and OAuth token). Use them for backend integrations such as
+catalog, order, fulfillment, or inventory synchronization; signed lifecycle webhooks; app-owned
+records; and approved app UI placements.
 
-Start with [the canonical private-app contract](./private/README.md). It includes the public-safe
-schema, scope catalog, denylist, OpenAPI/AsyncAPI definitions, synthetic examples, and concise
-webhook/API guidance. [`private-apps/`](../private-apps/) remains the stable legacy guide.
+Start with [the canonical private-app contract (`v1.3.0`)](./private/README.md). It includes the
+public-safe schema, 11-scope V1 catalog, denylist, OpenAPI/AsyncAPI definitions, synthetic
+examples, concise webhook/API guidance, extensible cloud/runtime hosting guides
+([`hosting/`](./private/hosting/README.md) and [`hosting/index.json`](./private/hosting/index.json)
+covering Cloudflare Workers, AWS Lambda, Google Cloud Run, Microsoft Azure Functions/Container Apps,
+and Docker), and runnable reference implementations:
+[`examples/hello-inventory/`](./private/examples/hello-inventory/),
+[`recipes/inventory-sync-wms/`](./private/recipes/inventory-sync-wms/),
+[`recipes/fulfillment-label-station/`](./private/recipes/fulfillment-label-station/),
+[`recipes/dropship-multi-supplier/`](./private/recipes/dropship-multi-supplier/), and
+[`samples/fulfillment-connector/`](./private/samples/fulfillment-connector/).
+[`private-apps/`](../private-apps/) remains the stable legacy guide.
 
 `private-apps/` remains the stable, direct URL for this current guide. This `apps/` directory is
 the broader front door; links to the existing private-app material are intentionally not broken.

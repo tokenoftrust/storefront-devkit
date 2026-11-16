@@ -1,0 +1,9 @@
+{
+  "id": "private-app-example-hello-inventory",
+  "kind": "sample",
+  "title": "Hello Inventory (starter private app)",
+  "description": "Minimal runnable starter Private App demonstrating location registration (GET/PUT /inventory/locations/{locationId}), stock read/write (GET /inventory, POST /inventory/movements), and synthetic preview order verification (POST /api/apps/admin/test-orders).",
+  "tags": ["private-apps", "inventory", "starter", "locations", "test-orders", "example"],
+  "contract": "private-apps@1.3",
+  "requires": { "node": ">=20", "cli": ">=6.12.2" }
+}
