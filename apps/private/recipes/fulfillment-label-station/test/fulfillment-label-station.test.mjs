@@ -48,7 +48,7 @@ test('carrier catalog resolves all national and regional PACT carriers and flags
 test('self-test verifies PACT USPS refusal, 1:N split cartons, and whole-order label-voided recovery', async () => {
   const result = await runSelfTest();
   assert.equal(result.ok, true);
-  assert.equal(result.uspsRefusedCode, 'pact_carrier_ineligible');
+  assert.equal(result.uspsRefusedCode, 'carrier-prohibited');
   assert.equal(result.splitShipmentsComplete, true);
   assert.equal(result.replacementPurchaseId, 'pur_PACT9001_A2');
   assert.deepEqual(result.emittedTopics, [

@@ -276,7 +276,7 @@ Orders may be fulfilled whole via `POST /fulfillment/orders/{orderId}/shipment-e
 intermediate cartons and `order.fulfilled` once all assigned line quantities are covered). Use
 `GET /fulfillment/carriers` to validate carrier capabilities—including `pactEligible` and
 `adultSignature`—before purchasing labels for PACT-regulated vape/tobacco assignments (USPS is
-refused with `422 pact_carrier_ineligible`). Use
+refused with `409 carrier-prohibited`). Use
 `POST /fulfillment/assignments/{assignmentId}/exceptions` to report `backordered`, `cannot_fulfill`,
 or `address_undeliverable` line exceptions. There is no rate quote, platform label purchase, return,
 or change to payment, tax, price or checkout.
