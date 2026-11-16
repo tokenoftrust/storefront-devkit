@@ -210,15 +210,40 @@ paths:
       description: >
         Requires scope `orders:read:minimal`. Returns the minimized order shape only —
         no raw checkout payload, no signed-cart material, no tax internals, customer as
-        opaque hash. On a preview host (test install) the orders are the preview-ledger
-        orders, including synthetic orders from `POST /admin/test-orders`; on a publication
-        host (production install) they are live orders. A stage or env mismatch answers 403
-        `stage_mismatch`.
+        opaque hash. Paged (1..100 orders per page, default 24) in deterministic
+        `(createdAt DESC, id ASC)` order with an opaque keyset `cursor` and `updatedSince`
+        filter stable under concurrent writes. `status` is mapped to the contract
+        vocabulary and filtered before slicing, so every page up to the final one is full
+        and `total` is the filtered count. `updatedSince` means last changed: an order
+        created earlier and cancelled or otherwise changed since the instant is returned;
+        on a publication host "changed" is taken from the platform's own order-lifecycle
+        records (forwarded events), so a change that never reached the platform is not
+        seen. A live scan reads at most 50 upstream pages per request; if it is cut short
+        `total` is null and `nextCursor` continues from the scan frontier. When more than
+        500 live orders changed since `updatedSince`, `truncated: true` is returned and
+        the result may be incomplete; the remedy is a full backfill without `updatedSince`.
+        On a preview host (test install)
+        the orders are the preview-ledger orders, including synthetic orders from
+        `POST /admin/test-orders`; on a publication host (production install) they are live
+        orders. A stage or env mismatch answers 403 `stage_mismatch`.
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - name: status
           in: query
           schema: { type: string, enum: [created, fulfilled, cancelled] }
+          description: Optional contract order status filter, applied after mapping and before paging so pages are full and `total` is accurate.
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 512 }
+          description: Opaque keyset cursor returned in a prior page's `nextCursor`. Stable under concurrent writes.
+        - name: updatedSince
+          in: query
+          schema: { type: string, format: date-time }
+          description: ISO-8601 date-time filter; returns only orders last changed (created, fulfilled, cancelled, or otherwise updated) at or after this instant.
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 24 }
+          description: Maximum number of orders returned per page (1..100, default 24; alias of `pageSize`).
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }
@@ -234,6 +259,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/OrderList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -1627,10 +1653,20 @@ components:
       properties:
         orders:
           type: array
+          maxItems: 100
           items: { $ref: '#/components/schemas/Order' }
-        page: { type: integer }
-        pageSize: { type: integer }
-        total: { type: integer }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total:
+          type: [integer, 'null']
+          minimum: 0
+          description: Exact count of matching orders, or null when the live scan was cut short (never an undercount).
+        truncated:
+          type: boolean
+          description: Present and true only when more than 500 live orders changed since `updatedSince` and the excess was not fetched; the result may be incomplete.
+        nextCursor:
+          type: [string, 'null']
+          description: Opaque keyset cursor for the next page (also returned when a live scan is cut short, so paging continues past the scan limit), or null on the final page.
 
     Order:
       type: object
@@ -2108,8 +2144,11 @@ components:
             - catalog.product.updated
             - inventory.changed
             - order.created
+            - order.paid
             - order.fulfilled
             - order.partially_fulfilled
+            - order.cancelled
+            - order.updated
             - customer.marketing_consent.updated
             - attribution.finalized
             - fulfillment.assignment.created

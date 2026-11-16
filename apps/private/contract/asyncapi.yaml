@@ -86,6 +86,16 @@ channels:
       message:
         $ref: '#/components/messages/OrderCreated'
 
+  order.paid:
+    description: >
+      Emitted once per order when payment is captured or settled. Requires scope
+      orders:webhook. Minimized order payload with line items and SKUs; idempotent per
+      (order, transition).
+    subscribe:
+      operationId: onOrderPaid
+      message:
+        $ref: '#/components/messages/OrderPaid'
+
   order.fulfilled:
     description: >
       Emitted when an order is fulfilled. Requires scope orders:webhook. With per-assignment
@@ -94,6 +104,26 @@ channels:
       operationId: onOrderFulfilled
       message:
         $ref: '#/components/messages/OrderFulfilled'
+
+  order.cancelled:
+    description: >
+      Emitted once per order when the order is cancelled or refunded. Requires scope
+      orders:webhook. Minimized order payload with status `cancelled`, line items, and SKUs;
+      idempotent per (order, transition).
+    subscribe:
+      operationId: onOrderCancelled
+      message:
+        $ref: '#/components/messages/OrderCancelled'
+
+  order.updated:
+    description: >
+      Emitted when an existing order's line items, quantities, or totals are modified.
+      Requires scope orders:webhook. Minimized order payload with line items and SKUs;
+      idempotent per (order, transition).
+    subscribe:
+      operationId: onOrderUpdated
+      message:
+        $ref: '#/components/messages/OrderUpdated'
 
   customer.marketing_consent.updated:
     description: Emitted when a customer's marketing consent changes. Requires scope customers:read:minimal. Opaque customer id only.
@@ -206,8 +236,11 @@ components:
             - com.tokenoftrust.storefront.catalog.product.updated
             - com.tokenoftrust.storefront.inventory.changed
             - com.tokenoftrust.storefront.order.created
+            - com.tokenoftrust.storefront.order.paid
             - com.tokenoftrust.storefront.order.fulfilled
             - com.tokenoftrust.storefront.order.partially_fulfilled
+            - com.tokenoftrust.storefront.order.cancelled
+            - com.tokenoftrust.storefront.order.updated
             - com.tokenoftrust.storefront.customer.marketing_consent.updated
             - com.tokenoftrust.storefront.attribution.finalized
             - com.tokenoftrust.storefront.fulfillment.assignment.created
@@ -432,10 +465,52 @@ components:
             properties:
               data: { $ref: '#/components/schemas/OrderData' }
 
+    OrderPaid:
+      name: orderPaid
+      messageId: orderPaid
+      title: order.paid
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/OrderData' }
+
     OrderFulfilled:
       name: orderFulfilled
       messageId: orderFulfilled
       title: order.fulfilled
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/OrderData' }
+
+    OrderCancelled:
+      name: orderCancelled
+      messageId: orderCancelled
+      title: order.cancelled
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/OrderData' }
+
+    OrderUpdated:
+      name: orderUpdated
+      messageId: orderUpdated
+      title: order.updated
       contentType: application/cloudevents+json
       traits:
         - $ref: '#/components/messageTraits/cloudEventEnvelope'

@@ -19,7 +19,7 @@
     },
     {
       "id": "orders:webhook",
-      "grants": "Subscribe to order lifecycle events (order.created, order.partially_fulfilled, order.fulfilled) delivered as signed CloudEvents.",
+      "grants": "Subscribe to order lifecycle events (order.created, order.paid, order.partially_fulfilled, order.fulfilled, order.cancelled, order.updated) delivered as signed CloudEvents.",
       "access": "read (event delivery)",
       "dataMinimization": "Same minimized order shape as orders:read:minimal, delivered in the event payload.",
       "pii": "minimal — customer hash only by default (stable per (tenant, app-install-id); not comparable across apps on the same tenant)."
