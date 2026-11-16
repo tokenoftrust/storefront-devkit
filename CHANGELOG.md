@@ -5,6 +5,14 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Added
+- `packages/connector-kit/` (`KIT_VERSION` 1.0.0) — vendored source kit for private-app connectors,
+  copied into a project and never published: `ConnectorAuthClient` (`client_secret_basic`,
+  `client_secret_post`, `private_key_jwt` with RS256/ES256 assertions; cached token with early
+  refresh), `WebhookReceiver` (Content-Digest, RFC 9421 `sig1`, `created` window, keyid lookup in
+  the published `webhook_signing_keys`, replay guard through an injectable seen-event store) and
+  `ApiClient` (`Idempotency-Key` on every write and reused on retry, `Retry-After` honored, bounded
+  backoff, cursor pagination with `updatedSince`), with one error model. Zero dependencies; Node 20+
+  and fetch-based edge runtimes. Its tests run in `npm run check`.
 - Private Apps contract 1.3.0 (minor, compatible) and 4 runnable reference recipes/examples:
   - Machine contracts synced to `1.3.0` (`apps/private/contract/{openapi.yaml, asyncapi.yaml,
     scopes.json, tot-app.schema.json, forbidden-scopes.json}`): 11 V1 scopes (`catalog:read`,

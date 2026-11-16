@@ -5,6 +5,6 @@
   "description": "Repository checks for the Storefront Devkit. Node built-ins only; tools/ keeps its own browser-dependent suite.",
   "engines": { "node": ">=24 <25" },
   "scripts": {
-    "check": "node --test apps/private/samples/fulfillment-connector/test/*.test.js apps/private/examples/*/test/*.test.mjs apps/private/recipes/*/test/*.test.mjs"
+    "check": "node --test apps/private/samples/fulfillment-connector/test/*.test.js apps/private/examples/*/test/*.test.mjs apps/private/recipes/*/test/*.test.mjs packages/connector-kit/test/*.test.js"
   }
 }
