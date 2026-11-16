@@ -44,7 +44,7 @@ transport parcels and require adult signature (`21+`) on delivery:
 | `BETTER_TRUCKS` | `better_trucks` | `true` | `supported` | `tracking.bettertrucks.com` |
 | `USPS` | `usps` | **`false`** | `supported` | `tools.usps.com` |
 
-Attempting to report a `USPS` shipment on a PACT-enabled store is refused fail-closed (`422 pact_carrier_ineligible` / `409 carrier-prohibited`), and any shipment missing `adultSignature: "accepted"` when `adultSignatureRequired: true` is refused with `409 adult-signature`.
+Attempting to report a `USPS` shipment on a PACT-enabled store is refused fail-closed (`409 carrier-prohibited`), and any shipment missing `adultSignature: "accepted"` when `adultSignatureRequired: true` is refused with `409 adult-signature`.
 
 ### 3. Consent-gated recipient hydration (`GET /api/apps/v1/fulfillment/orders/{orderId}/recipient`)
 

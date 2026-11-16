@@ -3,7 +3,7 @@
 // 1. Receives fulfillment.assignment.created / .updated CloudEvents and reconciles via GET /fulfillment/assignments.
 // 2. Queries GET /fulfillment/carriers to validate PACT Act & adultSignature eligibility
 //    (ups, fedex, dhl_express, ontrac, lasership, gso_gls, lso, spee_dee, stat_overnight, better_trucks)
-//    and verifies USPS refusal (422 pact_carrier_ineligible / 409 carrier-prohibited) on regulated orders.
+//    and verifies USPS refusal (409 carrier-prohibited) on regulated orders.
 // 3. Hydrates the ship-to recipient in memory (GET /fulfillment/orders/{orderId}/recipient) without logging PII.
 // 4. Demonstrates both fulfillment write-back patterns:
 //    a) 1:N split-carton shipments via POST /fulfillment/assignments/{assignmentId}/shipments
@@ -183,7 +183,7 @@ export function createSimulatedLabelStationGateway({ pactAct = true } = {}) {
         const profile = resolveCarrierProfile(body.carrier);
         if (!profile) return json(400, { code: 'malformed', error: 'malformed' });
         if (pactAct && !profile.pactEligible) {
-          return json(422, { code: 'pact_carrier_ineligible', error: 'carrier-prohibited' });
+          return json(409, { code: 'carrier-prohibited', error: 'carrier-prohibited' });
         }
         if (assignment.adultSignatureRequired && body.adultSignature !== 'accepted') {
           return json(409, { code: 'adult-signature', error: 'adult-signature' });
@@ -222,7 +222,7 @@ export function createSimulatedLabelStationGateway({ pactAct = true } = {}) {
           const profile = resolveCarrierProfile(body.carrier);
           if (!profile) return json(400, { code: 'malformed', error: 'malformed' });
           if (pactAct && !profile.pactEligible) {
-            return json(422, { code: 'pact_carrier_ineligible', error: 'carrier-prohibited' });
+            return json(409, { code: 'carrier-prohibited', error: 'carrier-prohibited' });
           }
           wholeOrderLabel = 'purchased';
           lastFacts = {
@@ -313,7 +313,7 @@ export async function runSelfTest() {
   assert.equal(recipientRes.status, 200);
   assert.equal(recipientRes.body.city, 'Austin');
 
-  // 4. Verify USPS is refused on a PACT-regulated order (422 pact_carrier_ineligible)
+  // 4. Verify USPS is refused on a PACT-regulated order (409 carrier-prohibited)
   const uspsAttempt = await connector.postAssignmentShipment(activeAssignment.assignmentId, {
     lines: [{ sku: 'VAPE-KIT-STARTER', quantity: 2 }],
     carrier: 'USPS',
@@ -322,8 +322,8 @@ export async function runSelfTest() {
     trackingUrl: 'https://tools.usps.com/go/TrackConfirmAction?tLabels=9400100000000000000000',
     adultSignature: 'accepted',
   });
-  assert.equal(uspsAttempt.status, 422);
-  assert.equal(uspsAttempt.body.code, 'pact_carrier_ineligible');
+  assert.equal(uspsAttempt.status, 409);
+  assert.equal(uspsAttempt.body.code, 'carrier-prohibited');
 
   // 5. Execute 1:N split-carton shipments with PACT-eligible carriers (UPS + Better Trucks)
   const carton1 = await connector.postAssignmentShipment(activeAssignment.assignmentId, {
