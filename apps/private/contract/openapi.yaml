@@ -423,9 +423,18 @@ paths:
       operationId: listReports
       summary: List report snapshots
       x-requiredScope: reports:read
-      description: Requires scope `reports:read`. Aggregate snapshots only.
+      description: >
+        Requires scope `reports:read`. Aggregate snapshots only. Returns the `sales-velocity`
+        report for the install's tenant and the host's routed stage: per sku, units sold over the
+        window, unsold (on-hand) units, velocity (units per day) and days of cover. Cancelled,
+        voided and refunded orders are not counted.
       parameters:
         - $ref: '#/components/parameters/Traceparent'
+        - name: windowDays
+          in: query
+          required: false
+          description: Sales window in days, ending now. Integer 1 to 365, default 30.
+          schema: { type: integer, minimum: 1, maximum: 365, default: 30 }
       responses:
         '200':
           description: Report snapshot list.
@@ -435,8 +444,10 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ReportList' }
+        '400': { description: Malformed `windowDays`. }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { description: Reports are not configured for this host. }
 
   /attribution:
     post:
@@ -1810,6 +1821,30 @@ components:
               generatedAt: { type: string, format: date-time }
               format: { type: string, enum: [json, csv] }
               downloadUrl: { type: string, format: uri }
+              window:
+                type: object
+                description: The sales window the report covers.
+                additionalProperties: false
+                required: [days, from, to]
+                properties:
+                  days: { type: integer, minimum: 1, maximum: 365 }
+                  from: { type: string, format: date-time }
+                  to: { type: string, format: date-time }
+              skus:
+                type: array
+                description: One row per sku sold in the window or holding availability, sorted by sku.
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [sku, soldUnits, unsoldUnits, velocityPerDay, daysOfCover]
+                  properties:
+                    sku: { type: string }
+                    soldUnits: { type: integer, minimum: 0, description: Units on paid, uncancelled orders placed in the window. }
+                    unsoldUnits: { type: integer, minimum: 0, description: Projected on-hand availability, floored at 0. }
+                    velocityPerDay: { type: number, minimum: 0, description: soldUnits divided by the window days. }
+                    daysOfCover:
+                      type: [number, 'null']
+                      description: unsoldUnits divided by velocityPerDay; null when nothing sold in the window.
 
     AttributionWrite:
       type: object
