@@ -39,13 +39,9 @@ tot preview
 tot app dev validate ./tot-app.json
 tot app install --tenant <tenant> --env=test --app .
 
-# 3. Create a synthetic preview order on the preview gateway:
-curl -sS -X POST "https://tot-preview.tokenoftrust.store/api/apps/admin/test-orders" \
-  -H "Authorization: Bearer ${TOT_ADMIN_TOKEN}" \
-  -H "X-Tot-Tenant: <tenant>" \
-  -H "X-Tot-Caller-Capability: preview-access" \
-  -H "Content-Type: application/json" \
-  -d '{"action":"create"}'
+# 3. Bind your test install and create a synthetic preview order (no --url needed):
+tot app test-order bind <installId> --tenant <tenant>
+tot app test-order create --tenant <tenant>
 ```
 
 The stage wall guarantees isolation: tokens minted on the preview gateway carry `env: "test"` and
