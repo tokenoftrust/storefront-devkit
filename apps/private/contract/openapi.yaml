@@ -2175,6 +2175,7 @@ components:
             - attribution.finalized
             - fulfillment.assignment.created
             - fulfillment.assignment.updated
+            - fulfillment.label.voided
         state: { type: string, enum: [delivered, retrying, dead-lettered] }
         attempts: { type: integer, minimum: 0 }
         lastStatus: { type: integer }
