@@ -16,7 +16,7 @@ your deployed service can be single-tenant or multi-tenant (routing on the `tena
 catalog, order, fulfillment, or inventory synchronization; signed lifecycle webhooks; app-owned
 records; and approved app UI placements.
 
-Start with [the canonical private-app contract (`v1.3.0`)](./private/README.md). It includes the
+Start with [the canonical private-app contract (`v1.4.0`)](./private/README.md). It includes the
 public-safe schema, 11-scope V1 catalog, denylist, OpenAPI/AsyncAPI definitions, synthetic
 examples, concise webhook/API guidance, extensible cloud/runtime hosting guides
 ([`hosting/`](./private/hosting/README.md) and [`hosting/index.json`](./private/hosting/index.json)

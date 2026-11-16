@@ -2,8 +2,8 @@
 // Shipping & Label Station Connector Recipe (Multi-Carrier & Regional PACT Label Desks):
 // 1. Receives fulfillment.assignment.created / .updated CloudEvents and reconciles via GET /fulfillment/assignments.
 // 2. Queries GET /fulfillment/carriers to validate PACT Act & adultSignature eligibility
-//    (ups, fedex, dhl_express, ontrac, lasership, gso_gls, lso, spee_dee, stat_overnight, better_trucks)
-//    and verifies USPS refusal (409 carrier-prohibited) on regulated orders.
+//    (UPS, FEDEX, DHL, ONTRAC, GLS_US, LSO, SPEE_DEE, STAT_OVERNIGHT, BETTER_TRUCKS; station slugs map
+//    onto these codes) and verifies USPS refusal (409 carrier-prohibited) on regulated orders.
 // 3. Hydrates the ship-to recipient in memory (GET /fulfillment/orders/{orderId}/recipient) without logging PII.
 // 4. Demonstrates both fulfillment write-back patterns:
 //    a) 1:N split-carton shipments via POST /fulfillment/assignments/{assignmentId}/shipments
@@ -23,21 +23,31 @@ const FIXTURE = JSON.parse(
 );
 
 /**
- * Platform carrier catalog profiles returned by `GET /api/apps/v1/fulfillment/carriers`,
- * including both the canonical uppercase `code` (`CarrierCode`) and common station slug aliases.
+ * The platform carrier catalog (`CarrierProfile[]`) that `GET /api/apps/v1/fulfillment/carriers`
+ * returns as `carriers`, each entry extended with this station's local `slug` / `aliases`. The
+ * slugs are recipe-local: the wire carries only the uppercase `code` (`CarrierCode`).
  */
 export const PLATFORM_CARRIER_CATALOG = Object.freeze([
   { code: 'UPS', slug: 'ups', name: 'UPS', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.ups.com'] },
   { code: 'FEDEX', slug: 'fedex', name: 'FedEx', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.fedex.com'] },
-  { code: 'DHL', slug: 'dhl_express', name: 'DHL Express', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.dhl.com'] },
   { code: 'USPS', slug: 'usps', name: 'USPS', region: 'US', pactEligible: false, adultSignature: 'supported', trackingHosts: ['tools.usps.com'] },
-  { code: 'ONTRAC', slug: 'ontrac', aliases: ['lasership'], name: 'OnTrac / LaserShip', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.ontrac.com'] },
-  { code: 'GLS_US', slug: 'gso_gls', name: 'GLS US (GSO)', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.gls-us.com'] },
-  { code: 'LSO', slug: 'lso', name: 'Lone Star Overnight (LSO)', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.lso.com'] },
-  { code: 'SPEE_DEE', slug: 'spee_dee', name: 'Spee-Dee Delivery', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['speedeedelivery.com'] },
-  { code: 'STAT_OVERNIGHT', slug: 'stat_overnight', name: 'Stat Overnight Delivery', region: 'US', pactEligible: true, adultSignature: 'required', trackingHosts: ['statovernight.com'] },
-  { code: 'BETTER_TRUCKS', slug: 'better_trucks', name: 'Better Trucks', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['tracking.bettertrucks.com'] },
+  { code: 'DHL', slug: 'dhl_express', name: 'DHL', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.dhl.com'] },
+  { code: 'ONTRAC', slug: 'ontrac', aliases: ['lasership'], name: 'OnTrac', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.ontrac.com'] },
+  { code: 'LSO', slug: 'lso', name: 'Lone Star Overnight', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.lso.com'] },
+  { code: 'BETTER_TRUCKS', slug: 'better_trucks', name: 'Better Trucks', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.bettertrucks.com'] },
+  { code: 'GLS_US', slug: 'gso_gls', name: 'GLS US', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.gls-us.com'] },
+  { code: 'SPEE_DEE', slug: 'spee_dee', name: 'Spee-Dee Delivery', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.speedeedelivery.com'] },
+  { code: 'STAT_OVERNIGHT', slug: 'stat_overnight', name: 'Stat Overnight', region: 'US', pactEligible: true, adultSignature: 'supported', trackingHosts: ['www.statovernight.com'] },
 ]);
+
+/** The `CarrierCatalog` body `GET /fulfillment/carriers` answers for a store with this policy. */
+export function carrierCatalogResponse({ pactEnabled, adultSignatureRequired }) {
+  const carriers = PLATFORM_CARRIER_CATALOG.map(({ slug, aliases, ...profile }) => profile);
+  const allowedCarriers = carriers
+    .filter((c) => (!pactEnabled || c.pactEligible) && (!adultSignatureRequired || c.adultSignature !== 'unsupported'))
+    .map((c) => c.code);
+  return { carriers, allowedCarriers, pactEnabled, adultSignatureRequired };
+}
 
 export function resolveCarrierProfile(carrierInput, catalog = PLATFORM_CARRIER_CATALOG) {
   const normalized = String(carrierInput ?? '').trim().toLowerCase();
@@ -158,7 +168,7 @@ export function createSimulatedLabelStationGateway({ pactAct = true } = {}) {
       const path = url.pathname.replace(/^\/api\/apps\/v1/, '');
 
       if (method === 'GET' && path === '/fulfillment/carriers') {
-        return json(200, { carriers: PLATFORM_CARRIER_CATALOG });
+        return json(200, carrierCatalogResponse({ pactEnabled: pactAct, adultSignatureRequired: assignment.adultSignatureRequired }));
       }
 
       if (method === 'GET' && path === '/fulfillment/assignments') {
@@ -301,12 +311,12 @@ export async function runSelfTest() {
   // 2. Inspect GET /fulfillment/carriers for PACT & adult-signature eligibility
   const carriersRes = await connector.listCarriers();
   assert.equal(carriersRes.status, 200);
-  const pactEligibleSlugs = carriersRes.body.carriers.filter((c) => c.pactEligible).map((c) => c.slug);
-  assert.ok(pactEligibleSlugs.includes('ups'));
-  assert.ok(pactEligibleSlugs.includes('fedex'));
-  assert.ok(pactEligibleSlugs.includes('ontrac'));
-  assert.ok(pactEligibleSlugs.includes('better_trucks'));
-  assert.ok(!pactEligibleSlugs.includes('usps'));
+  const { allowedCarriers, pactEnabled } = carriersRes.body;
+  assert.equal(pactEnabled, true);
+  assert.equal(carriersRes.body.carriers.length, PLATFORM_CARRIER_CATALOG.length);
+  for (const code of ['UPS', 'FEDEX', 'ONTRAC', 'BETTER_TRUCKS']) assert.ok(allowedCarriers.includes(code));
+  assert.ok(!allowedCarriers.includes('USPS'));
+  assert.equal(resolveCarrierProfile('lasership').code, 'ONTRAC');
 
   // 3. Hydrate ship-to recipient in memory (never logged)
   const recipientRes = await connector.readRecipient(activeAssignment.orderId);
@@ -342,7 +352,7 @@ export async function runSelfTest() {
     carrier: 'BETTER_TRUCKS',
     service: 'NEXT_DAY_ADULT',
     trackingNumber: 'BT888888888882',
-    trackingUrl: 'https://tracking.bettertrucks.com/BT888888888882',
+    trackingUrl: 'https://www.bettertrucks.com/track/BT888888888882',
     adultSignature: 'accepted',
   });
   assert.equal(carton2.status, 200);
@@ -395,7 +405,7 @@ export async function runSelfTest() {
 
   return {
     ok: true,
-    pactCarriersCount: pactEligibleSlugs.length,
+    pactCarriersCount: allowedCarriers.length,
     uspsRefusedCode: uspsAttempt.body.code,
     splitShipmentsComplete: carton2.body.complete,
     replacementPurchaseId: voided.body.purchaseId,

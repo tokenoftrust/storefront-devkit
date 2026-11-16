@@ -274,9 +274,10 @@ Orders may be fulfilled whole via `POST /fulfillment/orders/{orderId}/shipment-e
 `label-voided` recovery that issues a fresh replacement `purchaseId`) or in 1:N cartons via
 `POST /fulfillment/assignments/{assignmentId}/shipments` (which emits `order.partially_fulfilled` on
 intermediate cartons and `order.fulfilled` once all assigned line quantities are covered). Use
-`GET /fulfillment/carriers` to validate carrier capabilities—including `pactEligible` and
-`adultSignature`—before purchasing labels for PACT-regulated vape/tobacco assignments (USPS is
-refused with `409 carrier-prohibited`). Use
+`GET /fulfillment/carriers` before purchasing labels: it returns the carrier catalog (`carriers`,
+each with `pactEligible` and `adultSignature`) and the codes this store allows (`allowedCarriers`).
+A code outside `allowedCarriers`, such as USPS on a PACT-enabled store, is refused with
+`409 carrier-prohibited`. Use
 `POST /fulfillment/assignments/{assignmentId}/exceptions` to report `backordered`, `cannot_fulfill`,
 or `address_undeliverable` line exceptions. There is no rate quote, platform label purchase, return,
 or change to payment, tax, price or checkout.
