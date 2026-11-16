@@ -112,7 +112,8 @@
               "customer.marketing_consent.updated",
               "attribution.finalized",
               "fulfillment.assignment.created",
-              "fulfillment.assignment.updated"
+              "fulfillment.assignment.updated",
+              "fulfillment.label.voided"
             ]
           }
         },

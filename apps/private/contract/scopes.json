@@ -69,7 +69,7 @@
     },
     {
       "id": "fulfillment:process",
-      "grants": "Act as the merchant-configured fulfillment processor for orders assigned to this install: receive fulfillment.assignment.created and fulfillment.assignment.updated, read the install's active assignments (GET /fulfillment/assignments), and report label outcome and confirmed handoff for an assigned order (POST /fulfillment/orders/{orderId}/shipment-evidence).",
+      "grants": "Act as the merchant-configured fulfillment processor for orders assigned to this install: receive fulfillment.assignment.created, fulfillment.assignment.updated and fulfillment.label.voided, read the install's active assignments (GET /fulfillment/assignments), and report label outcome and confirmed handoff for an assigned order (POST /fulfillment/orders/{orderId}/shipment-evidence).",
       "access": "read + write (assigned orders only)",
       "dataMinimization": "Assignment id, opaque order id, stage, assignment state, event version, timestamps, the platform purchase id, and line SKUs/quantities. Writes are whole-order label-outcome and handoff facts (purchase id, carrier and service codes, tracking number and URL, adult-signature result) for an order whose active assignment names this install. Granting the scope assigns nothing: only the merchant's processor configuration and an operator release do. Cannot buy labels, quote rates, split an order, create returns, or alter payment, tax, price or checkout.",
       "pii": "none — no customer identity field in any event, read or write."

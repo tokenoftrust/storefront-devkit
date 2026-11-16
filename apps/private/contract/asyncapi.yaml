@@ -20,10 +20,6 @@ info:
     a production install never receives a preview event.
 
 
-    Channels marked `x-tot-wave: 2` with `x-tot-status: planned` are locked wire shapes that
-    no emitter produces yet. Their types are listed in `components.x-tot-planned-event-types`
-    and are not part of the `CloudEventEnvelope.type` enum until implemented.
-
 defaultContentType: application/cloudevents+json
 
 tags:
@@ -175,11 +171,10 @@ channels:
         $ref: '#/components/messages/OrderPartiallyFulfilled'
 
   fulfillment.label.voided:
-    x-tot-wave: 2
-    x-tot-status: planned
     description: >
-      Planned (PA). Emitted when the label of an assignment moves to `voided`, so the
-      processor learns of a voided label without polling. Requires scope fulfillment:process.
+      Emitted once when the processor's `label-voided` shipment evidence is accepted, so the
+      processor learns of a voided label without polling. A retried identical report emits
+      nothing more. Requires scope fulfillment:process.
       Delivered only to the assigned install. Carries no customer identity.
     subscribe:
       operationId: onFulfillmentLabelVoided
@@ -187,9 +182,6 @@ channels:
         $ref: '#/components/messages/FulfillmentLabelVoided'
 
 components:
-  x-tot-planned-event-types:
-    - com.tokenoftrust.storefront.fulfillment.label.voided
-
   messageTraits:
     cloudEventEnvelope:
       headers:
@@ -245,6 +237,7 @@ components:
             - com.tokenoftrust.storefront.attribution.finalized
             - com.tokenoftrust.storefront.fulfillment.assignment.created
             - com.tokenoftrust.storefront.fulfillment.assignment.updated
+            - com.tokenoftrust.storefront.fulfillment.label.voided
         time:
           type: string
           format: date-time
@@ -376,8 +369,6 @@ components:
     LabelVoidedData:
       type: object
       additionalProperties: false
-      x-tot-wave: 2
-      x-tot-status: planned
       description: >
         Closed four-key payload of fulfillment.label.voided. No customer identity, contact or
         address.
@@ -567,8 +558,6 @@ components:
       name: fulfillmentLabelVoided
       messageId: fulfillmentLabelVoided
       title: fulfillment.label.voided
-      x-tot-wave: 2
-      x-tot-status: planned
       contentType: application/cloudevents+json
       traits:
         - $ref: '#/components/messageTraits/cloudEventEnvelope'
