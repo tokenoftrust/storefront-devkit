@@ -13,6 +13,7 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { ApiClient, ApiError, AuthorizationMetadata, WebhookReceiver } from './vendor/connector-kit/index.js';
 
 const SAMPLE_EVENT = JSON.parse(
   readFileSync(new URL('./fixtures/inventory.changed.cloudevent.json', import.meta.url), 'utf8'),
@@ -73,24 +74,28 @@ export function classifyThresholdTransition({ previousAvailable, currentAvailabl
   return 'steady';
 }
 
+/**
+ * One `/api/apps/v1` call through the vendored connector-kit `ApiClient` (retries, `Retry-After`,
+ * `Idempotency-Key`). A non-2xx answer resolves `{ status, ok: false, body: { code } }`.
+ */
+function createRequest({ baseUrl, accessToken, fetchImpl }) {
+  const api = new ApiClient({ origin: baseUrl, auth: { getAccessToken: async () => accessToken }, fetch: fetchImpl });
+  return async function request(method, path, { query, body, idempotencyKey } = {}) {
+    try {
+      const res = await api.request({ method, path, query, body, idempotencyKey });
+      return { status: res.status, ok: true, body: res.body };
+    } catch (err) {
+      if (err instanceof ApiError) return { status: err.status, ok: false, body: { code: err.code } };
+      throw err;
+    }
+  };
+}
+
 export function createWmsInventoryConnector({ baseUrl, accessToken, fetchImpl = fetch, lowStockThreshold = 5 }) {
   const seenEvents = new Set();
   const lastAvailableBySkuLocation = new Map();
 
-  async function request(method, path, { body, idempotencyKey } = {}) {
-    const headers = {
-      accept: 'application/json',
-      authorization: `Bearer ${accessToken}`,
-    };
-    if (body !== undefined) headers['content-type'] = 'application/json';
-    if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
-    const res = await fetchImpl(`${baseUrl}/api/apps/v1${path}`, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-    return { status: res.status, ok: res.ok, body: await res.json() };
-  }
+  const request = createRequest({ baseUrl, accessToken, fetchImpl });
 
   return {
     upsertLocation(locationId, locationWrite) {
@@ -102,8 +107,7 @@ export function createWmsInventoryConnector({ baseUrl, accessToken, fetchImpl = 
     },
 
     getInventory({ sku, locationId = 'unspecified' } = {}) {
-      const q = new URLSearchParams({ locationId, ...(sku ? { sku } : {}) });
-      return request('GET', `/inventory?${q}`);
+      return request('GET', '/inventory', { query: { locationId, ...(sku ? { sku } : {}) } });
     },
 
     /**
@@ -181,6 +185,21 @@ export function createWmsInventoryConnector({ baseUrl, accessToken, fetchImpl = 
         transition,
       };
     },
+  };
+}
+
+/**
+ * Verifies a delivery (body digest, RFC 9421 signature, replay guard) with the vendored
+ * connector-kit `WebhookReceiver`, then hands only verified, first-seen events to the connector.
+ * `endpoint` is the registered `webhooks.endpoint` exactly as written in `tot-app.json`.
+ */
+export function createWmsWebhookReceiver({ origin, endpoint, connector, keys = new AuthorizationMetadata({ origin }), seenEvents }) {
+  const receiver = new WebhookReceiver({ endpoint, keys, seenEvents });
+  return {
+    handleRequest: (request) =>
+      receiver.handleRequest(request, async (event) => {
+        connector.handleInventoryChangedWebhook(event);
+      }),
   };
 }
 

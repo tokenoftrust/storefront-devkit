@@ -17,6 +17,7 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { ApiClient, ApiError } from './vendor/connector-kit/index.js';
 
 const FIXTURE = JSON.parse(
   readFileSync(new URL('./fixtures/multi-supplier-routing.json', import.meta.url), 'utf8'),
@@ -80,21 +81,25 @@ export function planStone2MultiVendorSplit({ orderId, cartLines, locationBinding
   return Array.from(groups.values());
 }
 
+/**
+ * One `/api/apps/v1` call through the vendored connector-kit `ApiClient` (retries, `Retry-After`,
+ * `Idempotency-Key`). A non-2xx answer resolves `{ status, ok: false, body: { code } }`.
+ */
+function createRequest({ baseUrl, accessToken, fetchImpl }) {
+  const api = new ApiClient({ origin: baseUrl, auth: { getAccessToken: async () => accessToken }, fetch: fetchImpl });
+  return async function request(method, path, { query, body, idempotencyKey } = {}) {
+    try {
+      const res = await api.request({ method, path, query, body, idempotencyKey });
+      return { status: res.status, ok: true, body: res.body };
+    } catch (err) {
+      if (err instanceof ApiError) return { status: err.status, ok: false, body: { code: err.code } };
+      throw err;
+    }
+  };
+}
+
 export function createMultiSupplierRoutingConnector({ baseUrl, accessToken, fetchImpl = fetch }) {
-  async function request(method, path, { body, idempotencyKey } = {}) {
-    const headers = {
-      accept: 'application/json',
-      authorization: `Bearer ${accessToken}`,
-    };
-    if (body !== undefined) headers['content-type'] = 'application/json';
-    if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
-    const res = await fetchImpl(`${baseUrl}/api/apps/v1${path}`, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-    return { status: res.status, ok: res.ok, body: await res.json() };
-  }
+  const request = createRequest({ baseUrl, accessToken, fetchImpl });
 
   return {
     upsertVendorLocation(locationId, { name, kind = 'dropship_vendor', isFulfillable = true, status = 'active' }) {

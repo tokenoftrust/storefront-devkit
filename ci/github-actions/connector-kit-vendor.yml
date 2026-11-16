@@ -1,0 +1,22 @@
+name: connector-kit-vendor
+
+# Refuse a PR whose vendored connector-kit copies differ from packages/connector-kit/src.
+# Fix a failure with: node packages/connector-kit/scripts/vendor.mjs
+
+on:
+  pull_request:
+    paths:
+      - "packages/connector-kit/**"
+      - "apps/private/recipes/**"
+      - "apps/private/examples/**"
+
+jobs:
+  vendor-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Vendored copies equal the kit
+        run: node packages/connector-kit/scripts/vendor.mjs --check

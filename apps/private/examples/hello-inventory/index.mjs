@@ -13,6 +13,7 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { ApiClient, ApiError, ConnectorAuthClient } from './vendor/connector-kit/index.js';
 
 const FIXTURE = JSON.parse(readFileSync(new URL('./fixtures/sample-workflow.json', import.meta.url), 'utf8'));
 
@@ -24,42 +25,18 @@ export function buildIdempotencyKey(prefix, payload) {
 }
 
 export function createHelloInventoryClient({ baseUrl, clientId, clientSecret, adminBearer, tenantId, fetchImpl = fetch }) {
-  let cachedToken = null;
+  const auth = new ConnectorAuthClient({ origin: baseUrl, clientId, clientSecret, method: 'client_secret_post', fetch: fetchImpl });
+  const api = new ApiClient({ origin: baseUrl, auth, fetch: fetchImpl });
 
-  async function getAccessToken() {
-    if (cachedToken) return cachedToken;
-    const form = new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: clientId,
-      client_secret: clientSecret,
-    });
-    const res = await fetchImpl(`${baseUrl}/api/apps/oauth/token`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
-      body: form.toString(),
-    });
-    const body = await res.json();
-    if (!res.ok || !body.access_token) {
-      throw new Error(`OAuth token exchange failed: ${res.status} ${body.error ?? 'unknown'}`);
+  /** A non-2xx answer resolves `{ status, ok: false, body: { code } }`. */
+  async function apiRequest(method, path, { query, body, idempotencyKey } = {}) {
+    try {
+      const res = await api.request({ method, path, query, body, idempotencyKey });
+      return { status: res.status, ok: true, body: res.body };
+    } catch (err) {
+      if (err instanceof ApiError) return { status: err.status, ok: false, body: { code: err.code } };
+      throw err;
     }
-    cachedToken = body.access_token;
-    return cachedToken;
-  }
-
-  async function apiRequest(method, path, { body, idempotencyKey } = {}) {
-    const token = await getAccessToken();
-    const headers = {
-      accept: 'application/json',
-      authorization: `Bearer ${token}`,
-    };
-    if (body !== undefined) headers['content-type'] = 'application/json';
-    if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
-    const res = await fetchImpl(`${baseUrl}/api/apps/v1${path}`, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-    return { status: res.status, ok: res.ok, body: await res.json() };
   }
 
   return {
@@ -72,15 +49,13 @@ export function createHelloInventoryClient({ baseUrl, clientId, clientSecret, ad
       return apiRequest('GET', '/inventory/locations');
     },
     getInventory({ sku, locationId = 'unspecified', limit = 50 } = {}) {
-      const query = new URLSearchParams({ locationId, limit: String(limit), ...(sku ? { sku } : {}) });
-      return apiRequest('GET', `/inventory?${query}`);
+      return apiRequest('GET', '/inventory', { query: { locationId, limit, ...(sku ? { sku } : {}) } });
     },
     postMovement(movement, idempotencyKey = buildIdempotencyKey('hello-inv', movement)) {
       return apiRequest('POST', '/inventory/movements', { body: movement, idempotencyKey });
     },
     listOrders({ page = 1, pageSize = 24 } = {}) {
-      const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-      return apiRequest('GET', `/orders?${query}`);
+      return apiRequest('GET', '/orders', { query: { page, pageSize } });
     },
     async createSyntheticPreviewOrder() {
       const headers = {

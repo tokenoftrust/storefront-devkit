@@ -110,3 +110,10 @@ curl -sS -X POST "https://tot-preview.tokenoftrust.store/api/apps/admin/test-ord
 node index.mjs --self-test
 npm test
 ```
+
+## Vendored connector-kit
+
+`vendor/connector-kit/` is a byte-identical copy of [`packages/connector-kit/src`](../../../../packages/connector-kit/).
+`index.mjs` makes every call through `ApiClient` and verifies inbound deliveries with `WebhookReceiver` (`createLabelStationWebhookReceiver`).
+Do not edit it. Refresh every copy with `node packages/connector-kit/scripts/vendor.mjs`; CI runs
+`node packages/connector-kit/scripts/vendor.mjs --check` and refuses a copy that differs.

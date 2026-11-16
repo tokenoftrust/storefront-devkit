@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   PLATFORM_CARRIER_CATALOG,
+  createLabelStationConnector,
+  createLabelStationWebhookReceiver,
+  createSimulatedLabelStationGateway,
   resolveCarrierProfile,
   runSelfTest,
 } from '../index.mjs';
@@ -53,4 +56,21 @@ test('self-test verifies PACT USPS refusal, 1:N split cartons, and whole-order l
     'order.fulfilled',
     'order.fulfilled',
   ]);
+});
+
+test('an unsigned delivery is refused by the kit receiver and never reaches the connector', async () => {
+  const connector = createLabelStationConnector({
+    baseUrl: 'https://tot-preview.tokenoftrust.store',
+    accessToken: 'sim-label-station-token',
+    fetchImpl: createSimulatedLabelStationGateway().fetchImpl,
+  });
+  const receiver = createLabelStationWebhookReceiver({
+    origin: 'https://tot-preview.tokenoftrust.store',
+    endpoint: 'https://connector.example.com/webhooks/tot',
+    connector,
+  });
+  const event = JSON.parse(readFileSync(new URL('../fixtures/pact-assignment.json', import.meta.url), 'utf8')).assignmentEvent;
+  const res = await receiver.handleRequest(new Request('https://connector.example.com/webhooks/tot', { method: 'POST', body: JSON.stringify(event) }));
+  assert.equal(res.status, 400);
+  assert.equal(connector.handleAssignmentWebhook(event).duplicate, false);
 });
