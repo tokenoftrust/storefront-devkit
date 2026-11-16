@@ -68,3 +68,10 @@ npm test
 | [`fixtures/sample-workflow.json`](./fixtures/sample-workflow.json) | Synthetic location, SKU, and movement payloads. |
 | [`test/hello-inventory.test.mjs`](./test/hello-inventory.test.mjs) | `node:test` verification suite. |
 | [`meta.json`](./meta.json) | Devkit asset metadata for `manifest.json`. |
+
+## Vendored connector-kit
+
+`vendor/connector-kit/` is a byte-identical copy of [`packages/connector-kit/src`](../../../../packages/connector-kit/).
+`index.mjs` gets its token from `ConnectorAuthClient` (`client_secret_post`) and makes every call through `ApiClient` (`Idempotency-Key`, `Retry-After`, bounded backoff).
+Do not edit it. Refresh every copy with `node packages/connector-kit/scripts/vendor.mjs`; CI runs
+`node packages/connector-kit/scripts/vendor.mjs --check` and refuses a copy that differs.

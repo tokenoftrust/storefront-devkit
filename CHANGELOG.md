@@ -5,6 +5,10 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Added
+- The three private-app recipes and `hello-inventory` vendor connector-kit at `vendor/connector-kit/` and make
+  their calls through `ApiClient` (and `ConnectorAuthClient`, `WebhookReceiver` where the app authenticates or
+  receives); `packages/connector-kit/scripts/vendor.mjs` syncs the copies and `--check` (CI:
+  `ci/github-actions/connector-kit-vendor.yml`, and `npm run check`) refuses a drifted copy.
 - `packages/connector-kit/` (`KIT_VERSION` 1.0.0) — vendored source kit for private-app connectors,
   copied into a project and never published: `ConnectorAuthClient` (`client_secret_basic`,
   `client_secret_post`, `private_key_jwt` with RS256/ES256 assertions; cached token with early

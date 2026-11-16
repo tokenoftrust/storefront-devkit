@@ -4,6 +4,7 @@ Run the compliance/contract checks in your own pipeline so bad changes never rea
 
 - [`github-actions/validate.yml`](./github-actions/validate.yml) — on every PR: validate tenant
   JSON files against the devkit schemas, then (if credentials are configured) run `tot validate`.
+- [`github-actions/connector-kit-vendor.yml`](./github-actions/connector-kit-vendor.yml) — on PRs touching the kit, a recipe or an example: refuse a vendored connector-kit copy that differs from `packages/connector-kit/src`.
 
 ## Why two layers
 

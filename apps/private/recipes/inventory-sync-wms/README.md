@@ -137,3 +137,10 @@ The Store Owner reviews the staged candidate in `/admin#integrations` and approv
 node index.mjs --self-test
 npm test
 ```
+
+## Vendored connector-kit
+
+`vendor/connector-kit/` is a byte-identical copy of [`packages/connector-kit/src`](../../../../packages/connector-kit/).
+`index.mjs` makes every call through `ApiClient` and verifies inbound deliveries with `WebhookReceiver` (`createWmsWebhookReceiver`).
+Do not edit it. Refresh every copy with `node packages/connector-kit/scripts/vendor.mjs`; CI runs
+`node packages/connector-kit/scripts/vendor.mjs --check` and refuses a copy that differs.

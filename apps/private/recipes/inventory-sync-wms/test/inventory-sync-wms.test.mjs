@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   classifyThresholdTransition,
   createSimulatedWmsGateway,
+  createWmsWebhookReceiver,
   createWmsInventoryConnector,
   runSelfTest,
 } from '../index.mjs';
@@ -46,4 +47,21 @@ test('classifyThresholdTransition distinguishes low_stock, out_of_stock, and bac
   assert.equal(classifyThresholdTransition({ previousAvailable: 12, currentAvailable: 4, lowStockThreshold: 5 }), 'low_stock');
   assert.equal(classifyThresholdTransition({ previousAvailable: 4, currentAvailable: 0, lowStockThreshold: 5 }), 'out_of_stock');
   assert.equal(classifyThresholdTransition({ previousAvailable: 0, currentAvailable: 9, lowStockThreshold: 5 }), 'back_in_stock');
+});
+
+test('an unsigned delivery is refused by the kit receiver and never reaches the connector', async () => {
+  const connector = createWmsInventoryConnector({
+    baseUrl: 'https://tot-preview.tokenoftrust.store',
+    accessToken: 'sim-wms-token',
+    fetchImpl: createSimulatedWmsGateway().fetchImpl,
+  });
+  const fixture = readFileSync(new URL('../fixtures/inventory.changed.cloudevent.json', import.meta.url), 'utf8');
+  const receiver = createWmsWebhookReceiver({
+    origin: 'https://tot-preview.tokenoftrust.store',
+    endpoint: 'https://connector.example.com/webhooks/tot',
+    connector,
+  });
+  const res = await receiver.handleRequest(new Request('https://connector.example.com/webhooks/tot', { method: 'POST', body: fixture }));
+  assert.equal(res.status, 400);
+  assert.equal(connector.handleInventoryChangedWebhook(JSON.parse(fixture)).duplicate, false);
 });
