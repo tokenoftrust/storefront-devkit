@@ -80,23 +80,20 @@ tot app dev validate ./tot-app.json
 tot app install --tenant <tenant> --env=test --app .
 
 # 3. Bind as the preview processor, create a synthetic PACT order, and release it:
-curl -sS -X POST "https://tot-preview.tokenoftrust.store/api/apps/admin/test-orders" \
+curl -sS -X POST "https://storefront.tokenoftrust.store/<tenant>/api/apps/admin/test-orders" \
   -H "Authorization: Bearer ${TOT_ADMIN_TOKEN}" \
-  -H "X-Tot-Tenant: <tenant>" \
   -H "X-Tot-Caller-Capability: preview-access" \
   -H "Content-Type: application/json" \
   -d '{"action":"bind","installId":"<installId>"}'
 
-curl -sS -X POST "https://tot-preview.tokenoftrust.store/api/apps/admin/test-orders" \
+curl -sS -X POST "https://storefront.tokenoftrust.store/<tenant>/api/apps/admin/test-orders" \
   -H "Authorization: Bearer ${TOT_ADMIN_TOKEN}" \
-  -H "X-Tot-Tenant: <tenant>" \
   -H "X-Tot-Caller-Capability: preview-access" \
   -H "Content-Type: application/json" \
   -d '{"action":"create"}'
 
-curl -sS -X POST "https://tot-preview.tokenoftrust.store/api/apps/admin/test-orders" \
+curl -sS -X POST "https://storefront.tokenoftrust.store/<tenant>/api/apps/admin/test-orders" \
   -H "Authorization: Bearer ${TOT_ADMIN_TOKEN}" \
-  -H "X-Tot-Tenant: <tenant>" \
   -H "X-Tot-Caller-Capability: preview-access" \
   -H "Content-Type: application/json" \
   -d '{"action":"release","orderId":"<orderId>"}'
