@@ -1,0 +1,32 @@
+{
+  "contractVersion": "1",
+  "id": "com.example.dropship-starter",
+  "name": "Dropship Connector (starter)",
+  "version": "0.1.0",
+  "owner": {
+    "name": "Your name",
+    "email": "you@example.com"
+  },
+  "description": "Dropship starter: sends Storefront fulfillment assignments to a supplier as a purchase order on a dropship platform (mocked), then reports each supplier shipment or backorder back.",
+  "installMode": "external",
+  "scopes": [
+    "orders:read:minimal",
+    "orders:read:recipient",
+    "orders:webhook",
+    "fulfillment:process"
+  ],
+  "webhooks": {
+    "endpoint": "https://example.invalid/webhooks",
+    "topics": [
+      "fulfillment.assignment.created",
+      "fulfillment.assignment.updated",
+      "order.partially_fulfilled",
+      "order.fulfilled"
+    ]
+  },
+  "telemetryMode": "errors-only",
+  "retention": {
+    "eventLogDays": 30,
+    "piiRedaction": "strict"
+  }
+}

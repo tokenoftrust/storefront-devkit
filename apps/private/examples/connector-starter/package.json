@@ -1,0 +1,16 @@
+{
+  "name": "storefront-app-starter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Starter template for Storefront private apps: label station, dropship and inventory-sync connectors against mocks, on a store preview.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "doctor": "node scripts/doctor.mjs",
+    "order": "node scripts/test-order.mjs",
+    "label-station": "node apps/label-station/connector.mjs",
+    "dropship": "node apps/dropship/connector.mjs",
+    "inventory-sync": "node apps/inventory-sync/connector.mjs",
+    "test": "node --test test/starter.test.mjs"
+  }
+}
