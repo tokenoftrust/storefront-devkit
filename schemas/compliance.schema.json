@@ -7,13 +7,13 @@
   "additionalProperties": false,
   "properties": {
     "ruleProfile": { "type": "string", "enum": ["vape-nicotine-us"], "description": "The reviewed rule profile checkout enforcement evaluates (e.g. state no-ship and flavored-ENDS rules). A regulated store with no profile fails checkout closed." },
-    "minAge": { "type": "integer", "description": "Minimum purchase age (e.g. 21). Presence signals the tenant is age/identity regulated." },
-    "nicotineWarning": { "type": "boolean", "description": "Show the FDA-mandated nicotine warning (wording fixed by law)." },
-    "pactAct": { "type": "boolean", "description": "Show the PACT Act notice (ENDS/vapor). Federal wording fixed by the platform." },
-    "adultSignature": { "type": "boolean", "description": "Show the adult-signature-on-delivery notice." },
-    "shippingRestriction": { "type": "string", "description": "Display text for shipping restrictions. The ship/no-ship DECISION stays platform-owned." },
+    "minAge": { "type": "integer", "description": "Minimum purchase age (e.g. 21). Presence signals the tenant is age/identity regulated and shows the age gate. Go-live check `age_gate` requires 18+ for a regulated store; `excise` requires 21+ when nicotineWarning is set." },
+    "nicotineWarning": { "type": "boolean", "description": "Show the FDA-mandated nicotine warning band at the top of every page (wording fixed by law). Also marks the store regulated and turns on excise-tax collection, which shows the fixed 'Applicable excise tax is calculated at checkout.' footer line on a store with a catalog (siteType commerce, the default)." },
+    "pactAct": { "type": "boolean", "description": "Show the PACT Act notice (ENDS/vapor) as a footer band on every page. Federal wording fixed by the platform. Satisfies the go-live `jurisdiction` check, as shippingRestriction does — a regulated store needs one of the two." },
+    "adultSignature": { "type": "boolean", "description": "Adult-signature-on-delivery notice. Accepted and validated; not yet placed on any page." },
+    "shippingRestriction": { "type": "string", "description": "Your own shipping-restriction text, shown as a footer band on every page. The ship/no-ship DECISION stays platform-owned. Satisfies the go-live `jurisdiction` check, as pactAct does — a regulated store needs one of the two." },
     "prop65": {
-      "description": "California Prop 65 warning. The mandated skeleton, symbol, and URL are platform-owned; you supply only harm endpoint(s) and chemical name(s).",
+      "description": "California Prop 65 warning. The mandated skeleton, symbol, and URL are platform-owned; you supply only harm endpoint(s) and chemical name(s). Accepted and validated; not yet placed on any page.",
       "oneOf": [
         { "type": "boolean" },
         {
@@ -31,14 +31,14 @@
     "purchaseLimit": {
       "type": "object",
       "additionalProperties": false,
-      "description": "DISPLAY only — enforcement stays platform/commerce-owned.",
+      "description": "DISPLAY only — enforcement stays platform/commerce-owned. Accepted and validated; not yet placed on any page.",
       "properties": { "text": { "type": "string" }, "reason": { "type": "string" } },
       "required": ["text"]
     },
     "stateEligibility": {
       "type": "object",
       "additionalProperties": false,
-      "description": "DISPLAY only — does not decide eligibility for a cart/address.",
+      "description": "DISPLAY only — does not decide eligibility for a cart/address. Accepted and validated; not yet placed on any page, and it does not satisfy the go-live `jurisdiction` check (pactAct or shippingRestriction does).",
       "properties": {
         "restrictedStates": { "type": "array", "items": { "type": "string" } },
         "eligibleStates": { "type": "array", "items": { "type": "string" } },
@@ -48,7 +48,7 @@
     "exciseTax": {
       "type": "object",
       "additionalProperties": false,
-      "description": "DISPLAY cue only — the platform NEVER computes tax here; calculation is platform/commerce-owned.",
+      "description": "DISPLAY cue only — the platform NEVER computes tax here; calculation is platform/commerce-owned. Accepted and validated; not yet placed on any page — the footer excise line comes from nicotineWarning and its wording is fixed.",
       "properties": {
         "note": { "type": "string" },
         "jurisdictions": {
