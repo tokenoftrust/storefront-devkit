@@ -31,6 +31,10 @@ to read `assignmentId`, `orderId`, `purchaseId`, `locationId`, `allowedCarriers`
 Regulated stores (such as vape/nicotine tenants with PACT Act enabled) restrict which carriers can
 transport parcels and require adult signature (`21+`) on delivery:
 
+The response is `{ carriers, allowedCarriers, pactEnabled, adultSignatureRequired }`: `carriers` is
+the whole catalog below, and `allowedCarriers` is the codes this store's carrier policy allows. Ship
+only with a code in `allowedCarriers` (and in the assignment's own `allowedCarriers`).
+
 | Carrier Code (`CarrierCode`) | Station Slug / Alias | `pactEligible` | `adultSignature` | Allowed Tracking Host |
 |---|---|---|---|---|
 | `UPS` | `ups` | `true` | `supported` | `www.ups.com` |
@@ -39,12 +43,14 @@ transport parcels and require adult signature (`21+`) on delivery:
 | `ONTRAC` | `ontrac` / `lasership` | `true` | `supported` | `www.ontrac.com` |
 | `GLS_US` | `gso_gls` | `true` | `supported` | `www.gls-us.com` |
 | `LSO` | `lso` | `true` | `supported` | `www.lso.com` |
-| `SPEE_DEE` | `spee_dee` | `true` | `supported` | `speedeedelivery.com` |
-| `STAT_OVERNIGHT` | `stat_overnight` | `true` | `required` | `statovernight.com` |
-| `BETTER_TRUCKS` | `better_trucks` | `true` | `supported` | `tracking.bettertrucks.com` |
+| `SPEE_DEE` | `spee_dee` | `true` | `supported` | `www.speedeedelivery.com` |
+| `STAT_OVERNIGHT` | `stat_overnight` | `true` | `supported` | `www.statovernight.com` |
+| `BETTER_TRUCKS` | `better_trucks` | `true` | `supported` | `www.bettertrucks.com` |
 | `USPS` | `usps` | **`false`** | `supported` | `tools.usps.com` |
 
-Attempting to report a `USPS` shipment on a PACT-enabled store is refused fail-closed (`409 carrier-prohibited`), and any shipment missing `adultSignature: "accepted"` when `adultSignatureRequired: true` is refused with `409 adult-signature`.
+On a PACT-enabled store `USPS` is absent from `allowedCarriers`, and reporting a `USPS` shipment is
+refused fail-closed with `409 carrier-prohibited`. Any shipment missing `adultSignature: "accepted"`
+when `adultSignatureRequired: true` is refused with `409 adult-signature`.
 
 ### 3. Consent-gated recipient hydration (`GET /api/apps/v1/fulfillment/orders/{orderId}/recipient`)
 

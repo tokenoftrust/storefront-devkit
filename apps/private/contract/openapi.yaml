@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Storefront Private Apps API
-  version: "1.3.0"
+  version: "1.4.0"
   x-contractVersion: "1"
   description: >
     Scoped, least-privilege API for installed Storefront Private Apps. All access is
@@ -25,6 +25,13 @@ info:
     Operations and schemas marked `x-tot-wave: 2` with `x-tot-status: planned` are locked
     wire shapes that are not implemented yet; a server answers 404 for a planned path.
     Everything else is implemented.
+
+
+    Every response from `/api/apps/*` carries `tot-request-id`, refusals included, and is
+    JSON. A path no operation declares answers 404 `{"code":"not_found"}`; a method an
+    operation's path does not declare answers 405 `{"code":"method_not_allowed"}` with
+    `Allow`. A path-routed base (`https://<shared-host>/<store>/api/apps/v1`) serves the
+    same operations, path parameters and responses as a host-routed one.
   contact:
     name: Token of Trust Storefront
     url: https://storefront.tokenoftrust.com
@@ -603,6 +610,37 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/FulfillmentAssignmentList' }
+        '401': { $ref: '#/components/responses/FulfillmentRefused' }
+        '403': { $ref: '#/components/responses/FulfillmentRefused' }
+        '409': { $ref: '#/components/responses/FulfillmentRefused' }
+        '503': { $ref: '#/components/responses/FulfillmentRefused' }
+
+  /fulfillment/carriers:
+    get:
+      tags: [fulfillment]
+      operationId: listFulfillmentCarriers
+      summary: The platform carrier catalog and the carriers this tenant may ship with
+      x-requiredScope: fulfillment:process
+      description: >
+        Requires scope `fulfillment:process` in both the install grant and the token. `carriers`
+        is every `CarrierProfile` of the platform carrier catalog, the same catalog that
+        validates a shipment's `carrier` and `trackingUrl`. `allowedCarriers` is that catalog
+        under the host tenant's carrier policy: a code absent from it answers 409
+        `carrier-prohibited` on a shipment or evidence write. An assignment's own
+        `allowedCarriers` can narrow it further for one order. Response is
+        `cache-control: no-store`. A `tenant`, `tenantId` or `stage` query parameter answers
+        403 `denied`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: The carrier catalog and the tenant's allowed subset.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CarrierCatalog' }
         '401': { $ref: '#/components/responses/FulfillmentRefused' }
         '403': { $ref: '#/components/responses/FulfillmentRefused' }
         '409': { $ref: '#/components/responses/FulfillmentRefused' }
@@ -1320,9 +1358,11 @@ paths:
       x-requiredScope: null
       security: [{ adminSession: [] }, { operatorBearer: [] }]
       description: >
-        Session-authed or operator Bearer. Served only on a preview host (a publication or
-        unrouted host answers 409 `preview_stage_required`); the resolved tenant must be the
-        routed host's tenant (403 `tenant_mismatch`) and the install must be env `test`
+        Session-authed or operator Bearer. The stage is the install's, never the host's: a
+        `test` install acts only on the `preview` stage, so the call works on any host that
+        routes the tenant (the CLI default `https://storefront.tokenoftrust.store/<tenant>`
+        needs no preview token) and never writes publication data. The resolved tenant must be
+        the routed host's tenant (403 `tenant_mismatch`) and the install must be env `test`
         (403 `test_install_required`). A non-owner caller is limited to env `test`
         (403 `owner_required_for_production_app`). The request is an `action` union.
         `bind` binds the caller's own test install as the tenant's preview fulfillment
@@ -1484,8 +1524,8 @@ components:
         A refusal from `/admin/*`. 401 not signed in; 403 not authorized,
         `owner_required_for_production_app`, or on `test-orders` `tenant_mismatch` or
         `test_install_required`; 404 `not_found` (an install of another tenant is
-        indistinguishable from a missing one); 409 `already_installed` or `invalid_state`,
-        and on `test-orders` `preview_stage_required`; 400 `invalid_caller_capability` or
+        indistinguishable from a missing one); 409 `already_installed` or `invalid_state`;
+        400 `invalid_caller_capability` or
         otherwise; 503 `unavailable` or `vault_unavailable` on `test-orders`. Never echoes
         internals.
       content:
@@ -1549,9 +1589,9 @@ components:
 
     InventoryRefused:
       description: >
-        A refusal from `POST /inventory/movements`. Status and `code` pairs are listed on
-        `InventoryRefusal.code`. Always `cache-control: no-store`; refused writes leave no
-        movement and no receipt.
+        A refusal from an `/inventory/*` route. Status and `code` pairs are listed on
+        `InventoryRefusal.code`; a 400 names the request part in `field`. Always
+        `cache-control: no-store`; refused writes leave no movement and no receipt.
       headers:
         tot-request-id: { $ref: '#/components/headers/TotRequestId' }
       content:
@@ -1817,6 +1857,16 @@ components:
           minimum: 0
           maximum: 249
           description: The batch item the refusal names, when it names one.
+        field:
+          type: string
+          description: >
+            The request part a 400 names: a body field (`name`, `kind`, `isFulfillable`,
+            `status`, `sku`, `locationId`, `quantityDelta`, `reason`, `onHand`, `observedAt`),
+            a server-derived key, an unknown key as sent when it is identifier-shaped
+            (`^[A-Za-z][A-Za-z0-9_]{0,63}$`), `body` for any other unknown key and for an empty,
+            oversized, non-JSON or non-object body, `items` for the batch array or a duplicate item,
+            `locationId` for the path parameter, or `Idempotency-Key` for the header. With
+            `index`, the field is inside that batch item.
 
     ReportList:
       type: object
@@ -2291,7 +2341,7 @@ components:
           description: >
             scope_denied, not_found, already_installed, invalid_state, invalid_webhook_endpoint,
             invalid_widget_placement, unknown_version, invalid_version_facets, invalid_manifest,
-            owner_required_for_production_app, invalid_caller_capability, preview_stage_required,
+            owner_required_for_production_app, invalid_caller_capability,
             tenant_mismatch, test_install_required, unavailable, vault_unavailable, invalid_json,
             invalid_action, install_id_required, order_id_required, invalid_jwks or
             candidate_pending.
@@ -2811,6 +2861,28 @@ components:
           type: array
           minItems: 1
           items: { type: string }
+
+    CarrierCatalog:
+      type: object
+      additionalProperties: false
+      required: [carriers, allowedCarriers, pactEnabled, adultSignatureRequired]
+      properties:
+        carriers:
+          type: array
+          description: Every carrier of the platform catalog, in catalog order.
+          items: { $ref: '#/components/schemas/CarrierProfile' }
+        allowedCarriers:
+          type: array
+          description: >
+            The catalog codes the host tenant's carrier policy allows, in catalog order. A code
+            absent here answers 409 `carrier-prohibited` on a shipment or evidence write.
+          items: { $ref: '#/components/schemas/CarrierCode' }
+        pactEnabled:
+          type: boolean
+          description: The tenant's compliance enables PACT, so only `pactEligible` carriers are allowed.
+        adultSignatureRequired:
+          type: boolean
+          description: The tenant requires adult signature, so a carrier whose `adultSignature` is `unsupported` is not allowed.
 
     ShipmentCandidateStatus:
       type: string

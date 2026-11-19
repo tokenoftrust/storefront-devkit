@@ -13,7 +13,7 @@ publish.
 3. [`schemas/`](./schemas/) — the machine-checkable shape of every tenant-owned file. When shape
    is ambiguous, the schema is authoritative.
 4. [`apps/`](./apps/) and [`apps/private/`](./apps/private/) when working on an app integration.
-   The latter contains the canonical public schema (`v1.3.0`), 11-scope V1 catalog, denylist,
+   The latter contains the canonical public schema (`v1.4.0`), 11-scope V1 catalog, denylist,
    API/event definitions, safe fixtures, extensible multi-tenant & cloud hosting guides
    ([`apps/private/hosting/`](./apps/private/hosting/README.md) and
    [`apps/private/hosting/index.json`](./apps/private/hosting/index.json) — always check

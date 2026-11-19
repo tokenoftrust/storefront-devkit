@@ -70,7 +70,7 @@ over the contract.
 |---|---|---|---|
 | [`examples/hello-inventory/`](./examples/hello-inventory/) | Starter app | `catalog:read`, `inventory:read`, `inventory:write`, `orders:read:minimal` | Location registration (`GET/PUT /inventory/locations/{locationId}`), stock reads (`GET /inventory`), idempotent movement writes (`POST /inventory/movements`), and self-serve preview order verification (`POST /api/apps/admin/test-orders`). |
 | [`recipes/inventory-sync-wms/`](./recipes/inventory-sync-wms/) | Multi-Location WMS Connector | `catalog:read`, `inventory:read`, `inventory:write` | Multi-location upsert, `PUT /inventory/levels` CAS reconciliation (`expectedVersion` + `409 version_conflict` recovery), batch WMS `POST /inventory/movements` across all 7 reason codes, `inventory.changed` threshold transitions (`low_stock`, `out_of_stock`, `back_in_stock`), and `private_key_jwt` candidate staging. |
-| [`recipes/fulfillment-label-station/`](./recipes/fulfillment-label-station/) | Shipping & Label Station Connector | `orders:read:minimal`, `orders:read:recipient`, `orders:webhook`, `fulfillment:process` | Assignment webhooks and reconciliation, recipient hydration (`GET /fulfillment/orders/{orderId}/recipient`), PACT & `adultSignature` carrier validation via `GET /fulfillment/carriers` (refusing USPS with `409 carrier-prohibited`), 1:N split cartons (`POST /fulfillment/assignments/{assignmentId}/shipments`), and whole-order `label-voided` recovery. |
+| [`recipes/fulfillment-label-station/`](./recipes/fulfillment-label-station/) | Shipping & Label Station Connector | `orders:read:minimal`, `orders:read:recipient`, `orders:webhook`, `fulfillment:process` | Assignment webhooks and reconciliation, recipient hydration (`GET /fulfillment/orders/{orderId}/recipient`), PACT & `adultSignature` carrier validation via `GET /fulfillment/carriers` (USPS on a PACT store is absent from `allowedCarriers` and refused `409 carrier-prohibited`), 1:N split cartons (`POST /fulfillment/assignments/{assignmentId}/shipments`), and whole-order `label-voided` recovery. |
 | [`recipes/dropship-multi-supplier/`](./recipes/dropship-multi-supplier/) | 3PL & Multi-Supplier Routing Connector | `orders:read:minimal`, `orders:read:recipient`, `orders:webhook`, `fulfillment:process`, `inventory:read`, `inventory:write` | **Stone 1 (Live):** Location-keyed processor coexistence `(tenant_id, stage, location_id)`, partial line shipments emitting `order.partially_fulfilled` → `order.fulfilled`, and `POST /fulfillment/assignments/{assignmentId}/exceptions` (`backordered`, `cannot_fulfill`, `address_undeliverable`). **Stone 2 (Contract Locked):** Multi-supplier cart auto-split across distinct `(appInstallId, locationId)` pairs. |
 | [`samples/fulfillment-connector/`](./samples/fulfillment-connector/) | Full HTTP/Worker fulfillment sample | `fulfillment:process`, `orders:read:recipient` | End-to-end webhook verification (Content-Digest, RFC 9421), CloudEvents dedupe, reconciliation, recipient read, simulated label provider, and both `node:http` and Cloudflare Worker entrypoints. |
 
@@ -93,10 +93,14 @@ examples here for local tests.
 
 ## Versioning
 
-This is contract major version 1 (currently **1.3.0**, with 11 V1 scopes in `scopes.json`:
+This is contract major version 1 (currently **1.4.0**, with 11 V1 scopes in `scopes.json`:
 `catalog:read`, `orders:read:minimal`, `orders:webhook`, `customers:read:minimal`,
 `inventory:read`, `inventory:write`, `reports:read`, `attribution:write`, `widgets:launch`,
-`fulfillment:process`, and `orders:read:recipient`). Version 1.3.0 adds multi-location
+`fulfillment:process`, and `orders:read:recipient`). Version 1.4.0 specifies
+`GET /fulfillment/carriers` (`CarrierCatalog`: `carriers`, the tenant's `allowedCarriers`,
+`pactEnabled`, `adultSignatureRequired`), names the malformed request part in an inventory 400's
+`field`, and answers an undeclared path with JSON 404 `not_found` and an undeclared method with
+JSON 405 `method_not_allowed`, each with `tot-request-id`. Version 1.3.0 adds multi-location
 inventory (`GET/PUT /inventory/locations/{locationId}`), compare-and-swap level reconciliation
 (`PUT /inventory/levels` with `expectedVersion`), batch movement writes with WMS reason codes,
 carrier capability discovery (`GET /fulfillment/carriers` with PACT/adult-signature metadata),
