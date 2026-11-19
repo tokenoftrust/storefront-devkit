@@ -1,0 +1,28 @@
+{
+  "contractVersion": "1",
+  "id": "com.example.inventory-sync-starter",
+  "name": "Inventory Sync Connector (starter)",
+  "version": "0.1.0",
+  "owner": {
+    "name": "Your name",
+    "email": "you@example.com"
+  },
+  "description": "Inventory starter: copies on-hand counts from a warehouse system (mocked) into a Storefront stock location and listens for inventory changes.",
+  "installMode": "external",
+  "scopes": [
+    "catalog:read",
+    "inventory:read",
+    "inventory:write"
+  ],
+  "webhooks": {
+    "endpoint": "https://example.invalid/webhooks",
+    "topics": [
+      "inventory.changed"
+    ]
+  },
+  "telemetryMode": "errors-only",
+  "retention": {
+    "eventLogDays": 30,
+    "piiRedaction": "strict"
+  }
+}

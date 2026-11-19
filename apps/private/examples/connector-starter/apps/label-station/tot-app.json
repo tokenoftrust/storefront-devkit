@@ -1,0 +1,32 @@
+{
+  "contractVersion": "1",
+  "id": "com.example.label-station-starter",
+  "name": "Label Station Connector (starter)",
+  "version": "0.1.0",
+  "owner": {
+    "name": "Your name",
+    "email": "you@example.com"
+  },
+  "description": "Label station starter: takes Storefront fulfillment assignments, creates the order and label with a label provider (mocked), and reports label and handoff back.",
+  "installMode": "external",
+  "scopes": [
+    "orders:read:minimal",
+    "orders:read:recipient",
+    "orders:webhook",
+    "fulfillment:process"
+  ],
+  "webhooks": {
+    "endpoint": "https://example.invalid/webhooks",
+    "topics": [
+      "fulfillment.assignment.created",
+      "fulfillment.assignment.updated",
+      "fulfillment.label.voided",
+      "order.fulfilled"
+    ]
+  },
+  "telemetryMode": "errors-only",
+  "retention": {
+    "eventLogDays": 30,
+    "piiRedaction": "strict"
+  }
+}

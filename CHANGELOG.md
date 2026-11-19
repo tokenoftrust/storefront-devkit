@@ -5,6 +5,10 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Added
+- `apps/private/examples/connector-starter/` — three runnable private-app connectors (label station, multi-supplier
+  dropship, inventory/WMS sync) against in-process mocks of their outside systems, run end to end on a store preview
+  with `env=test` installs and synthetic orders: preflight `doctor`, a `tot app test-order` helper, and a webhook
+  server verifying signatures through vendored connector-kit. Tests run in `npm run check`.
 - The three private-app recipes and `hello-inventory` vendor connector-kit at `vendor/connector-kit/` and make
   their calls through `ApiClient` (and `ConnectorAuthClient`, `WebhookReceiver` where the app authenticates or
   receives); `packages/connector-kit/scripts/vendor.mjs` syncs the copies and `--check` (CI:
