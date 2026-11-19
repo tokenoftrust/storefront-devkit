@@ -124,7 +124,7 @@ more than once, and out of order.
 - **Inventory ordering.** `inventory.changed` can arrive out of order; order by `asOf`, not arrival time.
 - **Hosting.** See [`../../hosting/`](../../hosting/) to run it somewhere other than your laptop.
 
-Request bodies follow [`contract/openapi.yaml`](../../contract/openapi.yaml) 1.3.0, the source of
+Request bodies follow [`contract/openapi.yaml`](../../contract/openapi.yaml) 1.4.0, the source of
 truth. Known rough edges: [`KNOWN-ISSUES.md`](./KNOWN-ISSUES.md).
 
 ## Reporting a problem
