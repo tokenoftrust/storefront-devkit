@@ -243,7 +243,7 @@ export async function run({ only, pauseMs }, env) {
         case 'storefront.levels': return ok(`PUT /inventory/levels (${e.reason}) HTTP ${e.http} · drift ${e.drift?.length ? e.drift.map((d) => `${d.sku} ${d.quantityDelta > 0 ? '+' : ''}${d.quantityDelta}`).join(', ') : 'none (0)'}`);
         case 'storefront.movements': return ok(`POST /inventory/movements HTTP ${e.http} · ${e.count} movement(s) · receipt ${e.receiptId?.slice(0, 14)}…`);
         case 'storefront.movement_refused': return bad(`movement refused ${j(e)}`);
-        case 'webhook.received': return hook(`signed webhook ${e.topic} · ${e.data?.sku} balance ${e.data?.balance} · asOf ${e.data?.asOf}`);
+        case 'webhook.received': return hook(`signed webhook ${e.topic} · ${e.data?.sku} at ${e.data?.locationId}: balance ${e.data?.balance} · asOf ${e.data?.asOf}`);
         case 'inventory.changed.applied': return info('applied (newer than anything seen for this SKU)');
         case 'inventory.changed.stale': return info(`ignored: older than ${e.lastSeenAsOf}`);
         case 'webhook.refused': return bad(`webhook refused ${j(e.body)}`);
@@ -264,6 +264,7 @@ export async function run({ only, pauseMs }, env) {
     let m = app.mark();
     info(`WMS now holds ${(await wms('/_mock/move', { sku, qty: 12, reason: 'RECEIVE' })).quantityOnHand} of ${sku}`);
     await waiting('next sync', app.waitFor((e) => e.event === 'storefront.movements', m), 30);
+    m = app.mark(); // the recount that follows this batch, not an earlier routine one
     await waiting('reconcile', app.waitFor((e) => e.event === 'storefront.levels', m), 30);
     await sleep(pauseMs);
 
@@ -272,6 +273,7 @@ export async function run({ only, pauseMs }, env) {
     const pick = await wms('/_mock/pick', { sku, qty: 2 });
     info(`WMS now holds ${pick.quantityOnHand} of ${sku}`);
     await waiting('next sync', app.waitFor((e) => e.event === 'storefront.movements', m), 30);
+    m = app.mark(); // the recount that follows this batch, not an earlier routine one
     await waiting('reconcile', app.waitFor((e) => e.event === 'storefront.levels', m), 30);
     await sleep(pauseMs);
 
