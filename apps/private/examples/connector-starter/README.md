@@ -42,7 +42,12 @@ the first. Use one store each, or take turns.
 
 Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<store>` with your store.
 
-1. **Offline check**: `npm test`. No credentials needed.
+1. **Offline check & conformance certification**:
+   - Run `npm test` (no credentials needed).
+   - Or start your local receiver and run the CLI conformance checklist / certification receipt generator:
+     ```bash
+     tot app conformance --url http://127.0.0.1:8787/webhooks --archetype <app> --certify --app-id com.example.<app> --receipt ./conformance-receipt.json
+     ```
 2. **Install your app on the store (test environment)**:
    ```bash
    tot app install --app apps/<app> --env test --tenant <store>
@@ -68,11 +73,12 @@ Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<stor
    tot app update <installId> --app apps/<app> --webhook-endpoint https://<tunnel>/webhooks --tenant <store>
    ```
    Run `npm run doctor -- <app>` again. Every check should PASS.
-8. **Label station / dropship: send a test order** (terminal 3):
+8. **Label station / dropship: send a test order or run a 1-click smoke test** (terminal 3 or browser):
    ```bash
    npm run order -- <app> bind   # once, after step 7: makes this install the store's preview processor
    npm run order -- <app> go     # create + release one synthetic order
    ```
+   Or open **`/dashboard/<store>/apps`** in your browser and click **"Run Smoke Test"** on the `test` install card (calls `POST /api/apps/admin/test-orders?tenant=<store>` with `{"action":"smoke","installId":"<installId>"}` to exercise `bind -> create -> release -> hold -> cancel` in an isolated preview location `smoke:<installId>` without disturbing the wildcard processor).
    Watch terminal 2. Within about a minute the app picks up the order and reports back.
    **Inventory sync** needs no orders: it syncs on start and every `SYNC_SECONDS`.
 9. **When you're done**: stop the app and the tunnel, then
