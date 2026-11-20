@@ -4,6 +4,12 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 
 ## Unreleased
 
+### Changed
+- `apps/private/examples/hello-inventory/` is now `apps/private/examples/inventory-fulfillment-e2e/` (app id
+  `com.example.inventory-fulfillment-e2e`): it is an end-to-end test of the inventory and fulfillment APIs, not a
+  starter UI. New `npm run e2e`: a captioned run on a store preview that also drives the connector-starter
+  inventory-sync and dropship apps (signed `inventory.changed` webhooks, a split shipment, hold and cancel).
+
 ### Added
 - `apps/private/examples/connector-starter/` — three runnable private-app connectors (label station, multi-supplier
   dropship, inventory/WMS sync) against in-process mocks of their outside systems, run end to end on a store preview

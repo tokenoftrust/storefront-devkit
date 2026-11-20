@@ -1,7 +1,7 @@
 {
-  "id": "private-app-example-hello-inventory",
+  "id": "private-app-example-inventory-fulfillment-e2e",
   "kind": "sample",
-  "title": "Hello Inventory (starter private app)",
+  "title": "Inventory & Fulfillment API E2E (private-app example)",
   "description": "Minimal runnable starter Private App: quarantine location (PUT /inventory/locations/{locationId}, isFulfillable: false), atomic WMS batch (POST /inventory/movements), absolute reconciliation (PUT /inventory/levels), sales-velocity report (GET /reports), signed inventory.changed verification, and synthetic preview orders (tot app test-order create).",
   "tags": [
     "private-apps",

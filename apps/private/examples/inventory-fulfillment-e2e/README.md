@@ -1,10 +1,20 @@
-# Hello Inventory — Starter Private App
+# Inventory & Fulfillment API E2E
 
-A minimal, dependency-free starter reference app for **Storefront Private Apps 1.4**
-(`apps/private/contract/openapi.yaml` 1.4.0, connector-kit 1.1.0). Copy it when you build an
-inventory or WMS connector: it declares a quarantine stock location, posts atomic WMS movement
-batches, reconciles absolute on-hand levels, reads the sales-velocity report, verifies signed
-`inventory.changed` webhooks, and checks synthetic preview orders.
+An end-to-end test of the **Storefront Private Apps 1.4** inventory and fulfillment APIs
+(`apps/private/contract/openapi.yaml` 1.4.0, connector-kit 1.1.0). Dependency-free, in three
+layers:
+
+- `npm test` / `--self-test` — offline, against a contract-shaped simulated gateway: quarantine
+  location, atomic WMS movement batch, absolute level reconciliation, sales-velocity report, signed
+  `inventory.changed` webhooks, synthetic preview orders.
+- `--live` — the same inventory calls against your own test install on a store preview.
+- `npm run e2e` — a captioned run on a store preview that also drives the
+  [`../connector-starter/`](../connector-starter/) apps: WMS changes coming back as signed webhooks,
+  a synthetic order shipped in two cartons (`order.partially_fulfilled`, then `order.fulfilled`), and
+  an order held then cancelled. See [End-to-end run](#end-to-end-run-npm-run-e2e).
+
+It is a test and reference for the API calls, not a merchant-facing app; start a connector from
+[`../connector-starter/`](../connector-starter/).
 
 ## Scopes requested (`tot-app.json`)
 
@@ -103,14 +113,50 @@ SKU, reconciles twice, reads inventory, the velocity report and orders, and logs
 step (never a credential). `--cleanup` sets that SKU's balance at the test location back to 0 and
 archives the location. Always use `--cleanup` on a shared store preview.
 
+## End-to-end run (`npm run e2e`)
+
+One captioned run, step by step, against a store **preview** (CLI 7.5.5 or later, signed in):
+
+1. **Inventory API** — this example's `--live` calls with a caption per step, then cleanup.
+2. **Inventory changes** — the connector-starter inventory-sync app with its mock WMS: a receive (+12)
+   and a pick (-2) become reason-coded movement batches, the recount shows drift 0, and Storefront
+   confirms each change with a signed `inventory.changed` webhook. Then `--cleanup`.
+3. **Fulfilment with a split shipment** — the dropship app is bound to its own preview location; a
+   synthetic 2-unit order goes to the mock supplier as a purchase order and ships in two cartons,
+   each reported with `POST /fulfillment/assignments/{id}/shipments`.
+4. **Hold and cancel** — a second order is held, then cancelled; the app holds, then cancels, the
+   supplier purchase order and nothing ships.
+
+Set up once:
+
+```bash
+# this example's own test install (prints the secret once): copy .env.example to .env and fill it
+tot app install --app . --env test --tenant <store>
+# a tunnel to the local webhook port, e.g.
+cloudflared tunnel --url http://127.0.0.1:8787
+# the connector-starter inventory-sync and dropship test installs (their apps/<app>/.env),
+# with the tunnel as their webhook endpoint:
+tot app update <installId> --app ../connector-starter/apps/<app> --webhook-endpoint <tunnel>/webhooks --tenant <store>
+```
+
+Then `npm run e2e` (or `npm run e2e -- --only inventory-api|inventory-sync|fulfilment|hold`,
+`--pause <seconds>`, `--help`). Preview webhooks can take up to about a minute; the run shows a
+counter while it waits. Afterwards set the endpoints back with `--webhook-endpoint none`.
+
+What it does not cover: one cart split across two suppliers or locations. `tot app test-order create`
+takes a single `--location`, so that case cannot be set up on a preview yet.
+
 ## Files
 
 - [`tot-app.json`](./tot-app.json) — Private Apps v1 manifest (five scopes, `inventory.changed` webhook).
 - [`index.mjs`](./index.mjs) — the client, the `inventory.changed` mirror, the offline gateway
   simulator, `--self-test` and `--live`.
+- [`e2e.mjs`](./e2e.mjs) — `npm run e2e`: the captioned preview run, including the
+  connector-starter inventory-sync and dropship apps.
+- [`.env.example`](./.env.example) — settings for `npm run e2e`.
 - [`fixtures/sample-workflow.json`](./fixtures/sample-workflow.json) — quarantine location, SKUs,
   opening balances, the four-reason batch and the levels observation.
-- [`test/hello-inventory.test.mjs`](./test/hello-inventory.test.mjs) — `node:test` suite.
+- [`test/inventory-fulfillment-e2e.test.mjs`](./test/inventory-fulfillment-e2e.test.mjs) — `node:test` suite.
 - [`test/webhook-signer.mjs`](./test/webhook-signer.mjs) — test-only signer standing in for the
   gateway; a production app only verifies.
 - [`meta.json`](./meta.json) — Devkit asset metadata for `manifest.json`.

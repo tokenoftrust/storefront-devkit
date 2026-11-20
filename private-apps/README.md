@@ -78,8 +78,8 @@ repository.
    stage a production candidate (`POST /api/apps/admin/candidates` with `clientAuth.method =
    "private_key_jwt"`) so the Merchant Owner can approve it in one click.
 6. **Start from a runnable reference recipe** under [`../apps/private/`](../apps/private/):
-   - [`../apps/private/examples/hello-inventory/`](../apps/private/examples/hello-inventory/) —
-     locations, stock read/write, and synthetic preview orders
+   - [`../apps/private/examples/inventory-fulfillment-e2e/`](../apps/private/examples/inventory-fulfillment-e2e/) —
+     end-to-end test of the inventory and fulfillment APIs on a store preview
    - [`../apps/private/recipes/inventory-sync-wms/`](../apps/private/recipes/inventory-sync-wms/) —
      multi-location WMS sync, CAS reconciliation, and `inventory.changed` threshold transitions
    - [`../apps/private/recipes/fulfillment-label-station/`](../apps/private/recipes/fulfillment-label-station/) —

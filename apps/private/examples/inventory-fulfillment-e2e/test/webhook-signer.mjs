@@ -6,7 +6,7 @@ import { createHash, createSign, generateKeyPairSync } from 'node:crypto';
  * Test-only signer for RFC 9421 webhook deliveries, mirroring what the gateway sends
  * (rsa-v1_5-sha256 over @method, @target-uri and content-digest). Production apps never sign.
  */
-export function createTestWebhookSigner({ endpoint, keyid = 'hello-inventory-test-key' } = {}) {
+export function createTestWebhookSigner({ endpoint, keyid = 'inventory-e2e-test-key' } = {}) {
   const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const jwk = { ...publicKey.export({ format: 'jwk' }), kid: keyid, alg: 'RS256', use: 'sig' };
   return {

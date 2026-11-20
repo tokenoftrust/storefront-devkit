@@ -1,7 +1,7 @@
 {
   "contractVersion": "1",
-  "id": "com.example.hello-inventory",
-  "name": "Hello Inventory Starter App",
+  "id": "com.example.inventory-fulfillment-e2e",
+  "name": "Inventory & Fulfillment API E2E",
   "version": "1.4.0",
   "owner": {
     "name": "Example Merchant Engineering",

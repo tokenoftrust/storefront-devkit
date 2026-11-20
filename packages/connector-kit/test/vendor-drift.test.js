@@ -40,7 +40,7 @@ test('recipe and example sources hold no token, signature or digest code of thei
     const app = join(copy, '..', '..');
     return files(app).filter((f) => f.endsWith('.mjs') && !f.includes('/vendor/') && !f.includes('/test/'));
   });
-  assert.equal(own.length, 18);
+  assert.equal(own.length, 19);
   for (const file of own) {
     const code = readFileSync(file, 'utf8');
     assert.doesNotMatch(code, /grant_type|signature-input|content-digest|createHmac|createSign|createVerify|subtle\./i, relative(ROOT, file));
