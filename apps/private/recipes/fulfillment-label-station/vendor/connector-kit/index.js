@@ -11,6 +11,7 @@ export { ApiClient, newIdempotencyKey, deriveIdempotencyKey } from './api.js';
 export { AuthorizationMetadata, StaticSigningKeys, importWebhookSigningKey, normalizeOrigin, METADATA_PATH, TOKEN_PATH, API_PREFIX } from './metadata.js';
 export { ConnectorError, ApiError, AuthError, TransportError, safeCode } from './errors.js';
 export { DEFAULT_RETRY_POLICY, RETRYABLE_STATUS, parseRetryAfter } from './retry.js';
+export { createRateLimiter } from './rate-limit.js';
 export {
   contentDigestFor,
   verifyContentDigest,
