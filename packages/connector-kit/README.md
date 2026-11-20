@@ -163,6 +163,26 @@ Success resolves `{ status, body, headers, requestId, idempotencyKey? }`.
 - **Pagination** refuses a cursor it has already seen (`pagination_stalled`) instead of looping.
 - **Redirects** are refused, never followed.
 
+## Pacing an outbound API
+
+Share one limiter per vendor quota. Each wrapped call takes a token before making the request.
+Set `burst` to the number of calls that can start together (default 1).
+
+```js
+import { createRateLimiter } from './vendor/connector-kit/index.js';
+
+const limiter = createRateLimiter({ requestsPerMinute: 40 });
+const vendorFetch = limiter.wrap(fetch);
+const response = await vendorFetch(vendorUrl, options);
+```
+
+The wrapper reads `Retry-After` and `X-Rate-Limit-Reset` on HTTP 429 or when the response reports
+zero remaining requests. It returns the original response so the connector controls retries.
+Pass `parseResetSeconds` to `wrap()` to read a vendor-specific delay in seconds. Return `undefined`
+to fall back to the standard headers. Use `await limiter.acquire()` with a different transport.
+
+The vendored `index.d.ts` provides types for the kit and its Storefront wire payloads.
+
 ## Error model
 
 Every failure is a `ConnectorError` with `kind`, `code`, and when known `status`, `requestId`
