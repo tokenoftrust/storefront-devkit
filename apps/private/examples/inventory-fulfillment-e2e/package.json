@@ -2,7 +2,7 @@
   "name": "storefront-private-app-inventory-fulfillment-e2e",
   "private": true,
   "type": "module",
-  "description": "Starter reference app for Storefront Private Apps 1.4: quarantine locations, batch movements, level reconciliation, reports, signed webhooks, synthetic preview orders.",
+  "description": "End-to-end test of the Storefront Private Apps 1.4 inventory and fulfillment APIs: offline self-test, live inventory run, and a captioned preview run through split shipments, hold and cancel.",
   "engines": {
     "node": ">=20"
   },
@@ -10,6 +10,7 @@
     "start": "node index.mjs --self-test",
     "self-test": "node index.mjs --self-test",
     "live": "node index.mjs --live",
+    "e2e": "node e2e.mjs",
     "test": "node --test test/*.test.mjs"
   }
 }
