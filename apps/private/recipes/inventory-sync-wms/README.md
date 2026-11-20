@@ -92,38 +92,26 @@ availability transitions (`steady` $\rightarrow$ `low_stock` $\rightarrow$ `out_
 
 ---
 
+## Create a synthetic order for a preview location
+
+Use the test store and a location from the seeded multi-warehouse catalog. Set `TENANT` and
+`LOCATION_ID` to those values, then create a synthetic order in the preview ledger.
+
+```bash
+tot app test-order create --tenant "$TENANT" --url https://storefront.tokenoftrust.store --location "$LOCATION_ID"
+```
+
+Binding and releasing to a fulfillment processor require a separate test install with
+`fulfillment:process` and a webhook endpoint.
+
 ## Staging a `private_key_jwt` Production Candidate
 
 Developers with `preview-access` or `ship-on-behalf` test in `env="test"` first, then stage a
 key-bound `production` candidate (`status: "pending_approval"`) for 1-click Store Owner approval:
 
 ```bash
-# Stage the production candidate using the jwksUri declared in tot-app.json:
-curl -sS -X POST "https://<tenant>.tokenoftrust.store/api/apps/admin/candidates" \
-  -H "Authorization: Bearer ${TOT_ADMIN_TOKEN}" \
-  -H "X-Tot-Tenant: <tenant>" \
-  -H "X-Tot-Caller-Capability: ship-on-behalf" \
-  -H "Content-Type: application/json" \
-  -d @- <<'EOF'
-{
-  "appId": "com.example.wms-inventory-sync",
-  "appVersion": "1.3.0",
-  "scopes": ["catalog:read", "inventory:read", "inventory:write"],
-  "manifest": {
-    "contractVersion": "1",
-    "id": "com.example.wms-inventory-sync",
-    "name": "Multi-Location WMS Inventory Sync",
-    "version": "1.3.0",
-    "owner": { "name": "Example WMS Integrations", "email": "wms-ops@integrations.example.com" },
-    "installMode": "external",
-    "scopes": ["catalog:read", "inventory:read", "inventory:write"],
-    "clientAuth": {
-      "method": "private_key_jwt",
-      "jwksUri": "https://wms.integrations.example.com/.well-known/jwks.json"
-    }
-  }
-}
-EOF
+# Stage the production candidate using the jwksUri declared in tot-app.json.
+tot app candidate --tenant "$TENANT" --url https://storefront.tokenoftrust.store --app .
 ```
 
 The Store Owner reviews the staged candidate in `/admin#integrations` and approves it in 1 click

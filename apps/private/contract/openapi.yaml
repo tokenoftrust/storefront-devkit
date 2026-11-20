@@ -1366,12 +1366,14 @@ paths:
         (403 `test_install_required`). A non-owner caller is limited to env `test`
         (403 `owner_required_for_production_app`). The request is an `action` union.
         `bind` binds the caller's own test install as the tenant's preview fulfillment
-        processor and, as part of that action, grants it preview recipient consent. `create`
+        processor for a location and grants it preview recipient consent. `create`
         writes one synthetic order to the preview partition of the commerce ledger with its
         source authority and a sealed recipient built only from RFC-reserved values
         (example.com mail domain, a 555-01xx number, a placeholder street), never real
         contact data. `release` claims and releases one synthetic order to the bound
-        processor, which emits `fulfillment.assignment.created` to the install. Synthetic
+        processor, which emits `fulfillment.assignment.created` to the install. `hold` and
+        `cancel` transition a released order's active assignment to `held` or `cancelled`,
+        respectively, and enqueue `fulfillment.assignment.updated`. Synthetic
         orders appear only in the preview ledger, so `GET /orders` on a preview host returns
         them and a publication host never does.
       parameters:
@@ -1383,7 +1385,7 @@ paths:
             schema: { $ref: '#/components/schemas/AdminTestOrderRequest' }
       responses:
         '200':
-          description: '`bind` or `release` completed.'
+          description: '`bind`, `release`, `hold`, or `cancel` completed.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AdminTestOrderResult' }
@@ -2628,17 +2630,21 @@ components:
         consentGranted: { type: boolean }
 
     AdminTestOrderRequest:
-      description: One of the `bind`, `create` or `release` actions.
+      description: One of the `bind`, `create`, `release`, `hold`, or `cancel` actions.
       oneOf:
         - $ref: '#/components/schemas/AdminTestOrderBind'
         - $ref: '#/components/schemas/AdminTestOrderCreate'
         - $ref: '#/components/schemas/AdminTestOrderRelease'
+        - $ref: '#/components/schemas/AdminTestOrderHold'
+        - $ref: '#/components/schemas/AdminTestOrderCancel'
       discriminator:
         propertyName: action
         mapping:
           bind: '#/components/schemas/AdminTestOrderBind'
           create: '#/components/schemas/AdminTestOrderCreate'
           release: '#/components/schemas/AdminTestOrderRelease'
+          hold: '#/components/schemas/AdminTestOrderHold'
+          cancel: '#/components/schemas/AdminTestOrderCancel'
 
     AdminTestOrderBind:
       type: object
@@ -2647,6 +2653,10 @@ components:
       properties:
         action: { type: string, const: bind }
         installId: { type: string, description: 'The caller''s own `test` install.' }
+        locationId:
+          type: string
+          pattern: '^(?:\*|[A-Za-z0-9._:-]{1,128})$'
+          description: Preview processor location. Use '*' for the wildcard processor.
 
     AdminTestOrderCreate:
       type: object
@@ -2654,6 +2664,20 @@ components:
       required: [action]
       properties:
         action: { type: string, const: create }
+        locationId:
+          type: string
+          pattern: '^[A-Za-z0-9._:-]{1,128}$'
+          description: Location used to route the synthetic order.
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/AssignmentLine' }
+        region:
+          type: string
+          pattern: '^[A-Z]{2}$'
+          default: TX
+          description: Two-letter region of the synthetic recipient.
 
     AdminTestOrderRelease:
       type: object
@@ -2663,10 +2687,26 @@ components:
         action: { type: string, const: release }
         orderId: { type: string, description: A synthetic preview order id from `create`. }
 
+    AdminTestOrderHold:
+      type: object
+      additionalProperties: false
+      required: [action, orderId]
+      properties:
+        action: { type: string, const: hold }
+        orderId: { type: string, description: A released synthetic preview order id. }
+
+    AdminTestOrderCancel:
+      type: object
+      additionalProperties: false
+      required: [action, orderId]
+      properties:
+        action: { type: string, const: cancel }
+        orderId: { type: string, description: A released synthetic preview order id. }
+
     AdminTestOrderResult:
       description: >
-        `bind` answers 200 `{processor}`; `create` answers 201 `{order}`; `release` answers
-        200 `{order}`.
+        `bind` answers 200 `{processor}`, `create` answers 201 `{order}`, and `release`,
+        `hold`, and `cancel` answer 200 `{order}`.
       oneOf:
         - type: object
           additionalProperties: false
@@ -2678,6 +2718,7 @@ components:
               required: [installId, notifiable, consentGranted]
               properties:
                 installId: { type: string }
+                locationId: { type: string }
                 notifiable: { type: boolean }
                 consentGranted: { type: boolean }
         - type: object

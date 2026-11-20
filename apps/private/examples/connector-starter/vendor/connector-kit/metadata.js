@@ -12,6 +12,8 @@ export const API_PREFIX = '/api/apps/v1';
 
 const DEFAULT_MAX_AGE_SECONDS = 300;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+const STORE_URL = /^(https?:\/\/[^/?#\\@\s]+)(?:\/([a-z0-9][a-z0-9.-]{0,127}))?\/?$/i;
+const TENANT = /^[a-z0-9][a-z0-9.-]{0,127}$/;
 
 /**
  * The storefront origin as `scheme://host[:port]`. HTTPS is required except for
@@ -19,18 +21,38 @@ const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
  * refused so a base URL with `/api/apps/v1` appended is caught at construction.
  */
 export function normalizeOrigin(origin) {
+  const { bareOrigin } = parseStoreUrl(origin, false);
+  return bareOrigin;
+}
+
+function parseStoreUrl(origin, allowTenantPath) {
+  // Inspect the raw path before URL parsing can discard dot segments or empty query/fragment markers.
+  const input = String(origin);
+  const match = STORE_URL.exec(input);
+  if (!match || match[0] !== input || (!allowTenantPath && match[2])) {
+    const pathRule = allowTenantPath ? 'at most one tenant path segment' : 'no path';
+    throw new TypeError(`origin must be scheme://host[:port] with ${pathRule} and no query, fragment or credentials`);
+  }
   let url;
   try {
-    url = new URL(String(origin));
+    url = new URL(match[1]);
   } catch {
     throw new TypeError('origin must be an absolute URL such as https://acme.tokenoftrust.store');
   }
   const loopback = url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname);
   if (url.protocol !== 'https:' && !loopback) throw new TypeError('origin must use https');
-  if (url.username || url.password || url.search || url.hash || (url.pathname !== '/' && url.pathname !== '')) {
-    throw new TypeError('origin must be scheme://host[:port] with no path, query or credentials');
+  return { bareOrigin: url.origin, pathTenant: match[2] };
+}
+
+/** Resolve the OAuth and API base while keeping discovery on the bare host. */
+export function resolveStoreBase(origin, tenant) {
+  const { bareOrigin, pathTenant } = parseStoreUrl(origin, true);
+  if (pathTenant !== undefined && tenant !== undefined) throw new TypeError('pass tenant in origin or as an option, not both');
+  const store = tenant === undefined ? pathTenant : tenant;
+  if (store !== undefined && (typeof store !== 'string' || !TENANT.test(store) || /\s/.test(store))) {
+    throw new TypeError('tenant must be a valid store slug');
   }
-  return url.origin;
+  return { bareOrigin, base: store === undefined ? bareOrigin : `${bareOrigin}/${store}` };
 }
 
 function maxAgeSeconds(cacheControl) {

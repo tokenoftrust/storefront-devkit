@@ -7,7 +7,7 @@
 // `limit` and `updatedSince`) drains every page.
 import { ApiError, AuthError, ConnectorError, TransportError, safeCode, safeRequestId } from './errors.js';
 import { hex, sha256, utf8 } from './encoding.js';
-import { API_PREFIX, normalizeOrigin } from './metadata.js';
+import { API_PREFIX, resolveStoreBase } from './metadata.js';
 import { RETRYABLE_STATUS, backoffDelay, defaultSleep, parseRetryAfter, retryPolicy } from './retry.js';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -51,9 +51,12 @@ function itemsOf(body, itemsKey) {
 }
 
 export class ApiClient {
+  #apiPrefix;
+
   /**
    * @param {object} options
    * @param {string} options.origin The storefront origin, e.g. https://acme.tokenoftrust.store.
+   * @param {string} [options.tenant] Store slug on a shared host. Can also be supplied as a single path segment in origin.
    * @param {{ getAccessToken(): Promise<string>, invalidate?(token: string): void }} options.auth Usually a ConnectorAuthClient.
    * @param {object} [options.retry] Retry policy overrides (see DEFAULT_RETRY_POLICY).
    * @param {typeof fetch} [options.fetch]
@@ -64,6 +67,7 @@ export class ApiClient {
    */
   constructor({
     origin,
+    tenant,
     auth,
     retry,
     fetch: fetchImpl = (...args) => globalThis.fetch(...args),
@@ -73,7 +77,9 @@ export class ApiClient {
     onRetry,
   }) {
     if (!auth || typeof auth.getAccessToken !== 'function') throw new TypeError('auth must provide getAccessToken()');
-    this.origin = normalizeOrigin(origin);
+    const { bareOrigin, base } = resolveStoreBase(origin, tenant);
+    this.origin = bareOrigin;
+    this.#apiPrefix = `${base.slice(bareOrigin.length)}${API_PREFIX}`;
     this.auth = auth;
     this.retry = retryPolicy(retry);
     this.fetch = fetchImpl;
@@ -106,9 +112,11 @@ export class ApiClient {
   url(path, query) {
     const refuse = () => new TypeError('path must be an absolute path under /api/apps/v1, e.g. /inventory; pass query separately');
     if (typeof path !== 'string' || !SAFE_PATH.test(path)) throw refuse();
-    const url = new URL(`${API_PREFIX}${path}`, this.origin);
+    if (this.#apiPrefix !== API_PREFIX && /%2f|%5c/i.test(path)) throw refuse();
+    const pathname = `${this.#apiPrefix}${path}`;
+    const url = new URL(pathname, this.origin);
     // Any normalization (a dot segment, an encoded dot) would move the call elsewhere.
-    if (url.origin !== this.origin || url.pathname !== `${API_PREFIX}${path}`) throw refuse();
+    if (url.origin !== this.origin || url.pathname !== pathname) throw refuse();
     appendQuery(url.searchParams, query);
     return url.toString();
   }
@@ -158,7 +166,7 @@ export class ApiClient {
         const res = await this.send(url, { method: verb, headers: { ...sendHeaders, authorization: `Bearer ${token}` }, body: payload, signal });
         const result = await this.read(res);
         if (res.ok) return { ...result, ...(key ? { idempotencyKey: key } : {}) };
-        error = this.refusal(res, result);
+        error = this.refusal(res, result, path);
       } catch (err) {
         if (!(err instanceof ConnectorError)) throw err;
         error = err;
@@ -204,10 +212,11 @@ export class ApiClient {
     return { status: res.status, body, headers: res.headers, requestId };
   }
 
-  refusal(res, { body, requestId }) {
+  refusal(res, { body, requestId }, path) {
     if (res.status >= 300 && res.status < 400) return new TransportError({ code: 'redirect_refused', status: res.status, requestId });
     const code = safeCode(body?.code ?? body?.error ?? (body === null ? `http_${res.status}` : undefined));
     const holds = Array.isArray(body?.holds) ? body.holds.map(safeCode) : undefined;
+    const isInventoryBatchRefusal = path?.startsWith('/inventory/') && (res.status === 400 || res.status === 422);
     return new ApiError({
       code,
       status: res.status,
@@ -215,6 +224,9 @@ export class ApiClient {
       retryable: RETRYABLE_STATUS.has(res.status),
       retryAfterMs: parseRetryAfter(res.headers.get('retry-after'), this.now()),
       holds,
+      field: body?.field,
+      index: isInventoryBatchRefusal ? body?.index : undefined,
+      reasons: res.status === 409 ? body?.reasons : undefined,
     });
   }
 
@@ -233,6 +245,9 @@ export class ApiClient {
    * @returns {AsyncGenerator<{ items: any[], nextCursor?: string, truncated: boolean, body: any, requestId?: string }>}
    */
   async *pages(path, { query, limit, updatedSince, cursor, itemsKey, maxPages = Infinity, signal } = {}) {
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 100)) {
+      throw new TypeError('limit must be an integer in 1..100');
+    }
     let next = cursor;
     const seen = new Set(cursor === undefined ? [] : [cursor]);
     for (let page = 0; page < maxPages; page++) {
