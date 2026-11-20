@@ -55,6 +55,8 @@ independent, versioned line assignments per `(appInstallId, locationId)` pair:
 
 ## Self-Serve Multi-Warehouse Preview Loop (`env="test"`)
 
+Set `TENANT` to the test store and `LOCATION_ID` to its preview fulfillment location.
+
 ```bash
 # 1. Inside a cloned store checkout, seed the preview catalog with multi-warehouse locations and stock:
 tot catalog seed --preset=multi-warehouse
@@ -62,14 +64,15 @@ tot preview
 
 # 2. Validate and install the multi-supplier routing connector in test mode:
 tot app dev validate ./tot-app.json
-tot app install --tenant <tenant> --env=test --app .
+tot app install --tenant "$TENANT" --env=test --app .
 
-# 3. Bind the test install, create a synthetic preview order, and release it:
-curl -sS -X POST "https://storefront.tokenoftrust.store/<tenant>/api/apps/admin/test-orders" \
-  -H "Authorization: Bearer ${TOT_ADMIN_TOKEN}" \
-  -H "X-Tot-Caller-Capability: preview-access" \
-  -H "Content-Type: application/json" \
-  -d '{"action":"bind","installId":"<installId>"}'
+# 3. Bind the test install to one supplier location, then create and release a synthetic order for it.
+# Set INSTALL_ID to the install ID printed by install.
+tot app test-order bind "$INSTALL_ID" --tenant "$TENANT" --url https://storefront.tokenoftrust.store --location "$LOCATION_ID"
+tot app test-order create --tenant "$TENANT" --url https://storefront.tokenoftrust.store --location "$LOCATION_ID"
+
+# Set ORDER_ID to the order ID printed by create.
+tot app test-order release "$ORDER_ID" --tenant "$TENANT" --url https://storefront.tokenoftrust.store
 ```
 
 ---

@@ -10,7 +10,7 @@
 // error, and a refusal carries only the OAuth `error` code.
 import { AuthError, TransportError, safeRequestId } from './errors.js';
 import { base64Encode, base64UrlEncode, utf8 } from './encoding.js';
-import { TOKEN_PATH, normalizeOrigin } from './metadata.js';
+import { TOKEN_PATH, resolveStoreBase } from './metadata.js';
 import { RETRYABLE_STATUS, backoffDelay, defaultSleep, parseRetryAfter, retryPolicy } from './retry.js';
 
 export const CLIENT_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
@@ -43,9 +43,9 @@ async function importSigningKey(privateKey) {
 }
 
 function jwsAlgFor(key) {
-  if (key.algorithm.name === 'RSASSA-PKCS1-v1_5') return 'RS256';
+  if (key.algorithm.name === 'RSASSA-PKCS1-v1_5' && key.algorithm.hash?.name === 'SHA-256') return 'RS256';
   if (key.algorithm.name === 'ECDSA' && key.algorithm.namedCurve === 'P-256') return 'ES256';
-  throw new TypeError('privateKey must be RSASSA-PKCS1-v1_5 (RS256) or ECDSA P-256 (ES256)');
+  throw new TypeError('privateKey must be RSASSA-PKCS1-v1_5 with SHA-256 (RS256) or ECDSA P-256 (ES256)');
 }
 
 export class ConnectorAuthClient {
@@ -59,6 +59,7 @@ export class ConnectorAuthClient {
   /**
    * @param {object} options
    * @param {string} options.origin The storefront origin, e.g. https://acme.tokenoftrust.store.
+   * @param {string} [options.tenant] Store slug on a shared host. Can also be supplied as a single path segment in origin.
    * @param {string} options.clientId The installation's client id.
    * @param {string} [options.clientSecret] For `client_secret_basic` (default) or `client_secret_post`.
    * @param {CryptoKey|object} [options.privateKey] For `private_key_jwt`: a private CryptoKey or private JWK (RSA or EC P-256).
@@ -75,6 +76,7 @@ export class ConnectorAuthClient {
    */
   constructor({
     origin,
+    tenant,
     clientId,
     clientSecret,
     privateKey,
@@ -102,8 +104,9 @@ export class ConnectorAuthClient {
     if (!Number.isInteger(assertionLifetimeSeconds) || assertionLifetimeSeconds < 1 || assertionLifetimeSeconds > MAX_ASSERTION_LIFETIME_SECONDS) {
       throw new TypeError(`assertionLifetimeSeconds must be an integer in 1..${MAX_ASSERTION_LIFETIME_SECONDS}`);
     }
-    this.origin = normalizeOrigin(origin);
-    this.tokenEndpoint = `${this.origin}${TOKEN_PATH}`;
+    const { bareOrigin, base } = resolveStoreBase(origin, tenant);
+    this.origin = bareOrigin;
+    this.tokenEndpoint = `${base}${TOKEN_PATH}`;
     this.clientId = clientId;
     this.method = resolved;
     this.refreshSkewMs = refreshSkewSeconds * 1000;

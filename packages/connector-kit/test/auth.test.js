@@ -97,6 +97,30 @@ test('private_key_jwt accepts a non-extractable CryptoKey with an explicit keyId
   assert.deepEqual(header, { alg: 'ES256', typ: 'JWT', kid: 'kid-x' });
 });
 
+test('private_key_jwt uses the exact tenant-scoped token URL as its audience', async () => {
+  const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign', 'verify']);
+  const expected = `${ORIGIN}/sample-store/api/apps/oauth/token`;
+  for (const options of [{ origin: ORIGIN, tenant: 'sample-store' }, { origin: `${ORIGIN}/sample-store/` }]) {
+    const endpoint = tokenEndpoint();
+    const auth = new ConnectorAuthClient({ ...options, clientId: 'cid', privateKey: pair.privateKey, fetch: endpoint.fetch });
+    await auth.getAccessToken();
+    const [request] = endpoint.requests;
+    const [, payload] = request.form.get('client_assertion').split('.');
+    assert.equal(decodeSegment(payload).aud, expected);
+    assert.equal(request.url, expected);
+  }
+});
+
+test('private_key_jwt refuses a SHA-384 RSA CryptoKey before sending a request', async () => {
+  const pair = await crypto.subtle.generateKey({
+    name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-384',
+  }, false, ['sign', 'verify']);
+  const endpoint = tokenEndpoint();
+  const auth = new ConnectorAuthClient({ origin: ORIGIN, clientId: 'cid', privateKey: pair.privateKey, fetch: endpoint.fetch });
+  await assert.rejects(auth.getAccessToken(), { name: 'TypeError', message: /SHA-256|RS256/ });
+  assert.equal(endpoint.requests.length, 0);
+});
+
 test('the token is cached and refreshed early, before it expires', async () => {
   const endpoint = tokenEndpoint();
   let clock = 0;
@@ -140,7 +164,15 @@ test('logging, inspecting or serializing either client never prints a token or a
   const privateJwk = { ...(await crypto.subtle.exportKey('jwk', pair.privateKey)), kid: 'k1' };
   const secret = 'client-secret-value-123';
   const token = 'live-bearer-token-xyz';
-  const fetch = async () => new Response(JSON.stringify({ access_token: token, token_type: 'Bearer', expires_in: 600, scope: '' }));
+  let apiRequests = 0;
+  const fetch = async (_url, { method, headers }) => {
+    if (method === 'GET') {
+      assert.equal(headers.authorization, `Bearer ${token}`);
+      apiRequests++;
+      return Response.json({ ok: true });
+    }
+    return Response.json({ access_token: token, token_type: 'Bearer', expires_in: 600, scope: '' });
+  };
   const secretClient = new ConnectorAuthClient({ origin: ORIGIN, clientId: 'cid', clientSecret: secret, fetch });
   const jwtClient = new ConnectorAuthClient({ origin: ORIGIN, clientId: 'cid', privateKey: privateJwk, fetch });
   const api = new ApiClient({ origin: ORIGIN, auth: secretClient, fetch });
@@ -152,13 +184,15 @@ test('logging, inspecting or serializing either client never prints a token or a
   assert.ok(!dump().includes(secret), 'no secret, even while a token request is in flight');
   assert.equal(await pending, token);
   await jwtClient.getAccessToken();
+  assert.deepEqual((await api.get('/app')).body, { ok: true });
+  assert.equal(apiRequests, 1);
   const after = dump();
   for (const leaked of [token, secret, privateJwk.d]) assert.ok(!after.includes(leaked), 'no token, secret or private key material');
   assert.equal(await secretClient.getAccessToken(), token, 'the cached token still works');
 });
 
 test('a refusal throws AuthError with the OAuth code and no remote text', async () => {
-  const endpoint = tokenEndpoint({ status: 401, body: { error: 'invalid_client', error_description: 'client cid secret mismatch' } });
+  const endpoint = tokenEndpoint({ status: 401, body: { error: 'invalid_client', error_description: 'fixture-description', message: 'fixture-message' } });
   const auth = new ConnectorAuthClient({ origin: ORIGIN, clientId: 'cid', clientSecret: 'hunter2', fetch: endpoint.fetch });
   const err = await auth.getAccessToken().catch((e) => e);
   assert.ok(err instanceof AuthError);
@@ -166,8 +200,9 @@ test('a refusal throws AuthError with the OAuth code and no remote text', async 
   assert.equal(err.status, 401);
   assert.equal(err.retryable, false);
   assert.equal(endpoint.requests.length, 1, 'a credential refusal is not retried');
+  assert.deepEqual(err.toJSON(), { kind: 'auth', code: 'invalid_client', status: 401, retryable: false });
   const logged = `${err.message} ${JSON.stringify(err)}`;
-  assert.ok(!logged.includes('mismatch') && !logged.includes('hunter2'));
+  assert.doesNotMatch(logged, /fixture-description|fixture-message|hunter2/);
 });
 
 test('temporarily_unavailable is retried with a bounded backoff', async () => {
@@ -189,7 +224,7 @@ test('misconfiguration is refused at construction', () => {
   assert.throws(() => new ConnectorAuthClient({ origin: ORIGIN, clientId: 'cid', clientSecret: 's', privateKey: {} }), /private_key_jwt takes no clientSecret/);
   assert.throws(() => new ConnectorAuthClient({ origin: ORIGIN, clientId: 'cid', clientSecret: 's', privateKey: {}, method: 'client_secret_post' }), /takes no privateKey/);
   assert.throws(() => new ConnectorAuthClient({ origin: ORIGIN, clientId: 'cid', method: 'private_key_jwt' }), /requires privateKey/);
-  assert.throws(() => new ConnectorAuthClient({ origin: `${ORIGIN}/api/apps/v1`, clientId: 'cid', clientSecret: 's' }), /no path/);
+  assert.throws(() => new ConnectorAuthClient({ origin: `${ORIGIN}/api/apps/v1`, clientId: 'cid', clientSecret: 's' }), TypeError);
   assert.throws(() => new ConnectorAuthClient({ origin: 'http://acme.example.com', clientId: 'cid', clientSecret: 's' }), /https/);
   assert.throws(() => new ConnectorAuthClient({ origin: ORIGIN, clientId: 'cid', clientSecret: 's', method: 'client_secret_jwt' }), /method must be/);
 });

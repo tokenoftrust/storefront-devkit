@@ -32,13 +32,15 @@ Recipes and the app scaffold vendor the kit the same way.
 import { ApiClient, AuthorizationMetadata, ConnectorAuthClient, WebhookReceiver } from './vendor/connector-kit/index.js';
 
 const origin = process.env.TOT_STOREFRONT_ORIGIN; // e.g. https://acme.tokenoftrust.store
+const tenant = process.env.TOT_TENANT; // store slug when using the shared host
 
 const auth = new ConnectorAuthClient({
   origin,
+  tenant,
   clientId: process.env.TOT_CLIENT_ID,
   clientSecret: process.env.TOT_CLIENT_SECRET, // client_secret_basic by default
 });
-const api = new ApiClient({ origin, auth });
+const api = new ApiClient({ origin, tenant, auth });
 
 // Writes: the kit adds an Idempotency-Key (or pass your own) and reuses it on every retry.
 await api.post('/inventory/movements', { sku: 'SKU-1', quantityDelta: -2 }, { idempotencyKey: 'inv-0001-abcdef' });
@@ -57,7 +59,7 @@ export default { fetch: (request) => receiver.handleRequest(request, async (even
 ## `ConnectorAuthClient`
 
 ```js
-new ConnectorAuthClient({ origin, clientId, clientSecret?, privateKey?, keyId?, method?, refreshSkewSeconds = 60,
+new ConnectorAuthClient({ origin, tenant?, clientId, clientSecret?, privateKey?, keyId?, method?, refreshSkewSeconds = 60,
   assertionLifetimeSeconds = 60, retry?, fetch?, now?, sleep?, random?, randomId? })
 ```
 
@@ -66,11 +68,14 @@ new ConnectorAuthClient({ origin, clientId, clientSecret?, privateKey?, keyId?, 
   used per request; mixing a secret and a key is refused at construction.
 - `client_secret_basic` form-urlencodes each half before Base64, per RFC 6749 section 2.3.1.
 - `private_key_jwt` signs an RFC 7523 assertion with `RS256` (RSA key) or `ES256` (EC P-256 key):
-  `iss` and `sub` are the client id, `aud` is the origin's token endpoint, `exp` is
+  `iss` and `sub` are the client id, `aud` is the exact token endpoint, `exp` is
   `assertionLifetimeSeconds` ahead (at most 300), and `jti` is fresh per request. `privateKey` is a
   private `CryptoKey` or a private JWK; `keyId` (or the JWK's `kid`) becomes the header `kid` and
   must match the public key registered for the client.
-- The token endpoint is always `<origin>/api/apps/oauth/token`.
+- For a shared host, pass the bare `origin` and a `tenant` slug to both clients, or supply a
+  single tenant segment in their `origin`. The token endpoint then includes that segment, for
+  example `https://storefront.tokenoftrust.store/acme/api/apps/oauth/token`.
+  Pass the bare origin to `AuthorizationMetadata` in either case.
 
 | Method | Purpose |
 |---|---|
@@ -125,11 +130,11 @@ A delivery is a notification, not an authorization: reconcile through the API be
 ## `ApiClient`
 
 ```js
-new ApiClient({ origin, auth, retry?, fetch?, sleep?, random?, now?, onRetry? })
+new ApiClient({ origin, tenant?, auth, retry?, fetch?, sleep?, random?, now?, onRetry? })
 ```
 
 `auth` is anything with `getAccessToken()` (and optionally `invalidate(token)`), usually a
-`ConnectorAuthClient`. Paths are relative to `/api/apps/v1`; pass `query` separately.
+`ConnectorAuthClient`. Paths are relative to `/api/apps/v1` on the selected store. Pass `query` separately.
 
 | Method | Purpose |
 |---|---|
@@ -161,8 +166,9 @@ Success resolves `{ status, body, headers, requestId, idempotencyKey? }`.
 ## Error model
 
 Every failure is a `ConnectorError` with `kind`, `code`, and when known `status`, `requestId`
-(`tot-request-id`), `retryable`, `retryAfterMs`, `holds` and, for a write, `idempotencyKey`. `message` is `kind:code (status)`;
-`toJSON()` returns only those fields, so an error is safe to log.
+(`tot-request-id`), `retryable`, `retryAfterMs`, `holds` and, for a write, `idempotencyKey`.
+`ApiError` can also carry a validated `field`, inventory batch `index`, or conflict `reasons`.
+`message` is `kind:code (status)`. `toJSON()` returns the structured fields and excludes remote prose.
 
 | Class | `kind` | `code` |
 |---|---|---|

@@ -2,8 +2,8 @@
 // contract (apps/private/contract). Vendor this directory; do not edit it in
 // place. Zero dependencies, ESM, Web Crypto and fetch only.
 
-export const KIT_VERSION = '1.0.0';
-export const CONTRACT_VERSION = 'private-apps@1.3';
+export const KIT_VERSION = '1.1.0';
+export const CONTRACT_VERSION = 'private-apps@1.4';
 
 export { ConnectorAuthClient, CLIENT_ASSERTION_TYPE, CLIENT_AUTH_METHODS, MAX_ASSERTION_LIFETIME_SECONDS } from './auth.js';
 export { WebhookReceiver, MemorySeenEventStore, WEBHOOK_REFUSALS, EVENT_TYPE_PREFIX, DEFAULT_MAX_BODY_BYTES, normalizeHeaders } from './webhook.js';

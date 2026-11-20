@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { getEventListeners } from 'node:events';
 import { ApiClient, ApiError, AuthError, deriveIdempotencyKey } from '../src/index.js';
 
 const ORIGIN = 'https://acme.example.com';
@@ -135,6 +136,36 @@ test('retries are bounded, with full-jitter exponential backoff under the cap', 
   assert.deepEqual(sleeps, [99, 199, 299]);
 });
 
+test('the retry timer removes its abort listener after each wait', async () => {
+  const { signal } = new AbortController();
+  const listener = () => {};
+  signal.addEventListener('abort', listener);
+  const retry = { status: 503, headers: { 'retry-after': '0' } };
+  const gw = gateway(retry, retry, { body: { ok: true } });
+  const api = new ApiClient({ origin: ORIGIN, auth: staticAuth(), fetch: gw.fetch });
+  assert.deepEqual((await api.get('/app', { signal })).body, { ok: true });
+  assert.equal(gw.requests.length, 3);
+  assert.deepEqual(getEventListeners(signal, 'abort'), [listener]);
+});
+
+test('aborting a retry wait removes its listener and prevents another request', async () => {
+  const controller = new AbortController();
+  const { signal } = controller;
+  const gw = gateway({ status: 503, headers: { 'retry-after': '1' } }, { body: { ok: true } });
+  let startedRetry;
+  const retrying = new Promise((resolve) => { startedRetry = resolve; });
+  const api = new ApiClient({ origin: ORIGIN, auth: staticAuth(), fetch: gw.fetch, onRetry: startedRetry });
+  const pending = api.get('/app', { signal });
+  await Promise.race([retrying, pending]);
+  assert.equal(getEventListeners(signal, 'abort').length, 1);
+  const reason = new Error('test abort');
+  const aborted = assert.rejects(pending, (err) => err === reason);
+  controller.abort(reason);
+  await aborted;
+  assert.deepEqual(getEventListeners(signal, 'abort'), []);
+  assert.equal(gw.requests.length, 1);
+});
+
 test('a network failure is retried; a non-retryable refusal is not', async () => {
   let calls = 0;
   const flaky = async () => {
@@ -191,6 +222,21 @@ test('pagination drains every page, carrying limit and updatedSince on each', as
   assert.deepEqual(handles, ['a', 'b', 'c', 'd']);
 });
 
+test('page limits must be integers from 1 through 100 before any fetch', async (t) => {
+  const gw = gateway({ body: { items: [] } });
+  const { api } = client(gw);
+  for (const limit of [-1, 0, 101, 1.5, '5', null, NaN, Infinity]) {
+    await t.test(String(limit), async () => {
+      const before = gw.requests.length;
+      await assert.rejects(api.pages('/inventory', { limit }).next(), { name: 'TypeError', message: /limit/ });
+      assert.equal(gw.requests.length, before);
+    });
+  }
+  const before = gw.requests.length;
+  for (const limit of [1, 100]) await api.collect('/inventory', { limit });
+  assert.deepEqual(gw.requests.slice(before).map(({ url }) => url.searchParams.get('limit')), ['1', '100']);
+});
+
 test('pagination reports truncation, resumes from a cursor, and refuses a stalled cursor', async () => {
   const truncated = gateway({ body: { orders: [{ id: 1 }], truncated: true } });
   assert.equal((await client(truncated).api.collect('/orders', { updatedSince: '2026-11-01T00:00:00Z' })).truncated, true);
@@ -226,12 +272,67 @@ test('the error model: body code, holds, request id; a shapeless code becomes un
   assert.equal((await client(empty).api.get('/app').catch((e) => e)).code, 'http_404');
 });
 
+test('inventory batch refusals expose only the documented field and index details', async () => {
+  const gw = gateway(
+    { status: 400, body: { code: 'malformed', field: 'items[0].quantityDelta', index: 0, message: 'fixture-message', error_description: 'fixture-description' } },
+    { status: 422, body: { code: 'unknown-location', field: 'Idempotency-Key', index: 249 } },
+    { status: 400, body: { code: 'malformed', field: 'invalid field <fixture>', index: -1, reasons: ['unavailable'] } },
+    { status: 422, body: { code: 'unknown-location', field: 'x'.repeat(129), index: '2' } },
+    { status: 422, body: { code: 'unknown-location', index: Number.MAX_SAFE_INTEGER + 1 } },
+  );
+  const { api } = client(gw);
+  const idempotencyKey = 'fixture-write';
+  const submit = () => api.post('/inventory/movements', { items: [{}] }, { idempotencyKey }).catch((err) => err);
+  const malformed = await submit();
+  assert.ok(malformed instanceof ApiError);
+  assert.equal(malformed.field, 'items[0].quantityDelta');
+  assert.equal(malformed.index, 0);
+  assert.deepEqual(malformed.toJSON(), {
+    kind: 'api', code: 'malformed', status: 400, retryable: false, field: 'items[0].quantityDelta', index: 0, idempotencyKey,
+  });
+  assert.doesNotMatch(`${malformed.message} ${JSON.stringify(malformed)}`, /fixture-message|fixture-description/);
+  const unknownLocation = await submit();
+  assert.equal(unknownLocation.field, 'Idempotency-Key');
+  assert.equal(unknownLocation.index, 249);
+  for (const invalid of [await submit(), await submit(), await submit()]) {
+    for (const detail of ['field', 'index', 'reasons']) assert.equal(Object.hasOwn(invalid.toJSON(), detail), false);
+  }
+});
+
+test('conflict refusals expose machine-readable reasons and omit misplaced batch indices', async () => {
+  const gw = gateway(
+    { status: 409, body: { code: 'conflict', reasons: ['version_conflict', 'Invalid reason text', null, 'label'], index: 2 } },
+    { status: 400, body: { code: 'malformed', index: 0 } },
+  );
+  const { api } = client(gw);
+  const err = await api.get('/inventory/levels').catch((e) => e);
+  assert.ok(err instanceof ApiError);
+  assert.deepEqual(err.reasons, ['version_conflict', 'label']);
+  assert.deepEqual(err.toJSON(), {
+    kind: 'api', code: 'conflict', status: 409, retryable: false, reasons: ['version_conflict', 'label'],
+  });
+  const other = await api.get('/app').catch((e) => e);
+  assert.equal(Object.hasOwn(other.toJSON(), 'index'), false);
+});
+
 test('redirects are refused and paths cannot leave /api/apps/v1', async () => {
   const redirect = gateway({ status: 302, headers: { location: 'https://elsewhere.example/' } });
   assert.equal((await client(redirect).api.get('/app').catch((e) => e)).code, 'redirect_refused');
   const { api } = client(gateway({ body: {} }));
   for (const bad of ['/../admin/install', '/%2e%2e/admin', 'inventory', '/inventory?x=1', 'https://elsewhere.example/x']) {
     await assert.rejects(api.get(bad), /path must be/, bad);
+  }
+});
+
+test('tenant API requests refuse encoded path separators before fetch', async (t) => {
+  const gw = gateway({ body: {} });
+  const { api } = client(gw, { tenant: 'sample-store' });
+  for (const path of ['/inventory/a%2Fb', '/inventory/a%5Cb']) {
+    await t.test(path, async () => {
+      const before = gw.requests.length;
+      await assert.rejects(api.get(path), /path must be/);
+      assert.equal(gw.requests.length, before);
+    });
   }
 });
 

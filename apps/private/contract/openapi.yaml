@@ -86,9 +86,9 @@ paths:
       operationId: getAppInstall
       summary: Read this install's metadata
       description: >
-        Returns the calling app's install record as resolved from the JWT: app id,
-        version, tenant, env, granted scopes, status, and declared widget placements.
-        Requires no additional scope beyond a valid token.
+        Returns the calling install's app id, version, install id, tenant, env, granted
+        scopes, status, and declared widget placements when present. Requires a valid
+        token with no additional scope.
       x-requiredScope: null
       parameters:
         - $ref: '#/components/parameters/Traceparent'
@@ -102,6 +102,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AppInstall' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /health:
     get:
@@ -1366,14 +1367,15 @@ paths:
         (403 `test_install_required`). A non-owner caller is limited to env `test`
         (403 `owner_required_for_production_app`). The request is an `action` union.
         `bind` binds the caller's own test install as the tenant's preview fulfillment
-        processor and, as part of that action, grants it preview recipient consent. `create`
+        processor for a location or the wildcard and grants it preview recipient consent. The install
+        must be active, have a webhook endpoint and hold `fulfillment:process`; otherwise 409
+        `install_not_processor` names each unmet condition in `reasons`. `create`
         writes one synthetic order to the preview partition of the commerce ledger with its
-        source authority and a sealed recipient built only from RFC-reserved values
-        (example.com mail domain, a 555-01xx number, a placeholder street), never real
-        contact data. `release` claims and releases one synthetic order to the bound
-        processor, which emits `fulfillment.assignment.created` to the install. Synthetic
-        orders appear only in the preview ledger, so `GET /orders` on a preview host returns
-        them and a publication host never does.
+        source authority, optional location and line items, and a sealed recipient built
+        from RFC-reserved contact values. `release` claims and releases one synthetic order to the bound
+        processor, which emits `fulfillment.assignment.created` to the install. `hold`
+        places a synthetic order on operator hold. `cancel` cancels a synthetic order and
+        its open assignment. `GET /orders` returns synthetic orders on preview hosts.
       parameters:
         - $ref: '#/components/parameters/CallerCapability'
       requestBody:
@@ -1383,7 +1385,7 @@ paths:
             schema: { $ref: '#/components/schemas/AdminTestOrderRequest' }
       responses:
         '200':
-          description: '`bind` or `release` completed.'
+          description: '`bind`, `release`, `hold`, or `cancel` completed.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AdminTestOrderResult' }
@@ -1524,10 +1526,12 @@ components:
         A refusal from `/admin/*`. 401 not signed in; 403 not authorized,
         `owner_required_for_production_app`, or on `test-orders` `tenant_mismatch` or
         `test_install_required`; 404 `not_found` (an install of another tenant is
-        indistinguishable from a missing one); 409 `already_installed` or `invalid_state`;
-        400 `invalid_caller_capability` or
-        otherwise; 503 `unavailable` or `vault_unavailable` on `test-orders`. Never echoes
-        internals.
+        indistinguishable from a missing one), or on `test-orders` `install_not_found` or
+        `order_not_found`; 409 `already_installed` or `invalid_state`, or on `test-orders`
+        `install_not_processor` with `reasons`;
+        400 `invalid_caller_capability` or an invalid request, including
+        `invalid_location_id`, `invalid_lines`, or `invalid_region` on `test-orders`;
+        503 `unavailable` or `vault_unavailable` on `test-orders`.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/AdminErrorBody' }
@@ -1613,7 +1617,7 @@ components:
     AppInstall:
       type: object
       additionalProperties: false
-      required: [appId, appVersion, tenant, env, scopes, status]
+      required: [appId, appVersion, installId, tenant, env, scopes, status]
       properties:
         appId: { type: string }
         appVersion: { type: string }
@@ -2342,13 +2346,18 @@ components:
             scope_denied, not_found, already_installed, invalid_state, invalid_webhook_endpoint,
             invalid_widget_placement, unknown_version, invalid_version_facets, invalid_manifest,
             owner_required_for_production_app, invalid_caller_capability,
-            tenant_mismatch, test_install_required, unavailable, vault_unavailable, invalid_json,
-            invalid_action, install_id_required, order_id_required, invalid_jwks or
-            candidate_pending.
+            tenant_mismatch, test_install_required, install_not_found, order_not_found,
+            install_not_processor, unavailable, vault_unavailable, invalid_json,
+            invalid_action, install_id_required, order_id_required, invalid_location_id,
+            invalid_lines, invalid_region, invalid_jwks or candidate_pending.
         denials:
           type: array
           items: { type: string }
           description: Present with `scope_denied`; the refused scopes.
+        reasons:
+          type: array
+          items: { type: string, enum: [install-inactive, webhook-endpoint-missing, processor-scope-missing] }
+          description: Present with `install_not_processor`; each condition the install must meet to process.
 
     AdminInstallRef:
       type: object
@@ -2628,17 +2637,21 @@ components:
         consentGranted: { type: boolean }
 
     AdminTestOrderRequest:
-      description: One of the `bind`, `create` or `release` actions.
+      description: One of the `bind`, `create`, `release`, `hold`, or `cancel` actions.
       oneOf:
         - $ref: '#/components/schemas/AdminTestOrderBind'
         - $ref: '#/components/schemas/AdminTestOrderCreate'
         - $ref: '#/components/schemas/AdminTestOrderRelease'
+        - $ref: '#/components/schemas/AdminTestOrderHold'
+        - $ref: '#/components/schemas/AdminTestOrderCancel'
       discriminator:
         propertyName: action
         mapping:
           bind: '#/components/schemas/AdminTestOrderBind'
           create: '#/components/schemas/AdminTestOrderCreate'
           release: '#/components/schemas/AdminTestOrderRelease'
+          hold: '#/components/schemas/AdminTestOrderHold'
+          cancel: '#/components/schemas/AdminTestOrderCancel'
 
     AdminTestOrderBind:
       type: object
@@ -2647,6 +2660,11 @@ components:
       properties:
         action: { type: string, const: bind }
         installId: { type: string, description: 'The caller''s own `test` install.' }
+        locationId:
+          type: string
+          pattern: '^(?:\*|[A-Za-z0-9._:-]{1,128})$'
+          default: '*'
+          description: Processor location. The wildcard is the fallback for orders without a matching location binding.
 
     AdminTestOrderCreate:
       type: object
@@ -2654,6 +2672,32 @@ components:
       required: [action]
       properties:
         action: { type: string, const: create }
+        locationId:
+          type: string
+          pattern: '^[A-Za-z0-9._:-]{1,128}$'
+          not: { const: unspecified }
+          description: Fulfillment location used to route the order to a preview processor.
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 20
+          default: [{ sku: synthetic-sku, quantity: 1 }]
+          description: The quantities of all lines sharing a trimmed SKU must sum to a safe integer.
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, quantity]
+            properties:
+              sku:
+                type: string
+                pattern: '^\s*\S(?:[\s\S]{0,254}\S)?\s*$'
+                description: SKU of 1 to 256 characters after trimming surrounding whitespace.
+              quantity: { type: integer, minimum: 1, maximum: 9007199254740991 }
+        region:
+          type: string
+          pattern: '^[A-Z]{2}$'
+          default: TX
+          description: Two uppercase letters for the synthetic shipping region.
 
     AdminTestOrderRelease:
       type: object
@@ -2663,10 +2707,26 @@ components:
         action: { type: string, const: release }
         orderId: { type: string, description: A synthetic preview order id from `create`. }
 
+    AdminTestOrderHold:
+      type: object
+      additionalProperties: false
+      required: [action, orderId]
+      properties:
+        action: { type: string, const: hold }
+        orderId: { type: string, description: A synthetic preview order id from `create`. }
+
+    AdminTestOrderCancel:
+      type: object
+      additionalProperties: false
+      required: [action, orderId]
+      properties:
+        action: { type: string, const: cancel }
+        orderId: { type: string, description: A synthetic preview order id from `create`. }
+
     AdminTestOrderResult:
       description: >
-        `bind` answers 200 `{processor}`; `create` answers 201 `{order}`; `release` answers
-        200 `{order}`.
+        `bind` returns `{processor}` with status 200. `create` returns `{order}` with
+        status 201. `release`, `hold`, and `cancel` return `{order}` with status 200.
       oneOf:
         - type: object
           additionalProperties: false
@@ -2675,9 +2735,10 @@ components:
             processor:
               type: object
               additionalProperties: false
-              required: [installId, notifiable, consentGranted]
+              required: [installId, locationId, notifiable, consentGranted]
               properties:
                 installId: { type: string }
+                locationId: { type: string, description: Effective processor location. }
                 notifiable: { type: boolean }
                 consentGranted: { type: boolean }
         - type: object
@@ -2686,12 +2747,25 @@ components:
           properties:
             order:
               type: object
-              required: [orderId]
+              additionalProperties: false
+              required: [orderId, stage]
               properties:
                 orderId: { type: string }
-                stage: { type: string, const: preview, description: Present on `create`. }
-                fulfillment: { type: string, description: Present on `release`. }
-                assignedInstallId: { type: [string, 'null'], description: Present on `release`. }
+                stage: { type: string, const: preview }
+        - type: object
+          additionalProperties: false
+          required: [order]
+          properties:
+            order:
+              type: object
+              additionalProperties: false
+              required: [orderId, fulfillment, assignedInstallId]
+              properties:
+                orderId: { type: string }
+                fulfillment: { type: string }
+                assignedInstallId:
+                  type: [string, 'null']
+                  description: Install on the active, held, or cancelled assignment for this action, when present.
 
     InventoryMovementReason:
       type: string

@@ -76,6 +76,8 @@ or persist recipient PII**.
 
 ## Self-Serve Regulated PACT Preview Verification (`env="test"`)
 
+Set `TENANT` to the test store and `LOCATION_ID` to its preview fulfillment location.
+
 ```bash
 # 1. Inside a cloned store checkout, seed the preview store with the regulated-vape preset (enables PACT Act & adultSignature):
 tot catalog seed --preset=regulated-vape
@@ -83,26 +85,15 @@ tot preview
 
 # 2. Validate and install the connector in test mode:
 tot app dev validate ./tot-app.json
-tot app install --tenant <tenant> --env=test --app .
+tot app install --tenant "$TENANT" --env=test --app .
 
-# 3. Bind as the preview processor, create a synthetic PACT order, and release it:
-curl -sS -X POST "https://storefront.tokenoftrust.store/<tenant>/api/apps/admin/test-orders" \
-  -H "Authorization: Bearer ${TOT_ADMIN_TOKEN}" \
-  -H "X-Tot-Caller-Capability: preview-access" \
-  -H "Content-Type: application/json" \
-  -d '{"action":"bind","installId":"<installId>"}'
+# 3. Bind the test install to the fulfillment location, then create and release a synthetic order.
+# Set INSTALL_ID to the install ID printed by install.
+tot app test-order bind "$INSTALL_ID" --tenant "$TENANT" --url https://storefront.tokenoftrust.store --location "$LOCATION_ID"
+tot app test-order create --tenant "$TENANT" --url https://storefront.tokenoftrust.store --location "$LOCATION_ID"
 
-curl -sS -X POST "https://storefront.tokenoftrust.store/<tenant>/api/apps/admin/test-orders" \
-  -H "Authorization: Bearer ${TOT_ADMIN_TOKEN}" \
-  -H "X-Tot-Caller-Capability: preview-access" \
-  -H "Content-Type: application/json" \
-  -d '{"action":"create"}'
-
-curl -sS -X POST "https://storefront.tokenoftrust.store/<tenant>/api/apps/admin/test-orders" \
-  -H "Authorization: Bearer ${TOT_ADMIN_TOKEN}" \
-  -H "X-Tot-Caller-Capability: preview-access" \
-  -H "Content-Type: application/json" \
-  -d '{"action":"release","orderId":"<orderId>"}'
+# Set ORDER_ID to the order ID printed by create.
+tot app test-order release "$ORDER_ID" --tenant "$TENANT" --url https://storefront.tokenoftrust.store
 ```
 
 ---

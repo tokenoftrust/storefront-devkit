@@ -18,6 +18,26 @@ guide and a machine-readable specification differ, the specification wins.
 5. Receive subscribed CloudEvents over HTTPS, verify the signature before parsing or acting on the
    event, and deduplicate on the CloudEvents `id`.
 
+## Authenticate with a private key
+
+For a key-bound installation, send an RFC 7523 `private_key_jwt` assertion to the tenant's token
+endpoint. POST `application/x-www-form-urlencoded` with `grant_type=client_credentials`,
+`client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer` and the signed JWT in
+`client_assertion`.
+
+- Set both `iss` and `sub` to the installation's OAuth client ID. If you send `client_id` in
+  the form, it must match `iss`.
+- Set `aud` to the exact tenant-scoped token endpoint URL you POST to, including the tenant
+  path segment when using a shared origin.
+- Set `exp` no more than 300 seconds ahead. Generate a unique, single-use `jti` for each
+  assertion, including on retries.
+- Sign with `RS256` or `ES256` using a registered key. Keep its private key on your connector.
+
+Stage a key-bound production candidate for Store Owner approval with `tot app candidate --app .`
+and either `--jwks ./public-jwks.json` or `--jwks-uri https://app.example.com/.well-known/jwks.json`.
+The gateway binds the client to those public keys when the Store Owner approves the candidate.
+You can also declare the key source in the manifest's `clientAuth`.
+
 ## Pull API
 
 The API base is `/api/apps/v1`; exact request and response shapes are in
@@ -192,7 +212,7 @@ matter to a webhook receiver:
 | Field | Meaning |
 |---|---|
 | `webhook_signing_keys` | A JWK Set (`{"keys": [...]}`) of the public keys that sign webhook deliveries. Each key is `kty: "RSA"`, `alg: "RS256"`, `use: "sig"`, identified by `kid`. Absent when the storefront has no webhook signing key configured. |
-| `token_endpoint` | Where to exchange installation credentials for a bearer token: `POST`, `application/x-www-form-urlencoded`, `grant_type=client_credentials` with `client_id` and `client_secret` in the form body (`client_secret_post`). The response carries `access_token`, `token_type`, `expires_in` and `scope`. |
+| `token_endpoint` | Where to exchange installation credentials for a bearer token with a form-encoded `POST` using `grant_type=client_credentials`. Use the install's authentication method. The response carries `access_token`, `token_type`, `expires_in` and `scope`. |
 
 `jwks_uri` in the same document publishes the keys of the bearer tokens the gateway issues. It is
 not the webhook key set; verify deliveries only against `webhook_signing_keys`.
