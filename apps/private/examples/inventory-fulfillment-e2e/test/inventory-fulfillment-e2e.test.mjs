@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   FIXTURE,
-  createHelloInventoryClient,
+  createInventoryApiClient,
   createInventoryMirror,
-  createSimulatedHelloGateway,
+  createSimulatedGateway,
   runLive,
   runSelfTest,
 } from '../index.mjs';
@@ -13,12 +13,12 @@ import {
 const BASE_URL = 'https://storefront.tokenoftrust.store';
 
 function simClient() {
-  const gateway = createSimulatedHelloGateway({ tenantId: 'acme' });
-  const client = createHelloInventoryClient({ baseUrl: BASE_URL, tenantId: 'acme', clientId: 'sim-client', clientSecret: 'sim-secret', fetchImpl: gateway });
+  const gateway = createSimulatedGateway({ tenantId: 'acme' });
+  const client = createInventoryApiClient({ baseUrl: BASE_URL, tenantId: 'acme', clientId: 'sim-client', clientSecret: 'sim-secret', fetchImpl: gateway });
   return { gateway, client };
 }
 
-test('hello-inventory manifest requests least-privilege starter scopes, including reports:read', () => {
+test('inventory-fulfillment-e2e manifest requests least-privilege starter scopes, including reports:read', () => {
   const manifest = JSON.parse(readFileSync(new URL('../tot-app.json', import.meta.url), 'utf8'));
   assert.equal(manifest.contractVersion, '1');
   assert.deepEqual(manifest.scopes, ['catalog:read', 'inventory:read', 'inventory:write', 'orders:read:minimal', 'reports:read']);
@@ -42,12 +42,12 @@ test('self-test: quarantine location, batch + replay, levels convergence, veloci
 
 test('the client routes token and API calls under the tenant path on the shared host', async () => {
   const seen = [];
-  const gateway = createSimulatedHelloGateway({ tenantId: 'giantvapes.com' });
+  const gateway = createSimulatedGateway({ tenantId: 'giantvapes.com' });
   const fetchImpl = (input, init) => {
     seen.push(new URL(input).pathname);
     return gateway(input, init);
   };
-  const client = createHelloInventoryClient({ baseUrl: BASE_URL, tenantId: 'giantvapes.com', clientId: 'c', clientSecret: 's', fetchImpl });
+  const client = createInventoryApiClient({ baseUrl: BASE_URL, tenantId: 'giantvapes.com', clientId: 'c', clientSecret: 's', fetchImpl });
   const res = await client.listLocations();
   assert.equal(res.status, 200);
   assert.deepEqual(seen, ['/giantvapes.com/api/apps/oauth/token', '/giantvapes.com/api/apps/v1/inventory/locations']);

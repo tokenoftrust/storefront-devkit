@@ -394,6 +394,22 @@ test('inventory sync: baseline levels, then reason-coded movement batches, then 
   assert.equal(h.fake.count('movements'), 1, 'the cursor survived the restart');
 });
 
+test('inventory sync: a WMS that restarts its numbering never gets an old receipt replayed for a new movement', async (t) => {
+  const fake = createFakeStorefront();
+  const first = await invHarness(t, { sf: fake });
+  await first.sync.sync('startup');
+  await first.move('SKU-A', 12, 'RECEIVE'); // WMS seq 1
+  await first.sync.sync('poll');
+  assert.equal(fake.count('movements'), 1);
+
+  await new Promise((r) => setTimeout(r, 5));
+  const second = await invHarness(t, { sf: fake }); // fresh WMS (seq starts at 1 again) and fresh state
+  await second.sync.sync('startup');
+  await second.move('SKU-A', 12, 'RECEIVE'); // same seq, same content, a different movement
+  await second.sync.sync('poll');
+  assert.equal(fake.count('movements'), 2, 'the second movement was applied, not answered with the first receipt');
+});
+
 test('inventory sync: a 422 names the refused item (index); the app drops it and sends the rest', async (t) => {
   const h = await invHarness(t, { sf: createFakeStorefront({ catalogSkus: ['SKU-A'] }), skus: ['SKU-A', 'SKU-GONE'] });
   await h.sync.sync('startup');

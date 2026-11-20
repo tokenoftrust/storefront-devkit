@@ -48,7 +48,7 @@ function refusalOf(err) {
  * (e.g. `giantvapes.com` on https://storefront.tokenoftrust.store); connector-kit routes
  * both the token request and every API call under it.
  */
-export function createHelloInventoryClient({ baseUrl, tenantId, clientId, clientSecret, fetchImpl = fetch, sleep }) {
+export function createInventoryApiClient({ baseUrl, tenantId, clientId, clientSecret, fetchImpl = fetch, sleep }) {
   const auth = new ConnectorAuthClient({
     origin: baseUrl,
     tenant: tenantId,
@@ -94,7 +94,7 @@ export function createHelloInventoryClient({ baseUrl, tenantId, clientId, client
         throw new RangeError(`POST /inventory/movements takes 1..${MAX_BATCH} items`);
       }
       const body = { items };
-      const key = idempotencyKey ?? (await deriveIdempotencyKey('hello-inv-mv', body));
+      const key = idempotencyKey ?? (await deriveIdempotencyKey('inv-e2e-mv', body));
       return { ...(await apiRequest('POST', '/inventory/movements', { body, idempotencyKey: key })), idempotencyKey: key };
     },
     /**
@@ -106,7 +106,7 @@ export function createHelloInventoryClient({ baseUrl, tenantId, clientId, client
         throw new RangeError(`PUT /inventory/levels takes 1..${MAX_BATCH} items`);
       }
       const body = { items };
-      const key = idempotencyKey ?? (await deriveIdempotencyKey('hello-inv-lv', body));
+      const key = idempotencyKey ?? (await deriveIdempotencyKey('inv-e2e-lv', body));
       return { ...(await apiRequest('PUT', '/inventory/levels', { body, idempotencyKey: key })), idempotencyKey: key };
     },
     /** The `sales-velocity` snapshot: soldUnits, unsoldUnits, velocityPerDay, daysOfCover per sku. */
@@ -149,7 +149,7 @@ export function createInventoryMirror() {
  * `createPreviewOrder()` stands in for `tot app test-order create`, `events` holds the
  * `inventory.changed` data each committed nonzero change emitted.
  */
-export function createSimulatedHelloGateway({ signingJwk, tenantId = 'acme' } = {}) {
+export function createSimulatedGateway({ signingJwk, tenantId = 'acme' } = {}) {
   const catalog = new Set([FIXTURE.catalogSku, FIXTURE.secondSku]);
   const locations = new Map([
     ['unspecified', { locationId: 'unspecified', name: 'Default Location', kind: 'warehouse', isFulfillable: true, status: 'active', updatedAt: '2026-11-13T12:00:00.000Z' }],
@@ -355,7 +355,7 @@ export function createSimulatedHelloGateway({ signingJwk, tenantId = 'acme' } = 
 }
 
 /** Wrap inventory.changed data in the CloudEvents envelope the gateway sends. */
-export function inventoryChangedEvent(data, { id, tenantId = 'acme', installId = 'inst_sim_hello_inventory' }) {
+export function inventoryChangedEvent(data, { id, tenantId = 'acme', installId = 'inst_sim_inventory_e2e' }) {
   return {
     specversion: '1.0',
     id,
@@ -377,8 +377,8 @@ export async function runSelfTest() {
   // The gateway signs real deliveries; offline, a test-only signer stands in for it.
   const { createTestWebhookSigner } = await import('./test/webhook-signer.mjs');
   const signer = createTestWebhookSigner({ endpoint: FIXTURE.webhookEndpoint });
-  const gateway = createSimulatedHelloGateway({ signingJwk: signer.jwk, tenantId });
-  const client = createHelloInventoryClient({ baseUrl, tenantId, clientId: 'sim-client', clientSecret: 'sim-secret', fetchImpl: gateway });
+  const gateway = createSimulatedGateway({ signingJwk: signer.jwk, tenantId });
+  const client = createInventoryApiClient({ baseUrl, tenantId, clientId: 'sim-client', clientSecret: 'sim-secret', fetchImpl: gateway });
   const loc = FIXTURE.location.locationId;
 
   // 1. Quarantine location: writable, auditable, never in shopper availability.
@@ -464,11 +464,11 @@ export async function runLive({ cleanup = false, env = process.env, log = (o) =>
   const baseUrl = env.TOT_STOREFRONT_ORIGIN || DEFAULT_ORIGIN;
   const missing = ['TOT_TENANT', 'TOT_CLIENT_ID', 'TOT_CLIENT_SECRET'].filter((k) => !env[k]);
   if (missing.length) throw new Error(`--live needs ${missing.join(', ')}`);
-  const client = createHelloInventoryClient({ baseUrl, tenantId: env.TOT_TENANT, clientId: env.TOT_CLIENT_ID, clientSecret: env.TOT_CLIENT_SECRET });
+  const client = createInventoryApiClient({ baseUrl, tenantId: env.TOT_TENANT, clientId: env.TOT_CLIENT_ID, clientSecret: env.TOT_CLIENT_SECRET });
   const loc = env.TOT_LOCATION_ID || FIXTURE.location.locationId;
   const runId = new Date().toISOString();
   const step = (name, res, extra = {}) => {
-    log({ event: `hello-inventory:live:${name}`, status: res.status, ok: res.ok, ...(res.ok ? {} : { refusal: res.body }), ...(res.requestId ? { requestId: res.requestId } : {}), ...extra });
+    log({ event: `inventory-fulfillment-e2e:live:${name}`, status: res.status, ok: res.ok, ...(res.ok ? {} : { refusal: res.body }), ...(res.requestId ? { requestId: res.requestId } : {}), ...extra });
     return res;
   };
   const must = (res) => {
@@ -492,25 +492,25 @@ export async function runLive({ cleanup = false, env = process.env, log = (o) =>
     { sku, locationId: loc, quantityDelta: -1, reason: 'cycle_count' },
     { sku, locationId: loc, quantityDelta: 1, reason: 'adjustment' },
   ];
-  const batch = must(step('movements', await client.postMovements(items, await deriveIdempotencyKey('hello-inv-mv', runId, { items })), {}));
+  const batch = must(step('movements', await client.postMovements(items, await deriveIdempotencyKey('inv-e2e-mv', runId, { items })), {}));
   const balance = batch.body.items.at(-1).balance;
-  log({ event: 'hello-inventory:live:movements:receipt', receiptId: batch.body.receiptId, sku, balance });
+  log({ event: 'inventory-fulfillment-e2e:live:movements:receipt', receiptId: batch.body.receiptId, sku, balance });
 
   const first = must(step('levels:first', await client.putLevels([{ sku, locationId: loc, onHand: Math.max(0, balance - 1), observedAt: new Date().toISOString() }])));
   const second = must(step('levels:repeat', await client.putLevels([{ sku, locationId: loc, onHand: Math.max(0, balance - 1), observedAt: new Date(Date.now() + 1000).toISOString() }])));
-  log({ event: 'hello-inventory:live:levels:drift', first: first.body.items[0].quantityDelta, repeat: second.body.items[0].quantityDelta });
+  log({ event: 'inventory-fulfillment-e2e:live:levels:drift', first: first.body.items[0].quantityDelta, repeat: second.body.items[0].quantityDelta });
 
   const inv = step('inventory', await client.getInventory({ sku, locationId: loc }));
   // mirror: this location's ledger; available/quantity/policy: store-wide availability (quarantine stock never adds to it).
   if (inv.ok) {
     const item = inv.body.items?.[0];
-    log({ event: 'hello-inventory:live:inventory:item', sku, mirrorBalance: item?.mirror?.balance, available: item?.available, quantity: item?.quantity, policy: item?.policy });
+    log({ event: 'inventory-fulfillment-e2e:live:inventory:item', sku, mirrorBalance: item?.mirror?.balance, available: item?.available, quantity: item?.quantity, policy: item?.policy });
   }
 
   const reports = step('reports', await client.getReports({ windowDays: 30 }));
   if (reports.ok) {
     const row = reports.body.reports?.find((r) => r.id === 'sales-velocity')?.skus?.find((s) => s.sku === sku);
-    log({ event: 'hello-inventory:live:reports:row', sku, row: row ?? null });
+    log({ event: 'inventory-fulfillment-e2e:live:reports:row', sku, row: row ?? null });
   }
   step('orders', await client.listOrders());
 
@@ -525,9 +525,9 @@ const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(pro
 if (invokedDirectly) {
   if (process.argv.includes('--live')) {
     const summary = await runLive({ cleanup: process.argv.includes('--cleanup') });
-    console.log(JSON.stringify({ event: 'hello-inventory:live:done', ...summary }));
+    console.log(JSON.stringify({ event: 'inventory-fulfillment-e2e:live:done', ...summary }));
   } else {
     const summary = await runSelfTest();
-    console.log(JSON.stringify({ event: 'hello-inventory:self-test:passed', ...summary }));
+    console.log(JSON.stringify({ event: 'inventory-fulfillment-e2e:self-test:passed', ...summary }));
   }
 }

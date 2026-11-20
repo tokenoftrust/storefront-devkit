@@ -22,7 +22,7 @@ examples, concise webhook/API guidance, extensible cloud/runtime hosting guides
 ([`hosting/`](./private/hosting/README.md) and [`hosting/index.json`](./private/hosting/index.json)
 covering Cloudflare Workers, AWS Lambda, Google Cloud Run, Microsoft Azure Functions/Container Apps,
 and Docker), and runnable reference implementations:
-[`examples/hello-inventory/`](./private/examples/hello-inventory/),
+[`examples/inventory-fulfillment-e2e/`](./private/examples/inventory-fulfillment-e2e/),
 [`recipes/inventory-sync-wms/`](./private/recipes/inventory-sync-wms/),
 [`recipes/fulfillment-label-station/`](./private/recipes/fulfillment-label-station/),
 [`recipes/dropship-multi-supplier/`](./private/recipes/dropship-multi-supplier/), and

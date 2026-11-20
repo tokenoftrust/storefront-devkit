@@ -52,7 +52,7 @@ Storefront tenant rather than customizing its tenant-owned files.
   [`apps/`](./apps/) and then read the canonical [`apps/private/`](./apps/private/) contract,
   multi-tenant & cloud hosting fast-paths ([`apps/private/hosting/`](./apps/private/hosting/README.md)
   for Cloudflare Workers, AWS Lambda, Google Cloud Run, Microsoft Azure Functions, and Docker),
-  starter example ([`apps/private/examples/hello-inventory/`](./apps/private/examples/hello-inventory/)),
+  an end-to-end test of the inventory and fulfillment APIs ([`apps/private/examples/inventory-fulfillment-e2e/`](./apps/private/examples/inventory-fulfillment-e2e/)),
   and connector recipes ([`apps/private/recipes/inventory-sync-wms/`](./apps/private/recipes/inventory-sync-wms/),
   [`apps/private/recipes/fulfillment-label-station/`](./apps/private/recipes/fulfillment-label-station/),
   [`apps/private/recipes/dropship-multi-supplier/`](./apps/private/recipes/dropship-multi-supplier/)).

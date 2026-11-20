@@ -304,8 +304,9 @@ or change to payment, tax, price or checkout.
 
 ### Runnable recipes and starter examples
 
-- [`examples/hello-inventory/`](./examples/hello-inventory/) — Starter app: location upsert, stock
-  read/write, and synthetic preview orders (`POST /api/apps/admin/test-orders`).
+- [`examples/inventory-fulfillment-e2e/`](./examples/inventory-fulfillment-e2e/) — End-to-end test of the inventory and
+  fulfillment APIs: locations, movement batches, level reconciliation, reports, signed webhooks, and
+  (`npm run e2e`) synthetic preview orders through split shipments, hold and cancel.
 - [`recipes/inventory-sync-wms/`](./recipes/inventory-sync-wms/) — Multi-location WMS sync:
   `PUT /inventory/levels` CAS reconciliation, batch WMS movements, and
   `inventory.changed` threshold transitions.

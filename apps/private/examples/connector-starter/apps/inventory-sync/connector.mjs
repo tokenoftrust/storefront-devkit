@@ -33,13 +33,18 @@ export function createInventorySync({ tot, provider, store, locationId, fulfilla
     return r.ok;
   }
 
-  /** One atomic batch. A 422 names the refused item (`index`): log it, drop it, send the rest once. */
-  async function postBatch(items, keyParts) {
+  /**
+   * One atomic batch. A 422 names the refused item (`index`): log it, drop it, send the rest once.
+   * `movementIds` are the WMS's own identities for these movements (sequence + time recorded). The
+   * Idempotency-Key covers them and the exact items, so a retry of the same batch replays its receipt,
+   * while a different movement can never reuse an old key, even when a WMS restarts its numbering.
+   */
+  async function postBatch(items, movementIds) {
     let batch = items;
     for (let attempt = 1; attempt <= 2 && batch.length; attempt++) {
       const r = await tot.call('POST', '/inventory/movements', {
         body: { items: batch },
-        idempotencyKey: await deriveIdempotencyKey('sv-mv', locationId, ...keyParts, attempt),
+        idempotencyKey: await deriveIdempotencyKey('sv-mv', locationId, movementIds, batch),
       });
       log('storefront.movements', { http: r.status, code: r.body?.code, index: r.body?.index, field: r.body?.field, count: batch.length, receiptId: r.body?.receiptId, requestId: r.requestId });
       if (r.ok) return true;
@@ -77,8 +82,9 @@ export function createInventorySync({ tot, provider, store, locationId, fulfilla
       const items = inSnapshot.map((m) => ({ sku: m.sku, locationId, quantityDelta: m.quantityDelta, reason: REASONS[m.reason] ?? 'adjustment' }));
       for (let i = 0; i < items.length; i += MAX_BATCH) {
         const chunk = items.slice(i, i + MAX_BATCH);
-        const seqs = inSnapshot.slice(i, i + MAX_BATCH).map((m) => m.seq);
-        if (!(await postBatch(chunk, [seqs[0], seqs.at(-1)]))) return; // cursor not advanced: retried next tick
+        const moves = inSnapshot.slice(i, i + MAX_BATCH);
+        const seqs = moves.map((m) => m.seq);
+        if (!(await postBatch(chunk, moves.map((m) => `${m.seq}@${m.at}`)))) return; // cursor not advanced: retried next tick
         await store.set('wms:cursor', seqs.at(-1));
       }
     }
