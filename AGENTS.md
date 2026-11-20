@@ -21,7 +21,7 @@ publish.
    cloud/runtime-specific deployment instructions such as Cloudflare Workers, AWS Lambda, Google
    Cloud Run, Microsoft Azure Functions, or Docker containers), and runnable reference
    examples/recipes
-   ([`apps/private/examples/hello-inventory/`](./apps/private/examples/hello-inventory/),
+   ([`apps/private/examples/inventory-fulfillment-e2e/`](./apps/private/examples/inventory-fulfillment-e2e/),
    [`apps/private/recipes/inventory-sync-wms/`](./apps/private/recipes/inventory-sync-wms/),
    [`apps/private/recipes/fulfillment-label-station/`](./apps/private/recipes/fulfillment-label-station/),
    [`apps/private/recipes/dropship-multi-supplier/`](./apps/private/recipes/dropship-multi-supplier/),

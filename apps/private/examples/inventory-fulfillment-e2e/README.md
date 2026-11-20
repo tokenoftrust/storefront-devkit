@@ -1,4 +1,4 @@
-# Hello Inventory — Starter Private App
+# Inventory & Fulfillment API E2E — Starter Private App
 
 A minimal, dependency-free starter reference app for **Storefront Private Apps 1.4**
 (`apps/private/contract/openapi.yaml` 1.4.0, connector-kit 1.1.0). Copy it when you build an
@@ -110,7 +110,7 @@ archives the location. Always use `--cleanup` on a shared store preview.
   simulator, `--self-test` and `--live`.
 - [`fixtures/sample-workflow.json`](./fixtures/sample-workflow.json) — quarantine location, SKUs,
   opening balances, the four-reason batch and the levels observation.
-- [`test/hello-inventory.test.mjs`](./test/hello-inventory.test.mjs) — `node:test` suite.
+- [`test/inventory-fulfillment-e2e.test.mjs`](./test/inventory-fulfillment-e2e.test.mjs) — `node:test` suite.
 - [`test/webhook-signer.mjs`](./test/webhook-signer.mjs) — test-only signer standing in for the
   gateway; a production app only verifies.
 - [`meta.json`](./meta.json) — Devkit asset metadata for `manifest.json`.

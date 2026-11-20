@@ -1,5 +1,5 @@
 {
-  "name": "storefront-private-app-hello-inventory",
+  "name": "storefront-private-app-inventory-fulfillment-e2e",
   "private": true,
   "type": "module",
   "description": "Starter reference app for Storefront Private Apps 1.4: quarantine locations, batch movements, level reconciliation, reports, signed webhooks, synthetic preview orders.",
