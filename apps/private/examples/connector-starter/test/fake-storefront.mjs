@@ -1,10 +1,11 @@
 // Test double for core/tot.mjs `tot.call` (Storefront /api/apps/v1), shaped after contract 1.4.0.
 // Records every write so tests can count side effects. Offline; no credentials.
-export function createFakeStorefront({ assignments = [], catalogSkus = null, failNext = {} } = {}) {
+// `ended`: assignment ids Storefront has cancelled or released; shipment posts for them answer 409 assignment-ended.
+export function createFakeStorefront({ assignments = [], catalogSkus = null, failNext = {}, ended = new Set() } = {}) {
   const writes = [];
   const replays = new Map(); // idempotency key -> response
   const balances = new Map();
-  const state = { assignments, writes, balances, failNext };
+  const state = { assignments, writes, balances, failNext, ended };
   const ok = (status, body) => ({ ok: true, status, body, requestId: `req_fake_${writes.length}` });
   const refuse = (status, body) => ({ ok: false, status, body, requestId: `req_fake_${writes.length}` });
   const bal = (sku, loc) => balances.get(`${sku}|${loc}`) ?? 0;
@@ -44,6 +45,7 @@ export function createFakeStorefront({ assignments = [], catalogSkus = null, fai
     }
     const sh = /^\/fulfillment\/assignments\/([^/]+)\/(shipments|exceptions)$/.exec(path);
     if (method === 'POST' && sh) {
+      if (ended.has(decodeURIComponent(sh[1]))) return refuse(409, { code: 'assignment-ended' });
       writes.push({ kind: sh[2], path, body, idempotencyKey });
       if (sh[2] === 'shipments' && body.carrier === 'USPS') return refuse(409, { code: 'carrier-prohibited' });
       return remember(ok(201, { complete: false }));

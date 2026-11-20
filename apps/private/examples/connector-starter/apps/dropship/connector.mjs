@@ -77,8 +77,9 @@ export function createDropship({ tot, provider, store, log = defaultLog }) {
     if (r.ok) await markReported(assignmentId, w, reportKey);
   }
 
+  /** Reports new supplier shipments and backorders. Returns the purchase order, or null when nothing was read. */
   async function syncPurchaseOrder(assignmentId, w) {
-    if (!w.poId || w.state !== 'active') return;
+    if (!w.poId || w.state !== 'active') return null;
     const po = await provider('GET', `/purchase_orders/${w.poId}`);
     for (const s of po.shipments) {
       const reportKey = `ship-${s.id}`;
@@ -99,7 +100,13 @@ export function createDropship({ tot, provider, store, log = defaultLog }) {
       });
       log('storefront.shipment', { orderId: w.orderId, supplierShipment: s.id, carrier: s.carrier, status: r.status, code: r.body?.code, holds: r.body?.holds, complete: r.body?.complete, requestId: r.requestId });
       if (r.ok) await markReported(assignmentId, w, reportKey);
-      else if (r.body?.code === 'carrier-prohibited' || r.body?.code === 'adult-signature') {
+      else if (r.body?.code === 'assignment-ended') {
+        // Cancelled, released or superseded in Storefront: nothing more can be reported for it.
+        w.ended = true;
+        await store.set(key(assignmentId), w);
+        log('assignment.ended', { assignmentId, orderId: w.orderId, poId: w.poId });
+        return po;
+      } else if (r.body?.code === 'carrier-prohibited' || r.body?.code === 'adult-signature') {
         // Storefront refused the supplier's shipment (compliance). Tell the merchant; don't retry forever.
         await reportException(assignmentId, w, reportKey, 'carrier_refused', body.lines, `supplier shipped with ${s.carrier}; Storefront refused: ${r.body.code}`);
       }
@@ -108,6 +115,14 @@ export function createDropship({ tot, provider, store, log = defaultLog }) {
       const reportKey = `bo-${b.sku}`;
       if (!w.reported.includes(reportKey)) await reportException(assignmentId, w, reportKey, 'backordered', [{ sku: b.sku, quantity: b.quantity }], 'supplier backorder');
     }
+    return po;
+  }
+
+  /** The supplier side is done: every ordered unit shipped and reported, or the purchase order is cancelled. */
+  function supplierDone(po, w) {
+    if (po.status === 'cancelled') return true;
+    const shipped = (sku) => po.shipments.flatMap((s) => s.items).filter((i) => i.sku === sku).reduce((n, i) => n + i.quantity, 0);
+    return po.items.every((i) => shipped(i.sku) >= i.quantity) && po.shipments.every((s) => w.reported.includes(`ship-${s.id}`));
   }
 
   /** fulfillment.assignment.updated: hold, resume or cancel the purchase order. Older eventVersions are ignored. */
@@ -138,9 +153,12 @@ export function createDropship({ tot, provider, store, log = defaultLog }) {
       const active = new Set(r.body.assignments.map((a) => a.assignmentId));
       for (const [k, w] of await store.entries('assign:')) {
         const assignmentId = k.slice('assign:'.length);
-        await syncPurchaseOrder(assignmentId, w);
-        // Closed (fully shipped, cancelled or released): forget it. A held assignment is absent from the read but kept.
-        if (!active.has(assignmentId) && w.poId && w.state !== 'held') await store.delete(k);
+        const po = await syncPurchaseOrder(assignmentId, w);
+        if (active.has(assignmentId) || !w.poId) continue;
+        // Absent from the read: fully shipped, held, cancelled or released. The held or cancelled
+        // webhook can arrive after this poll, so absence alone never closes a record: forget it only
+        // once Storefront said it is cancelled or ended, or the supplier finished and every carton is reported.
+        if (w.state === 'cancelled' || w.ended || (po && supplierDone(po, w))) await store.delete(k);
       }
     })()
       .catch((e) => logError('reconcile.error', e))
