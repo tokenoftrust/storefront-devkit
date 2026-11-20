@@ -330,6 +330,37 @@ test('dropship: held stops reporting and holds the PO, active resumes it, cancel
   assert.equal(c.fake.count('shipments'), 0);
 });
 
+test('dropship: a poll that runs before the held webhook keeps the record, so the late webhook still holds the PO', async (t) => {
+  const h = await dropshipHarness(t);
+  await h.dropship.startAssignment(assignment());
+  const { poId } = await h.store.get('assign:asg_1');
+  h.fake.assignments.length = 0; // held in Storefront: absent from the read, webhook not delivered yet
+  await h.dropship.reconcile('poll');
+  assert.ok(await h.store.get('assign:asg_1'), 'absence alone does not close the record');
+  await h.dropship.onAssignmentUpdated({ assignmentId: 'asg_1', orderId: 'ord_1', stage: 'preview', state: 'held', eventVersion: 5, occurredAt: 'x' });
+  assert.equal(h.mock.purchaseOrders.get(poId).status, 'on_hold');
+});
+
+test('dropship: a record is forgotten once every carton is reported, or when Storefront answers assignment-ended', async (t) => {
+  const h = await dropshipHarness(t);
+  await h.dropship.startAssignment(assignment());
+  h.mock.supplierActs((await h.store.get('assign:asg_1')).poId);
+  await h.dropship.reconcile('poll'); // still listed: both cartons reported, record kept
+  assert.equal(h.fake.count('shipments'), 2);
+  assert.ok(await h.store.get('assign:asg_1'));
+  h.fake.assignments.length = 0; // fully shipped: no longer listed
+  await h.dropship.reconcile('poll');
+  assert.equal(await h.store.get('assign:asg_1'), undefined);
+
+  const e = await dropshipHarness(t, { sf: createFakeStorefront({ assignments: [assignment()], ended: new Set(['asg_1']) }) });
+  await e.dropship.startAssignment(assignment());
+  e.mock.supplierActs((await e.store.get('assign:asg_1')).poId);
+  e.fake.assignments.length = 0; // released to another processor
+  await e.dropship.reconcile('poll');
+  assert.equal(e.fake.count('shipments'), 0);
+  assert.equal(await e.store.get('assign:asg_1'), undefined, 'assignment-ended closes the record');
+});
+
 // ---------- inventory sync ----------
 
 async function invHarness(t, { storePath, sf, server, skus = ['SKU-A', 'SKU-B'] } = {}) {

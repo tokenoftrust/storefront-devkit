@@ -501,7 +501,11 @@ export async function runLive({ cleanup = false, env = process.env, log = (o) =>
   log({ event: 'hello-inventory:live:levels:drift', first: first.body.items[0].quantityDelta, repeat: second.body.items[0].quantityDelta });
 
   const inv = step('inventory', await client.getInventory({ sku, locationId: loc }));
-  if (inv.ok) log({ event: 'hello-inventory:live:inventory:item', sku, mirrorBalance: inv.body.items?.[0]?.mirror?.balance, available: inv.body.items?.[0]?.available });
+  // mirror: this location's ledger; available/quantity/policy: store-wide availability (quarantine stock never adds to it).
+  if (inv.ok) {
+    const item = inv.body.items?.[0];
+    log({ event: 'hello-inventory:live:inventory:item', sku, mirrorBalance: item?.mirror?.balance, available: item?.available, quantity: item?.quantity, policy: item?.policy });
+  }
 
   const reports = step('reports', await client.getReports({ windowDays: 30 }));
   if (reports.ok) {

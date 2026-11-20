@@ -34,8 +34,11 @@ batches, reconciles absolute on-hand levels, reads the sales-velocity report, ve
    The first observation writes the drift as a `reconcile` movement (`quantityDelta` ≠ 0); the next
    observation of the same count writes `quantityDelta: 0`. A new observation needs a new
    `observedAt`: the same body under the same key is a replay of the first receipt.
-4. **Availability read** — `GET /inventory?sku=...&locationId=...`: the `mirror.balance` keeps the
-   quarantined count while `available` stays `false`.
+4. **Availability read** — `GET /inventory?sku=...&locationId=...`: `mirror.balance` is that
+   location's ledger reading and keeps the quarantined count. `available`, `quantity` and `policy` are
+   the SKU's store-wide shopper availability, which quarantined stock never adds to. In `--self-test`
+   the SKU has no other stock, so `available` is `false`; on a real store it can be `true` from stock
+   held at fulfillable locations.
 5. **Synthetic preview order** — created with `tot app test-order create`, read back with `GET /orders`.
 6. **EOM velocity snapshot** — `GET /reports?windowDays=30`: per SKU `soldUnits`, `unsoldUnits`,
    `velocityPerDay`, `daysOfCover` (`null` when nothing sold).
