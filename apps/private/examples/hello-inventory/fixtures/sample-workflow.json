@@ -1,37 +1,31 @@
 {
   "location": {
     "locationId": "loc-main-warehouse",
-    "name": "Main Warehouse (Austin)",
+    "name": "Main Warehouse (Austin) - preview test",
     "kind": "warehouse",
-    "isFulfillable": true,
+    "isFulfillable": false,
     "status": "active"
   },
   "catalogSku": "GEN-TEE-BLK-M",
-  "initialInventory": {
+  "secondSku": "GEN-TEE-WHT-L",
+  "openingBalances": {
+    "GEN-TEE-BLK-M": 20,
+    "GEN-TEE-WHT-L": 8
+  },
+  "movementBatch": {
     "items": [
-      {
-        "sku": "GEN-TEE-BLK-M",
-        "available": true,
-        "quantity": 20,
-        "policy": "deny",
-        "mirror": {
-          "locationId": "loc-main-warehouse",
-          "balance": 20,
-          "asOf": "2026-11-13T12:00:00.000Z"
-        }
-      }
-    ],
-    "pageSize": 50,
-    "total": 1,
-    "nextCursor": null
+      { "sku": "GEN-TEE-BLK-M", "locationId": "loc-main-warehouse", "quantityDelta": 12, "reason": "received" },
+      { "sku": "GEN-TEE-BLK-M", "locationId": "loc-main-warehouse", "quantityDelta": -2, "reason": "damaged" },
+      { "sku": "GEN-TEE-WHT-L", "locationId": "loc-main-warehouse", "quantityDelta": -1, "reason": "cycle_count" },
+      { "sku": "GEN-TEE-WHT-L", "locationId": "loc-main-warehouse", "quantityDelta": 3, "reason": "adjustment" }
+    ]
   },
-  "movementWrite": {
-    "sku": "GEN-TEE-BLK-M",
-    "locationId": "loc-main-warehouse",
-    "quantityDelta": 5,
-    "reason": "adjustment"
+  "levelsObservation": {
+    "items": [
+      { "sku": "GEN-TEE-BLK-M", "locationId": "loc-main-warehouse", "onHand": 27 },
+      { "sku": "GEN-TEE-WHT-L", "locationId": "loc-main-warehouse", "onHand": 10 }
+    ]
   },
-  "testOrderCreate": {
-    "action": "create"
-  }
+  "reportWindowDays": 30,
+  "webhookEndpoint": "https://inventory.merchant.example.com/webhooks/tot"
 }

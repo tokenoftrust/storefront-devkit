@@ -6,9 +6,9 @@ that gets in your way.
 
 | App | Archetype | Example systems | What it does today (against the mock) |
 |---|---|---|---|
-| `apps/label-station` | Label station | ShipStation | Gets a fulfillment assignment, creates the order and label, reports the label and the carrier handoff. |
-| `apps/dropship` | Multi-supplier dropship | Duoplane | Sends the assignment to a supplier as a purchase order, reports each supplier shipment, or raises an exception (backorder, refused carrier). |
-| `apps/inventory-sync` | Inventory / WMS sync | SkuVault | Copies warehouse on-hand counts into a Storefront stock location and receives `inventory.changed`. |
+| `apps/label-station` | Label station | ShipStation | Discovers the carriers it may buy, gets a fulfillment assignment, creates the order and label, reports the label and the carrier handoff; holds, resumes or voids and cancels on `fulfillment.assignment.updated`. |
+| `apps/dropship` | Multi-supplier dropship | Duoplane | Sends the assignment to a supplier as a purchase order, reports each supplier shipment, or raises an exception (backorder, refused carrier); holds, resumes or cancels the purchase order on `fulfillment.assignment.updated`. |
+| `apps/inventory-sync` | Inventory / WMS sync | SkuVault | Posts warehouse movements as reason-coded batches and absolute counts into a Storefront stock location, applies `inventory.changed` in `asOf` order, and reads the sales-velocity report. |
 
 The mocks are shaped like a typical system of each kind. They are **not** any vendor's real API.
 
@@ -32,9 +32,9 @@ end to end, with a setup check, a test-order helper and a webhook server.
 - An HTTPS tunnel to your machine for webhooks, e.g. `cloudflared` (no account needed),
   Microsoft `devtunnel` or `ngrok`.
 
-**One store, one test processor.** A store's preview sends test orders to the last install that
-ran `bind`. If two developers bind on the same store, the second one takes the test orders from
-the first. Use one store each, or take turns.
+**Your own test location.** `npm run order` binds and creates test orders at `STARTER_LOCATION_ID`
+(default `loc-starter-<app>`), so several developers can test on the same store preview without
+taking each other's orders. Give yours a unique value if someone else on the store uses the same app.
 
 ---
 
@@ -44,10 +44,17 @@ Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<stor
 
 1. **Offline check & conformance certification**:
    - Run `npm test` (no credentials needed).
-   - Or start your local receiver and run the CLI conformance checklist / certification receipt generator:
+   - Conformance certification (CLI 7.5.5 or later; needs the credentials from steps 2-3, because the
+     app reads the store's carrier catalog and declares its location at startup). Start the app against the
+     conformance run's signing key, with clean state, then certify it from a second terminal:
      ```bash
-     tot app conformance --url http://127.0.0.1:8787/webhooks --archetype <app> --certify --app-id com.example.<app> --receipt ./conformance-receipt.json
+     TOT_METADATA_ORIGIN=http://127.0.0.1:37891 WEBHOOK_PUBLIC_URL=http://127.0.0.1:8787 \
+       STATE_FILE=.run/conformance-<app>.json npm run <app>
+     tot app conformance --url http://127.0.0.1:8787/webhooks --archetype <app> --certify \
+       --app-id com.example.<app>-starter --receipt ./conformance-<app>.json
      ```
+     inventory-sync writes its WMS baseline to your test location on startup; run
+     `npm run inventory-sync -- --cleanup` afterwards on a shared store preview.
 2. **Install your app on the store (test environment)**:
    ```bash
    tot app install --app apps/<app> --env test --tenant <store>
@@ -75,8 +82,10 @@ Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<stor
    Run `npm run doctor -- <app>` again. Every check should PASS.
 8. **Label station / dropship: send a test order or run a 1-click smoke test** (terminal 3 or browser):
    ```bash
-   npm run order -- <app> bind   # once, after step 7: makes this install the store's preview processor
-   npm run order -- <app> go     # create + release one synthetic order
+   npm run order -- <app> bind          # once, after step 7: this install processes STARTER_LOCATION_ID
+   npm run order -- <app> go            # create (2 units) + release one synthetic order
+   npm run order -- <app> hold <id>     # app receives fulfillment.assignment.updated "held"
+   npm run order -- <app> cancel <id>   # app receives fulfillment.assignment.updated "cancelled"
    ```
    Or open **`/dashboard/<store>/apps`** in your browser and click **"Run Smoke Test"** on the `test` install card (calls `POST /api/apps/admin/test-orders?tenant=<store>` with `{"action":"smoke","installId":"<installId>"}` to exercise `bind -> create -> release -> hold -> cancel` in an isolated preview location `smoke:<installId>` without disturbing the wildcard processor).
    Watch terminal 2. Within about a minute the app picks up the order and reports back.
@@ -89,13 +98,16 @@ Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<stor
 
 - Label station: `assignment.start` → `storefront.label_outcome` (200, `purchased`) → `storefront.handoff` (200, `handed_off`)
 - Dropship: `assignment.start` → `provider.po_created` → `storefront.shipment` (200, `complete: true`) → `order.fulfilled.event`
-- Inventory sync: `storefront.location` (200) → `storefront.levels` (200) → `inventory.changed.event`
+- Inventory sync: `storefront.location` (200) → `reports.sales_velocity` → `storefront.levels` (baseline) → `storefront.movements` (201) → `storefront.levels` (`drift: []`) → `inventory.changed.applied`
+- Hold / cancel: `assignment.updated` with `state: "held"` / `"cancelled"`; label station logs `label-station.handoff_skipped` while held
 
 ### Unhappy paths (set in `apps/<app>/.env`, then restart the app)
 
 - Label station `MOCK_VOID_FIRST=1`: voids the first label and buys a replacement (`label-voided`).
 - Dropship `MOCK_SUPPLIER_CARRIER=USPS`: Storefront refuses USPS on a PACT order (`409 carrier-prohibited`), and the app raises a `carrier_refused` exception for the merchant.
 - Dropship `MOCK_BACKORDER=1`: the supplier backorders, and the app reports `backordered`.
+- Any app, mid-order: stop it (Ctrl+C) and start it again. Progress is in `.run/<app>-state.json`, so it resumes without buying a second label, creating a second purchase order or re-sending movements.
+- Label station `STATION_CARRIERS=FEDEX` on an order that only allows UPS: `label-station.no_station_carrier`, nothing is bought.
 
 ---
 
@@ -103,11 +115,13 @@ Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<stor
 
 ```
 core/config.mjs   loads apps/<app>/.env
-core/tot.mjs      token + /api/apps/v1 calls + webhook keys (connector-kit)
+core/tot.mjs      token + /api/apps/v1 calls + webhook keys (connector-kit, `tenant` option)
+core/state.mjs    StateStore: get / set / delete / entries, file-backed (.run/<app>-state.json); swap in your database
 core/server.mjs   POST /webhooks (signature verified before your code runs), GET /health
 core/log.mjs      JSON logs; recipient address fields and secrets are always redacted
 scripts/doctor.mjs      preflight
-scripts/test-order.mjs  bind / create / release synthetic orders (wraps the tot CLI, retries transient failures)
+scripts/test-order.mjs  bind / create / release / hold / cancel synthetic orders at your location (wraps the tot CLI)
+scripts/stage-candidate.mjs  stage a production candidate for owner approval (dry run unless --yes)
 apps/<app>/connector.mjs   the app
 apps/<app>/mock-*.mjs      the mock outside system (runs inside the app on MOCK_PORT)
 ```
@@ -120,18 +134,37 @@ more than once, and out of order.
 
 - **Real API.** Each mock says which calls it stands in for. Write a real client from your
   provider's API docs and switch with `PROVIDER_API_URL` (and keys) in `.env`.
-- **Persistence.** State is in memory. A restart mid-order can repeat work. Persist progress by
-  `assignmentId` / `purchaseId` so a restart resumes cleanly.
-- **Cancellations and holds.** `fulfillment.assignment.updated` is only logged. Handle it.
-- **Carrier and service mapping.** Label station maps only UPS and FedEx Ground. Storefront accepts
-  only carriers in the assignment's `allowedCarriers`.
-- **Partial shipments.** Synthetic test orders are one line, quantity 1. The dropship mock splits any
-  line with quantity > 1 into two cartons; make sure your code handles that.
-- **Inventory ordering.** `inventory.changed` can arrive out of order; order by `asOf`, not arrival time.
+- **Persistence.** `core/state.mjs` keeps progress in one JSON file per app. That is enough for one
+  process on one machine; for anything hosted, implement the same four methods on your database.
+- **Cancellations and holds.** Handled against the mocks. Map them to your provider's real hold, void
+  and cancel calls, and decide what happens to a parcel that already left.
+- **Carrier and service mapping.** Label station reads `GET /fulfillment/carriers` at startup and buys
+  only carriers that the store allows, the order allows and your provider offers
+  (`PROVIDER_TO_STOREFRONT` maps provider codes). Check the service codes against your provider.
+- **Partial shipments.** `npm run order` creates 2 units, so the dropship mock ships two cartons
+  (`order.partially_fulfilled`, then `order.fulfilled`). `tot app test-order create --line <sku>:<qty>` adds lines.
+- **Inventory ordering.** `inventory.changed` can arrive out of order; the inventory-sync app applies
+  it only when `asOf` is newer than the last one it saw for that SKU and location.
+- **Conformance receipt.** `tot app conformance ... --certify` (quick start step 1) signs synthetic
+  deliveries with an ephemeral RS256 key served at `http://127.0.0.1:37891`; `TOT_METADATA_ORIGIN` points
+  the app's `AuthorizationMetadata` there. It checks signed delivery, hold/cancel, duplicate handling and
+  stale inventory, and writes a receipt you can attach to your review.
 - **Hosting.** See [`../../hosting/`](../../hosting/) to run it somewhere other than your laptop.
 
-Request bodies follow [`contract/openapi.yaml`](../../contract/openapi.yaml) 1.3.0, the source of
+Request bodies follow [`contract/openapi.yaml`](../../contract/openapi.yaml) 1.4.0, the source of
 truth. Known rough edges: [`KNOWN-ISSUES.md`](./KNOWN-ISSUES.md).
+
+## Stage a production candidate
+
+When the store owner asks for it:
+
+```bash
+npm run stage-candidate -- <app> --generate-keys ./keys          # dry run: prints the tot command
+npm run stage-candidate -- <app> --jwks ./keys/public-jwks.json --yes
+```
+
+This stages `apps/<app>` with `--request-consent`; the owner approves it in their dashboard. Never
+commit or share the private key.
 
 ## Reporting a problem
 

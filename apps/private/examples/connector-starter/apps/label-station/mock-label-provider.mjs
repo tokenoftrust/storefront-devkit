@@ -6,7 +6,10 @@
 //   POST /orders/createorder           -> { orderId, orderNumber, orderStatus }
 //   POST /orders/createlabelfororder   -> { shipmentId, orderId, trackingNumber, carrierCode, serviceCode, labelData }
 //   POST /shipments/voidlabel          -> { approved, message }
-//   GET  /carriers                     -> [{ code, name }]
+//   GET  /carriers                     -> [{ code, name, services: [serviceCode] }]
+//   POST /orders/holduntil             { orderId } -> order on_hold: no label, no pickup
+//   POST /orders/restorefromhold       { orderId } -> order back to awaiting_shipment
+//   POST /orders/cancel                { orderId } -> order cancelled (void its label first)
 // Mock-only:
 //   POST /_mock/pickup/<shipmentId>    -> simulates the carrier scan; fires the SHIP_NOTIFY-style callback
 import { createServer } from 'node:http';
@@ -37,7 +40,16 @@ export function startMockLabelProvider({ port, onShipNotify = () => {} }) {
       return send(400, { Message: 'invalid JSON' });
     }
 
-    if (req.method === 'GET' && req.url === '/carriers') return send(200, CARRIERS.map(({ code, name }) => ({ code, name })));
+    if (req.method === 'GET' && req.url === '/carriers') return send(200, CARRIERS.map(({ code, name, services }) => ({ code, name, services })));
+
+    const status = { '/orders/holduntil': 'on_hold', '/orders/restorefromhold': 'awaiting_shipment', '/orders/cancel': 'cancelled' }[req.url];
+    if (req.method === 'POST' && status) {
+      const order = orders.get(Number(body.orderId));
+      if (!order) return send(404, { Message: 'order not found' });
+      if (order.orderStatus === 'cancelled' && status !== 'cancelled') return send(409, { Message: 'order is cancelled' });
+      order.orderStatus = status;
+      return send(200, order);
+    }
 
     if (req.method === 'POST' && req.url === '/orders/createorder') {
       if (!body.orderNumber || !Array.isArray(body.items) || !body.shipTo) return send(400, { Message: 'orderNumber, items and shipTo are required' });
@@ -52,6 +64,7 @@ export function startMockLabelProvider({ port, onShipNotify = () => {} }) {
     if (req.method === 'POST' && req.url === '/orders/createlabelfororder') {
       const order = orders.get(Number(body.orderId));
       if (!order) return send(404, { Message: 'order not found' });
+      if (order.orderStatus !== 'awaiting_shipment') return send(409, { Message: `order is ${order.orderStatus}` });
       const carrier = CARRIERS.find((c) => c.code === body.carrierCode);
       if (!carrier || !carrier.services.includes(body.serviceCode)) return send(400, { Message: `unknown carrier/service ${body.carrierCode}/${body.serviceCode}` });
       const shipment = {
@@ -80,6 +93,7 @@ export function startMockLabelProvider({ port, onShipNotify = () => {} }) {
     if (req.method === 'POST' && pickup) {
       const s = shipments.get(Number(pickup[1]));
       if (!s || s.voided) return send(404, { Message: 'no live shipment' });
+      if (orders.get(s.orderId)?.orderStatus !== 'awaiting_shipment') return send(409, { Message: 'order is not ready to ship' });
       send(200, { ok: true });
       onShipNotify(s);
       return;
@@ -88,5 +102,6 @@ export function startMockLabelProvider({ port, onShipNotify = () => {} }) {
     send(404, { Message: 'not found' });
   });
 
+  server.orders = orders;
   return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve(server)));
 }

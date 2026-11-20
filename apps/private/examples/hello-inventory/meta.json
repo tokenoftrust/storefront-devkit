@@ -2,8 +2,20 @@
   "id": "private-app-example-hello-inventory",
   "kind": "sample",
   "title": "Hello Inventory (starter private app)",
-  "description": "Minimal runnable starter Private App demonstrating location registration (GET/PUT /inventory/locations/{locationId}), stock read/write (GET /inventory, POST /inventory/movements), and synthetic preview order verification (POST /api/apps/admin/test-orders).",
-  "tags": ["private-apps", "inventory", "starter", "locations", "test-orders", "example"],
-  "contract": "private-apps@1.3",
-  "requires": { "node": ">=20", "cli": ">=6.12.2" }
+  "description": "Minimal runnable starter Private App: quarantine location (PUT /inventory/locations/{locationId}, isFulfillable: false), atomic WMS batch (POST /inventory/movements), absolute reconciliation (PUT /inventory/levels), sales-velocity report (GET /reports), signed inventory.changed verification, and synthetic preview orders (tot app test-order create).",
+  "tags": [
+    "private-apps",
+    "inventory",
+    "starter",
+    "locations",
+    "reports",
+    "webhooks",
+    "test-orders",
+    "example"
+  ],
+  "contract": "private-apps@1.4",
+  "requires": {
+    "node": ">=20",
+    "cli": ">=7.5.5"
+  }
 }

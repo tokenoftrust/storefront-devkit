@@ -1,36 +1,49 @@
 #!/usr/bin/env node
-// Synthetic preview orders, via the tot CLI (you must be signed in: `tot login`).
-//   npm run order -- <app> bind            bind this app's install as the preview processor (needs a webhook endpoint)
-//   npm run order -- <app> create          create one synthetic order (preview data only, never live)
+// Synthetic preview orders, via the tot CLI 7.5.2 or later (you must be signed in: `tot login`).
+//   npm run order -- <app> bind            bind this install as the preview processor for STARTER_LOCATION_ID (needs a webhook endpoint)
+//   npm run order -- <app> create          create one synthetic order (2 units) at STARTER_LOCATION_ID (preview data only, never live)
 //   npm run order -- <app> release <id>    release it to the bound install
 //   npm run order -- <app> go              create + release in one step
+//   npm run order -- <app> hold <id>       hold it: your app gets fulfillment.assignment.updated state "held"
+//   npm run order -- <app> cancel <id>     cancel it: your app gets fulfillment.assignment.updated state "cancelled"
+// Every order uses your own location, so other developers on the same store preview never get yours.
 // Retries the CLI's intermittent "identity check failed (mcp_http_error)" a few times.
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { APPS, loadConfig } from '../core/config.mjs';
 
-const [app, action, orderId] = process.argv.slice(2);
-if (!APPS.includes(app) || !['bind', 'create', 'release', 'go'].includes(action)) {
-  console.error('usage: npm run order -- <label-station|dropship|inventory-sync> <bind|create|release <orderId>|go>');
-  process.exit(2);
-}
-const cfg = loadConfig(app);
-if (!cfg.tenant || !cfg.installId) {
-  console.error(`set TOT_TENANT and TOT_INSTALL_ID in ${cfg.envPath} first (npm run doctor -- ${app})`);
-  process.exit(2);
+export const ACTIONS = ['bind', 'create', 'release', 'go', 'hold', 'cancel'];
+
+/** The tot CLI argument list for one step (without --tenant/--json). */
+export function cliArgs(action, cfg, orderId) {
+  const location = ['--location', cfg.locationId];
+  switch (action) {
+    case 'bind':
+      return ['app', 'test-order', 'bind', cfg.installId, ...location];
+    case 'create':
+      return ['app', 'test-order', 'create', ...location, '--quantity', '2'];
+    case 'release':
+    case 'hold':
+    case 'cancel':
+      if (!orderId) throw new Error(`${action} needs an orderId (from create)`);
+      return ['app', 'test-order', action, orderId];
+    default:
+      throw new Error(`unknown action ${action}`);
+  }
 }
 
-function tot(args) {
+function tot(cfg, args) {
   for (let attempt = 1; attempt <= 5; attempt++) {
     const r = spawnSync('tot', [...args, '--tenant', cfg.tenant, '--json'], { encoding: 'utf8' });
-    const out = `${r.stdout ?? ''}${r.stderr ?? ''}`.split('\n').filter((l) => !/Update available|npm i -g/.test(l)).join('\n').trim();
+    if (r.error) {
+      console.error(`could not run tot (${r.error.code ?? r.error.message}). Install it: npm i -g @tokenoftrust/cli`);
+      process.exit(1);
+    }
+    const out = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
     if (/mcp_http_error|mcp_unreachable/.test(out) && attempt < 5) {
       console.error(`  (tot: identity check failed, retry ${attempt}/4 in 20s)`);
       spawnSync('sleep', ['20']);
       continue;
-    }
-    if (r.error) {
-      console.error(r.error.code === 'ENOENT' ? 'tot CLI not found: npm i -g @tokenoftrust/cli' : String(r.error));
-      process.exit(1);
     }
     console.log(out);
     if (r.status !== 0) process.exit(r.status ?? 1);
@@ -43,19 +56,38 @@ function tot(args) {
   process.exit(1);
 }
 
-if (action === 'bind') tot(['app', 'test-order', 'bind', cfg.installId]);
-if (action === 'create') tot(['app', 'test-order', 'create']);
-if (action === 'release') {
-  if (!orderId) { console.error('release needs an orderId (from create)'); process.exit(2); }
-  tot(['app', 'test-order', 'release', orderId]);
-}
-if (action === 'go') {
-  const created = tot(['app', 'test-order', 'create']);
-  const id = created?.order?.orderId;
-  if (!id) { console.error('create did not return an orderId'); process.exit(1); }
-  const released = tot(['app', 'test-order', 'release', id]);
-  if (released?.order?.assignedInstallId !== cfg.installId) {
-    console.error(`\nreleased, but assigned to ${released?.order?.assignedInstallId ?? 'nobody'}, not this install. Run: npm run order -- ${app} bind`);
-    process.exit(1);
+function main() {
+  const [app, action, orderId] = process.argv.slice(2);
+  if (!APPS.includes(app) || !ACTIONS.includes(action)) {
+    console.error('usage: npm run order -- <label-station|dropship|inventory-sync> <bind|create|go|release <orderId>|hold <orderId>|cancel <orderId>>');
+    process.exit(2);
+  }
+  const cfg = loadConfig(app);
+  if (!cfg.tenant || !cfg.installId) {
+    console.error(`set TOT_TENANT and TOT_INSTALL_ID in ${cfg.envPath} first (npm run doctor -- ${app})`);
+    process.exit(2);
+  }
+  if (action === 'go') {
+    const created = tot(cfg, cliArgs('create', cfg));
+    const id = created?.order?.orderId;
+    if (!id) {
+      console.error('create did not return an orderId');
+      process.exit(1);
+    }
+    const released = tot(cfg, cliArgs('release', cfg, id));
+    if (released?.order?.assignedInstallId !== cfg.installId) {
+      console.error(`\nreleased, but assigned to ${released?.order?.assignedInstallId ?? 'nobody'}, not this install. Run: npm run order -- ${app} bind`);
+      process.exit(1);
+    }
+    console.error(`\norder ${id} released to this install. Next: npm run order -- ${app} hold ${id}   (or cancel ${id})`);
+    return;
+  }
+  try {
+    tot(cfg, cliArgs(action, cfg, orderId));
+  } catch (err) {
+    console.error(err.message);
+    process.exit(2);
   }
 }
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
