@@ -53,7 +53,9 @@ repository.
 - **The CLI** — `tot app scaffold <name>` creates a runnable, language-neutral skeleton
   (`tot-app.json`, `fixtures/`, `server.js`, Dockerfile); `tot app dev` (`validate` / `emit` /
   `verify` / `mint`) is the local harness that signs fixture CloudEvents exactly like the real
-  gateway so your verification code exercises the real path.
+  gateway so your verification code exercises the real path; `tot app conformance --url <loopbackWebhookUrl> --archetype <label-station|dropship|inventory-sync> [--certify --app-id <id> --receipt <path>]`
+  runs the signed Ed25519 CloudEvents + duplicate-replay checklist against your local connector
+  and emits a deterministic SHA-256 conformance certification receipt (`tot-connector-certification.v1`).
 - **No published npm library** — this devkit intentionally does not distribute an npm library or
   platform runtime. Implement against the documented standards and use the CLI's fixtures to test
   your service. This keeps the public developer deliverable language-neutral and source-free.
@@ -62,11 +64,12 @@ repository.
 
 1. **Author `tot-app.json`** — declare `id`, `owner`, `installMode`, and the fewest **scopes** you
    need (from the 11-scope V1 catalog in `apps/private/contract/scopes.json`). Validate against
-   `tot-app.schema.json`.
+   `tot-app.schema.json`, and run `tot app conformance --url http://127.0.0.1:8787/webhooks --archetype <name> --certify --app-id <id>`
+   against your local receiver to verify RFC 9421 signing and duplicate replay before installing.
 2. **Self-serve in `preview` (`env: "test"`)** — seed a realistic preview catalog
    (`tot catalog seed --preset=general|regulated-vape|multi-warehouse` followed by `tot preview`), install
    your app into the `test` stage (`tot app install --tenant <tenant> --env=test --app .`),
-   and generate synthetic preview orders (`POST /api/apps/admin/test-orders`) without touching live
+   and generate synthetic preview orders (`POST /api/apps/admin/test-orders` with `action: "bind" | "create" | "release" | "hold" | "cancel" | "smoke"`, or click **"Run Smoke Test"** on the `test` install card in `/dashboard/<tenant>/apps`) without touching live
    merchant inventory or customer data.
 3. **Exchange credentials for a short-lived JWT** (`POST /oauth/token`, `client_credentials` with
    `client_secret_post` or `private_key_jwt`).

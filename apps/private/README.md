@@ -88,8 +88,10 @@ endpoint.
 
 Use the language and framework appropriate to your service. The devkit intentionally publishes no
 npm library or platform runtime; the reference examples, recipes, and samples are copyable source,
-not packages. Keep installation credentials server-side and use the CLI fixtures or the synthetic
-examples here for local tests.
+not packages. Keep installation credentials server-side and use the CLI fixtures (`tot app dev`,
+`tot app conformance --url <loopbackWebhookUrl> --archetype <label-station|dropship|inventory-sync> --certify --app-id <id> [--receipt <path>]`),
+the 1-click **"Run Smoke Test"** on `/dashboard/<tenant>/apps` (`POST /api/apps/admin/test-orders` with `action: "smoke"`),
+or the synthetic examples here for local and preview tests.
 
 ## Versioning
 

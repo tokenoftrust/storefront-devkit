@@ -1375,7 +1375,10 @@ paths:
         from RFC-reserved contact values. `release` claims and releases one synthetic order to the bound
         processor, which emits `fulfillment.assignment.created` to the install. `hold`
         places a synthetic order on operator hold. `cancel` cancels a synthetic order and
-        its open assignment. `GET /orders` returns synthetic orders on preview hosts.
+        its open assignment. `smoke` runs the full five-step lifecycle (`bind`, `create`,
+        `release`, `hold`, `cancel`) against an isolated per-install preview location
+        (`smoke:<installId>`) without disturbing the default wildcard preview processor and
+        returns a step-by-step receipt (`smoke.steps[]`). `GET /orders` returns synthetic orders on preview hosts.
       parameters:
         - $ref: '#/components/parameters/CallerCapability'
       requestBody:
@@ -1385,7 +1388,7 @@ paths:
             schema: { $ref: '#/components/schemas/AdminTestOrderRequest' }
       responses:
         '200':
-          description: '`bind`, `release`, `hold`, or `cancel` completed.'
+          description: '`bind`, `release`, `hold`, `cancel`, or `smoke` completed.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AdminTestOrderResult' }
@@ -2348,7 +2351,7 @@ components:
             owner_required_for_production_app, invalid_caller_capability,
             tenant_mismatch, test_install_required, install_not_found, order_not_found,
             install_not_processor, unavailable, vault_unavailable, invalid_json,
-            invalid_action, install_id_required, order_id_required, invalid_location_id,
+            invalid_action, install_id_required, invalid_install_id, order_id_required, invalid_location_id,
             invalid_lines, invalid_region, invalid_jwks or candidate_pending.
         denials:
           type: array
@@ -2637,13 +2640,14 @@ components:
         consentGranted: { type: boolean }
 
     AdminTestOrderRequest:
-      description: One of the `bind`, `create`, `release`, `hold`, or `cancel` actions.
+      description: One of the `bind`, `create`, `release`, `hold`, `cancel`, or `smoke` actions.
       oneOf:
         - $ref: '#/components/schemas/AdminTestOrderBind'
         - $ref: '#/components/schemas/AdminTestOrderCreate'
         - $ref: '#/components/schemas/AdminTestOrderRelease'
         - $ref: '#/components/schemas/AdminTestOrderHold'
         - $ref: '#/components/schemas/AdminTestOrderCancel'
+        - $ref: '#/components/schemas/AdminTestOrderSmoke'
       discriminator:
         propertyName: action
         mapping:
@@ -2652,6 +2656,18 @@ components:
           release: '#/components/schemas/AdminTestOrderRelease'
           hold: '#/components/schemas/AdminTestOrderHold'
           cancel: '#/components/schemas/AdminTestOrderCancel'
+          smoke: '#/components/schemas/AdminTestOrderSmoke'
+
+    AdminTestOrderSmoke:
+      type: object
+      additionalProperties: false
+      required: [action, installId]
+      properties:
+        action: { type: string, const: smoke }
+        installId:
+          type: string
+          format: uuid
+          description: 'The caller''s own `test` install UUID to exercise through `bind -> create -> release -> hold -> cancel`.'
 
     AdminTestOrderBind:
       type: object
@@ -2727,6 +2743,7 @@ components:
       description: >
         `bind` returns `{processor}` with status 200. `create` returns `{order}` with
         status 201. `release`, `hold`, and `cancel` return `{order}` with status 200.
+        `smoke` returns `{smoke}` with status 200 when all five steps pass (or the failing step's HTTP status with completed steps preserved).
       oneOf:
         - type: object
           additionalProperties: false
@@ -2766,6 +2783,28 @@ components:
                 assignedInstallId:
                   type: [string, 'null']
                   description: Install on the active, held, or cancelled assignment for this action, when present.
+        - type: object
+          additionalProperties: false
+          required: [smoke]
+          properties:
+            smoke:
+              type: object
+              additionalProperties: false
+              required: [installId, orderId, passed, steps]
+              properties:
+                installId: { type: string, format: uuid }
+                orderId: { type: [string, 'null'] }
+                passed: { type: boolean }
+                steps:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [step, passed]
+                    properties:
+                      step: { type: string, enum: [bind, create, release, hold, cancel] }
+                      passed: { type: boolean }
+                      code: { type: string, description: Present when `passed` is false. }
 
     InventoryMovementReason:
       type: string

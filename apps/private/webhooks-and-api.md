@@ -60,7 +60,7 @@ the OpenAPI definition says so.
 | `widgets:launch` | Activate declared sandboxed widget placements and mint short-lived widget launch tokens. |
 | `fulfillment:process` | Read carrier capabilities (`GET /fulfillment/carriers`), read active fulfillment assignments (`GET /fulfillment/assignments`), report whole-order shipment evidence (`POST /fulfillment/orders/{orderId}/shipment-evidence`), record 1:N split shipments (`POST /fulfillment/assignments/{assignmentId}/shipments`), and report fulfillment exceptions (`POST /fulfillment/assignments/{assignmentId}/exceptions`). |
 | `orders:read:recipient` | Read the ship-to recipient of one assigned order (`GET /fulfillment/orders/{orderId}/recipient`), consent-gated and audited. |
-| App-install ownership | List and replay this installation's webhook delivery records, generate synthetic preview orders (`POST /api/apps/admin/test-orders` in `env=test`), and stage production candidate manifests (`POST /api/apps/admin/candidates`). |
+| App-install ownership | List and replay this installation's webhook delivery records, generate synthetic preview orders or run a full 5-step smoke test (`POST /api/apps/admin/test-orders` with `action: "bind" \| "create" \| "release" \| "hold" \| "cancel" \| "smoke"` in `env=test`, or **"Run Smoke Test"** in `/dashboard/<tenant>/apps`), and stage production candidate manifests (`POST /api/apps/admin/candidates`). |
 
 Catalog and inventory list endpoints (`GET /catalog/products` and `GET /inventory`) support opaque
 keyset `cursor` pagination (`nextCursor`), ISO-8601 `updatedSince` filtering, and `limit` /
