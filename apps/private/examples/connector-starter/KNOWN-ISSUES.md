@@ -1,4 +1,4 @@
-# Known issues (checked 2026-11-21, tot CLI 7.5.3, connector-kit 1.1.0)
+# Known issues (checked 2026-11-21, tot CLI 7.5.5, connector-kit 1.1.0)
 
 - **Request bodies: follow `openapi.yaml`.** Shipments need UPPERCASE `carrier` / `service`
   (`UPS`, `GROUND`) and `adultSignature: "accepted" | "refused" | "absent"`. Exceptions use `code`

@@ -51,11 +51,11 @@ straight from connector-kit's `ApiError`; quote `requestId` when you report a pr
 ## Self-serve preview workflow (`env=test`)
 
 Developers holding `preview-access` on a store can run the preview loop without store-owner
-approval (CLI 7.5 or later):
+approval (CLI 7.5.5 or later):
 
 ```bash
 # 1. Lint tot-app.json offline:
-tot app validate
+tot app validate .
 
 # 2. Self-serve install in test mode (prints the client id and secret once):
 tot app install --tenant <tenant> --env=test --app .
@@ -65,12 +65,10 @@ tot app test-order bind <installId> --tenant <tenant> --location loc-main-wareho
 tot app test-order create --tenant <tenant> --location loc-main-warehouse
 ```
 
-`tot app validate .` (with the dot) answers `EISDIR` on CLI 7.5.3; run it with no argument or with
-`./tot-app.json`.
-
 Conformance certification needs a running webhook receiver, which this example does not start (its
 `--self-test` verifies signed deliveries offline). Run the inventory-sync app in
-[`../connector-starter/`](../connector-starter/) and certify it:
+[`../connector-starter/`](../connector-starter/) with `TOT_METADATA_ORIGIN=http://127.0.0.1:37891`
+(so it reads the conformance run's RS256 key) and certify it:
 
 ```bash
 tot app conformance --url http://127.0.0.1:8787/webhooks --archetype inventory-sync \

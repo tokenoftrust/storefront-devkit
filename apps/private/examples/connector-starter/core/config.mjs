@@ -26,7 +26,7 @@ function parseEnvFile(path) {
   return out;
 }
 
-/** Returns { app, dir, envPath, envFound, tenant, host, clientId, clientSecret, installId, webhookPublicUrl, webhookEndpoint, port, mockPort, locationId, statePath, manifest, missing[] }. */
+/** Returns { app, dir, envPath, envFound, tenant, host, metadataOrigin, clientId, clientSecret, installId, webhookPublicUrl, webhookEndpoint, port, mockPort, locationId, statePath, manifest, missing[] }. */
 export function loadConfig(app) {
   const dir = appDir(app);
   const envPath = join(dir, '.env');
@@ -34,6 +34,8 @@ export function loadConfig(app) {
   const env = { ...(envFound ? parseEnvFile(envPath) : {}), ...pickDefined(process.env) };
   const manifest = JSON.parse(readFileSync(join(dir, 'tot-app.json'), 'utf8'));
   const host = (env.TOT_HOST || 'https://storefront.tokenoftrust.store').replace(/\/+$/, '');
+  // Where webhook signing keys are read from: the API host, or http://127.0.0.1:37891 under `tot app conformance`.
+  const metadataOrigin = (env.TOT_METADATA_ORIGIN || host).replace(/\/+$/, '');
   const webhookPublicUrl = (env.WEBHOOK_PUBLIC_URL || '').replace(/\/+$/, '');
   const cfg = {
     app,
@@ -42,6 +44,7 @@ export function loadConfig(app) {
     envFound,
     tenant: env.TOT_TENANT || '',
     host,
+    metadataOrigin,
     installId: env.TOT_INSTALL_ID || '',
     clientId: env.TOT_CLIENT_ID || '',
     clientSecret: env.TOT_CLIENT_SECRET || '',

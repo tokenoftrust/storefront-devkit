@@ -16,6 +16,6 @@
   "contract": "private-apps@1.4",
   "requires": {
     "node": ">=20",
-    "cli": ">=7.5.2"
+    "cli": ">=7.5.5"
   }
 }

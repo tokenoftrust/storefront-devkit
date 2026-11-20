@@ -24,7 +24,7 @@ export function createTot(cfg, { fetch: fetchImpl, seenEvents = new MemorySeenEv
   const api = new ApiClient({ origin: cfg.host, tenant: cfg.tenant, auth, ...io });
   // Webhook signing keys are published once for the whole host (not per tenant):
   // https://storefront.tokenoftrust.store/.well-known/tot-app-authorization-metadata -> webhook_signing_keys
-  const keys = new AuthorizationMetadata({ origin: cfg.host, ...io });
+  const keys = new AuthorizationMetadata({ origin: cfg.metadataOrigin ?? cfg.host, ...io });
 
   /**
    * call('GET', '/fulfillment/assignments') -> { ok, status, body, requestId }.

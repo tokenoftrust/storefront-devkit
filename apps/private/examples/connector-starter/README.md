@@ -44,10 +44,17 @@ Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<stor
 
 1. **Offline check & conformance certification**:
    - Run `npm test` (no credentials needed).
-   - Or start your local receiver and run the CLI conformance checklist / certification receipt generator:
+   - Conformance certification (CLI 7.5.5 or later; needs the credentials from steps 2-3, because the
+     app reads the store's carrier catalog and declares its location at startup). Start the app against the
+     conformance run's signing key, with clean state, then certify it from a second terminal:
      ```bash
-     tot app conformance --url http://127.0.0.1:8787/webhooks --archetype <app> --certify --app-id com.example.<app> --receipt ./conformance-receipt.json
+     TOT_METADATA_ORIGIN=http://127.0.0.1:37891 WEBHOOK_PUBLIC_URL=http://127.0.0.1:8787 \
+       STATE_FILE=.run/conformance-<app>.json npm run <app>
+     tot app conformance --url http://127.0.0.1:8787/webhooks --archetype <app> --certify \
+       --app-id com.example.<app>-starter --receipt ./conformance-<app>.json
      ```
+     inventory-sync writes its WMS baseline to your test location on startup; run
+     `npm run inventory-sync -- --cleanup` afterwards on a shared store preview.
 2. **Install your app on the store (test environment)**:
    ```bash
    tot app install --app apps/<app> --env test --tenant <store>
@@ -138,9 +145,10 @@ more than once, and out of order.
   (`order.partially_fulfilled`, then `order.fulfilled`). `tot app test-order create --line <sku>:<qty>` adds lines.
 - **Inventory ordering.** `inventory.changed` can arrive out of order; the inventory-sync app applies
   it only when `asOf` is newer than the last one it saw for that SKU and location.
-- **Conformance receipt.** With the app running locally, `tot app conformance --url http://127.0.0.1:8787/webhooks
-  --archetype <app> --app-id <your app id> --certify --receipt ./conformance-<app>.json` checks signed
-  delivery and duplicate handling and writes a receipt you can attach to your review.
+- **Conformance receipt.** `tot app conformance ... --certify` (quick start step 1) signs synthetic
+  deliveries with an ephemeral RS256 key served at `http://127.0.0.1:37891`; `TOT_METADATA_ORIGIN` points
+  the app's `AuthorizationMetadata` there. It checks signed delivery, hold/cancel, duplicate handling and
+  stale inventory, and writes a receipt you can attach to your review.
 - **Hosting.** See [`../../hosting/`](../../hosting/) to run it somewhere other than your laptop.
 
 Request bodies follow [`contract/openapi.yaml`](../../contract/openapi.yaml) 1.4.0, the source of
