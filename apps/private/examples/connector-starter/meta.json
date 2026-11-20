@@ -2,8 +2,20 @@
   "id": "private-app-example-connector-starter",
   "kind": "sample",
   "title": "Connector starter: label station, dropship and inventory sync on a store preview",
-  "description": "Three runnable Private App connectors (label station, multi-supplier dropship, inventory/WMS sync) against in-process mocks of their outside systems, run end to end on a store's preview stage with env=test installs and synthetic orders. Includes a preflight doctor, a test-order helper wrapping tot app test-order, and a webhook server verifying RFC 9421 signatures through vendored connector-kit.",
-  "tags": ["private-apps", "fulfillment", "inventory", "dropship", "labels", "webhooks", "starter", "example"],
-  "contract": "private-apps@1.3",
-  "requires": { "node": ">=20", "cli": ">=7.2.2" }
+  "description": "Three runnable Private App connectors (label station, multi-supplier dropship, inventory/WMS sync) against in-process mocks of their outside systems, run end to end on a store's preview stage with env=test installs and location-isolated synthetic orders. Includes a preflight doctor, a test-order helper (bind, create, release, hold, cancel), a file-backed state store, a candidate staging helper, and a webhook server verifying RFC 9421 signatures through vendored connector-kit.",
+  "tags": [
+    "private-apps",
+    "fulfillment",
+    "inventory",
+    "dropship",
+    "labels",
+    "webhooks",
+    "starter",
+    "example"
+  ],
+  "contract": "private-apps@1.4",
+  "requires": {
+    "node": ">=20",
+    "cli": ">=7.5.2"
+  }
 }

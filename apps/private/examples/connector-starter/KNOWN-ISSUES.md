@@ -1,9 +1,4 @@
-# Known issues (checked 2026-11-17, tot CLI 7.2.2)
-
-- **connector-kit and the test stage's URL.** A test install answers only at
-  `https://storefront.tokenoftrust.store/<store>/api/apps/...`, and connector-kit accepts only a bare
-  origin (no path). `tenantPathFetch()` in `core/tot.mjs` adds the `/<store>` part to `/api/apps/*`
-  calls. Remove it when connector-kit or the gateway accepts the test stage another way.
+# Known issues (checked 2026-11-21, tot CLI 7.5.3, connector-kit 1.1.0)
 
 - **Request bodies: follow `openapi.yaml`.** Shipments need UPPERCASE `carrier` / `service`
   (`UPS`, `GROUND`) and `adultSignature: "accepted" | "refused" | "absent"`. Exceptions use `code`

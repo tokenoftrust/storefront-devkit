@@ -26,7 +26,7 @@ function parseEnvFile(path) {
   return out;
 }
 
-/** Returns { app, dir, envPath, envFound, tenant, host, clientId, clientSecret, installId, webhookPublicUrl, webhookEndpoint, port, mockPort, manifest, missing[] }. */
+/** Returns { app, dir, envPath, envFound, tenant, host, clientId, clientSecret, installId, webhookPublicUrl, webhookEndpoint, port, mockPort, locationId, statePath, manifest, missing[] }. */
 export function loadConfig(app) {
   const dir = appDir(app);
   const envPath = join(dir, '.env');
@@ -50,6 +50,11 @@ export function loadConfig(app) {
     webhookEndpoint: webhookPublicUrl ? `${webhookPublicUrl}/webhooks` : '',
     port: Number(env.PORT || 8787),
     mockPort: Number(env.MOCK_PORT || 9100 + APPS.indexOf(app) + 1),
+    // Your own preview location: test orders (bind/create --location) and inventory counts go here,
+    // so several developers can test on one store preview without taking each other's orders.
+    locationId: env.STARTER_LOCATION_ID || (app === 'inventory-sync' ? 'loc-starter-wms' : `loc-starter-${app}`),
+    // Connector progress (core/state.mjs). .run/ is gitignored.
+    statePath: env.STATE_FILE || join(ROOT, '.run', `${app}-state.json`),
     env,
     manifest,
   };
@@ -59,5 +64,5 @@ export function loadConfig(app) {
 
 function pickDefined(obj) {
   // Only TOT_*, WEBHOOK_*, PORT, MOCK_* and app tuning vars may override the .env file.
-  return Object.fromEntries(Object.entries(obj).filter(([k, v]) => v !== undefined && /^(TOT_|WEBHOOK_|PORT$|MOCK_|SYNC_|POLL_)/.test(k)));
+  return Object.fromEntries(Object.entries(obj).filter(([k, v]) => v !== undefined && /^(TOT_|WEBHOOK_|PORT$|MOCK_|SYNC_|POLL_|STARTER_|STATE_|STATION_)/.test(k)));
 }
