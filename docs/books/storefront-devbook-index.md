@@ -195,6 +195,15 @@ Forward this paragraph to them if you are not the owner — there is nothing els
 detail (including the console-fetch equivalent, for an owner who'd rather not click through the UI):
 `runbook://storefront-runbook-permissions-and-grants`.
 
+## What Storefront does and what apps do
+
+Before you build an app for an inventory, fulfillment, shipping or accounting need, check the
+platform's published scope line in the devkit:
+[`docs/platform-and-apps.md`](https://github.com/tokenoftrust/storefront-devkit/blob/main/docs/platform-and-apps.md).
+It lists what is native (records, compliance gates, basic workflows), what is app territory
+(labels, rate shopping, forecasting models, marketplace and accounting sync, WMS execution), and
+what is never built, plus the rule for how the line moves.
+
 ## Your reference material while building
 
 - **The Storefront Devkit** — https://github.com/tokenoftrust/storefront-devkit — templates,

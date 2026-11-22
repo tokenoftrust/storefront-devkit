@@ -74,6 +74,7 @@
 
     { "id": "page-checks", "kind": "tooling", "title": "Single-page checks and style-concept audit", "path": "tools", "tags": ["validation", "performance", "accessibility", "lighthouse", "style", "audit"], "links": { "readme": "tools/README.md", "manifestSchema": "tools/style-concept.manifest.schema.json", "guide": "docs/style-concept-audit.md" } },
     { "id": "developer-books", "kind": "guide", "title": "Developer books (long-form guides)", "path": "docs/books/storefront-devbook-index.md", "tags": ["devbook", "guides", "compliance", "theme", "pages", "analytics", "performance", "seo", "embeds", "widgets"], "directory": "docs/books" },
+    { "id": "platform-and-apps", "kind": "guide", "title": "What Storefront does and what apps do (scope test, three classes, release valve)", "path": "docs/platform-and-apps.md", "tags": ["scope", "apps", "private-apps", "native", "commitment", "inventory", "fulfillment"] },
     { "id": "dev-loop-reference", "kind": "guide", "title": "Developer loop reference: tot dev, validate, preview, sync", "path": "docs/dev-loop-reference.md", "tags": ["dev-loop", "cli", "preview", "validate"] },
     { "id": "shared-chrome", "kind": "guide", "title": "Shared chrome and merchandising sections are standard components", "path": "docs/shared-chrome.md", "tags": ["chrome", "components", "theme"] },
     { "id": "style-concept-audit-guide", "kind": "guide", "title": "Style-concept audit", "path": "docs/style-concept-audit.md", "tags": ["style", "audit", "css", "contrast"] },
