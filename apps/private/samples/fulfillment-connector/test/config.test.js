@@ -96,6 +96,6 @@ test('simulation flags are explicit and unknown flags are refused', () => {
 
 test('the sample manifest requests exactly the fulfillment scopes and topics', () => {
   const manifest = JSON.parse(readFileSync(new URL('../tot-app.json', import.meta.url), 'utf8'));
-  assert.deepEqual(manifest.scopes, ['fulfillment:process', 'orders:read:recipient']);
+  assert.deepEqual(manifest.scopes, ['fulfillment:process', 'orders:read-recipient']);
   assert.deepEqual(manifest.webhooks.topics, ['fulfillment.assignment.created', 'fulfillment.assignment.updated']);
 });

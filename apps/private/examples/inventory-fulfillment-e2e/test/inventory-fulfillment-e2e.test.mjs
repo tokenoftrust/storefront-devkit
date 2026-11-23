@@ -21,7 +21,7 @@ function simClient() {
 test('inventory-fulfillment-e2e manifest requests least-privilege starter scopes, including reports:read', () => {
   const manifest = JSON.parse(readFileSync(new URL('../tot-app.json', import.meta.url), 'utf8'));
   assert.equal(manifest.contractVersion, '1');
-  assert.deepEqual(manifest.scopes, ['catalog:read', 'inventory:read', 'inventory:write', 'orders:read:minimal', 'reports:read']);
+  assert.deepEqual(manifest.scopes, ['catalog:read', 'inventory:read', 'inventory:write', 'orders:read-minimal', 'reports:read']);
   assert.deepEqual(manifest.webhooks.topics, ['inventory.changed']);
 });
 

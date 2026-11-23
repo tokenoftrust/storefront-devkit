@@ -194,7 +194,7 @@ export async function run({ only, pauseMs }, env) {
       'levels:first': ['Reconcile an absolute count from the warehouse', 'PUT /inventory/levels  onHand = balance - 1', 'The first observation writes the drift (-1); the next identical count writes 0.'],
       inventory: ['Read availability back', 'GET /inventory?sku=…&locationId=…', 'mirror.balance is this location\'s ledger; available/quantity are store-wide, which quarantine stock never adds to.'],
       reports: ['Read the 30-day sales-velocity snapshot', 'GET /reports?windowDays=30  (reports:read)', 'Per SKU: sold units, unsold units, velocity per day, days of cover.'],
-      orders: ['List orders the app may see', 'GET /orders  (orders:read:minimal: no customer PII)'],
+      orders: ['List orders the app may see', 'GET /orders  (orders:read-minimal: no customer PII)'],
       'cleanup:zero': ['Clean up the preview', 'Zero the test stock and archive the location.'],
     };
     const fmt = {

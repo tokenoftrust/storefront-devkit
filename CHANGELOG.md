@@ -5,6 +5,12 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Changed
+- Contract: `orders:read-holds` scope and `GET /orders/holds` (held orders with a closed-vocabulary reason, opaque page-scoped
+  references, no order id or customer field), mirrored from the Storefront runtime that serves it.
+- Scope ids `orders:read:minimal`, `customers:read:minimal` and `orders:read:recipient` are now
+  `orders:read-minimal`, `customers:read-minimal` and `orders:read-recipient` (one colon: `<resource>:<action>`),
+  matching the Storefront runtime vocabulary. The contract, every example, recipe and sample manifest, and the
+  docs use the new ids; a manifest naming an old id is refused by the token issuer.
 - `apps/private/examples/hello-inventory/` is now `apps/private/examples/inventory-fulfillment-e2e/` (app id
   `com.example.inventory-fulfillment-e2e`): it is an end-to-end test of the inventory and fulfillment APIs, not a
   starter UI. New `npm run e2e`: a captioned run on a store preview that also drives the connector-starter

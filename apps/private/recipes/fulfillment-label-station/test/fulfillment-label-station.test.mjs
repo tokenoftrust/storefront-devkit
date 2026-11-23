@@ -14,8 +14,8 @@ test('fulfillment-label-station manifest requests least-privilege fulfillment an
   const manifest = JSON.parse(readFileSync(new URL('../tot-app.json', import.meta.url), 'utf8'));
   assert.equal(manifest.contractVersion, '1');
   assert.deepEqual(manifest.scopes, [
-    'orders:read:minimal',
-    'orders:read:recipient',
+    'orders:read-minimal',
+    'orders:read-recipient',
     'orders:webhook',
     'fulfillment:process',
   ]);

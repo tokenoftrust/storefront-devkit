@@ -167,7 +167,7 @@ channels:
         $ref: '#/components/messages/OrderUpdated'
 
   customer.marketing_consent.updated:
-    description: Emitted when a customer's marketing consent changes. Requires scope customers:read:minimal. Opaque customer id only.
+    description: Emitted when a customer's marketing consent changes. Requires scope customers:read-minimal. Opaque customer id only.
     subscribe:
       operationId: onCustomerMarketingConsentUpdated
       message:

@@ -50,16 +50,16 @@ the OpenAPI definition says so.
 |---|---|
 | Token only | Read this app install (`GET /app`) and its delivery health (`GET /health`). |
 | `catalog:read` | Read published catalog products (`GET /catalog/products`, `GET /catalog/products/{handle}`), with keyset `cursor` and `updatedSince` pagination, and subscribe to `catalog.product.updated`. |
-| `orders:read:minimal` | Read minimized order lists and details (`GET /orders`, `GET /orders/{orderId}`). |
+| `orders:read-minimal` | Read minimized order lists and details (`GET /orders`, `GET /orders/{orderId}`). |
 | `orders:webhook` | Subscribe to `order.created`, `order.partially_fulfilled`, and `order.fulfilled` CloudEvents. |
-| `customers:read:minimal` | Read minimal marketing consent state keyed by opaque customer id and subscribe to `customer.marketing_consent.updated`. |
+| `customers:read-minimal` | Read minimal marketing consent state keyed by opaque customer id and subscribe to `customer.marketing_consent.updated`. |
 | `inventory:read` | Read availability, policy, per-location mirror-ledger readings (`GET /inventory`), and inventory locations (`GET /inventory/locations`, `GET /inventory/locations/{locationId}`), plus subscribe to `inventory.changed`. |
 | `inventory:write` | Upsert inventory locations (`PUT /inventory/locations/{locationId}`), record single or batch stock movements (`POST /inventory/movements`, `POST /inventory/adjustments`), and reconcile absolute levels with compare-and-swap (`PUT /inventory/levels`). |
 | `reports:read` | Read aggregate report snapshots (`GET /reports`). |
 | `attribution:write` | Write idempotent, app-owned attribution records (`POST /attribution`) and subscribe to `attribution.finalized`. |
 | `widgets:launch` | Activate declared sandboxed widget placements and mint short-lived widget launch tokens. |
 | `fulfillment:process` | Read carrier capabilities (`GET /fulfillment/carriers`), read active fulfillment assignments (`GET /fulfillment/assignments`), report whole-order shipment evidence (`POST /fulfillment/orders/{orderId}/shipment-evidence`), record 1:N split shipments (`POST /fulfillment/assignments/{assignmentId}/shipments`), and report fulfillment exceptions (`POST /fulfillment/assignments/{assignmentId}/exceptions`). |
-| `orders:read:recipient` | Read the ship-to recipient of one assigned order (`GET /fulfillment/orders/{orderId}/recipient`), consent-gated and audited. |
+| `orders:read-recipient` | Read the ship-to recipient of one assigned order (`GET /fulfillment/orders/{orderId}/recipient`), consent-gated and audited. |
 | App-install ownership | List and replay this installation's webhook delivery records, generate synthetic preview orders or run a full 5-step smoke test (`POST /api/apps/admin/test-orders` with `action: "bind" \| "create" \| "release" \| "hold" \| "cancel" \| "smoke"` in `env=test`, or **"Run Smoke Test"** in `/dashboard/<tenant>/apps`), and stage production candidate manifests (`POST /api/apps/admin/candidates`). |
 
 Catalog and inventory list endpoints (`GET /catalog/products` and `GET /inventory`) support opaque
@@ -265,7 +265,7 @@ A verifier MUST accept a delivery that meets all of the following, and MUST reje
 A private app can act as a merchant's fulfillment processor for whole orders. The merchant
 configures one install as processor and grants a separate consent; a Storefront operator then
 releases an order, which assigns it to that install exclusively. The app never assigns itself.
-Scopes: `fulfillment:process` and `orders:read:recipient`. Topics:
+Scopes: `fulfillment:process` and `orders:read-recipient`. Topics:
 `fulfillment.assignment.created` and `fulfillment.assignment.updated`. Routes, all under
 `/api/apps/v1`: `GET /fulfillment/assignments`,
 `GET /fulfillment/orders/{orderId}/recipient` and

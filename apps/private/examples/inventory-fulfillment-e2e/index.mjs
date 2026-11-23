@@ -244,7 +244,7 @@ export function createSimulatedGateway({ signingJwk, tenantId = 'acme' } = {}) {
         access_token: 'sim-preview-jwt-token',
         token_type: 'Bearer',
         expires_in: 300,
-        scope: 'catalog:read inventory:read inventory:write orders:read:minimal reports:read',
+        scope: 'catalog:read inventory:read inventory:write orders:read-minimal reports:read',
       });
     }
 

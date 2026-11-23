@@ -2,7 +2,7 @@
 
 **Target systems:** Multi-warehouse 3PL routers, dropship supplier portals, and split-fulfillment connectors.
 
-**Scopes required (`tot-app.json`):** `orders:read:minimal`, `orders:read:recipient`, `orders:webhook`, `fulfillment:process`, `inventory:read`, `inventory:write`
+**Scopes required (`tot-app.json`):** `orders:read-minimal`, `orders:read-recipient`, `orders:webhook`, `fulfillment:process`, `inventory:read`, `inventory:write`
 
 This recipe demonstrates how a multi-supplier dropship or 3PL connector integrates with Storefront
 Private Apps v1.3 across both **Stone 1 (Live)** — location-keyed processor coexistence, partial PO

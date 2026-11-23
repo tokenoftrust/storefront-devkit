@@ -14,7 +14,7 @@
     "catalog:read",
     "inventory:read",
     "inventory:write",
-    "orders:read:minimal",
+    "orders:read-minimal",
     "reports:read"
   ],
   "webhooks": {

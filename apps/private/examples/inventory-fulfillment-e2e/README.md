@@ -24,7 +24,7 @@ It is a test and reference for the API calls, not a merchant-facing app; start a
 - `inventory:write` — declare stock locations (`PUT /api/apps/v1/inventory/locations/{locationId}`),
   record movement batches (`POST /api/apps/v1/inventory/movements`) and reconcile absolute levels
   (`PUT /api/apps/v1/inventory/levels`).
-- `orders:read:minimal` — read minimized order lists (`GET /api/apps/v1/orders`) to verify
+- `orders:read-minimal` — read minimized order lists (`GET /api/apps/v1/orders`) to verify
   synthetic preview orders without raw customer PII.
 - `reports:read` — read the aggregate `sales-velocity` snapshot (`GET /api/apps/v1/reports`).
 

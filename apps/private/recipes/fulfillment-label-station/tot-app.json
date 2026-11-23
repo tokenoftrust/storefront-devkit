@@ -11,8 +11,8 @@
   "description": "Shipping and label station connector supporting PACT Act & adult-signature carrier validation, 1:N split-carton assignment shipments, and whole-order shipment evidence (label-purchased, label-voided, handed-off).",
   "installMode": "external",
   "scopes": [
-    "orders:read:minimal",
-    "orders:read:recipient",
+    "orders:read-minimal",
+    "orders:read-recipient",
     "orders:webhook",
     "fulfillment:process"
   ],
