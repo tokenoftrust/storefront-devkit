@@ -7,9 +7,9 @@
 //   -> GET /fulfillment/assignments            what to ship, allowed carriers, adult signature?
 //   -> GET /fulfillment/orders/{id}/recipient  ship-to, in memory only, never logged or stored
 //   -> label provider: create order + create label
-//   -> POST shipment-evidence label-outcome    label purchased (carrier, tracking, adultSignature)
-//   -> carrier pickup (SHIP_NOTIFY; the mock fires it after MOCK_PICKUP_SECONDS)
-//   -> POST shipment-evidence handoff          Storefront marks the order fulfilled
+//   -> POST shipment-evidence label-outcome    label purchased (carrier, tracking, adultSignature; what ShipStation's SHIP_NOTIFY signals)
+//   -> carrier pickup / first carrier scan     (the mock fires it after MOCK_PICKUP_SECONDS; never report handoff on label creation alone)
+//   -> POST shipment-evidence handoff          carrier accepted the parcel; Storefront marks the order fulfilled
 //
 // fulfillment.assignment.updated (Storefront -> station):
 //   held       -> put the provider order on hold; no label is bought and no handoff is reported
@@ -175,7 +175,7 @@ export function createLabelStation({ tot, provider, store, configuredCarriers = 
     }
   }
 
-  async function onShipNotify(shipment) {
+  async function onCarrierPickup(shipment) {
     const entry = (await store.entries('assign:')).find(([, w]) => w.shipment?.shipmentId === shipment.shipmentId);
     if (!entry) return;
     const [k, w] = entry;
@@ -191,6 +191,7 @@ export function createLabelStation({ tot, provider, store, configuredCarriers = 
       await store.set(k, w);
     }
   }
+  const onShipNotify = onCarrierPickup;
 
   /** fulfillment.assignment.updated: hold, resume or cancel the provider order. Older eventVersions are ignored. */
   async function onAssignmentUpdated(data) {
@@ -239,7 +240,7 @@ export function createLabelStation({ tot, provider, store, configuredCarriers = 
     'order.fulfilled': async (e) => log('order.fulfilled.event', { data: e.data }),
   };
 
-  return { discoverCarriers, processAssignment, onShipNotify, onAssignmentUpdated, reconcile, handlers, get carriers() { return carriers; } };
+  return { discoverCarriers, processAssignment, onCarrierPickup, onShipNotify, onAssignmentUpdated, reconcile, handlers, get carriers() { return carriers; } };
 }
 
 /** HTTP client for the label provider (the in-process mock unless PROVIDER_API_URL is set). */
