@@ -74,6 +74,7 @@
           "inventory:write",
           "purchasing:read",
           "purchasing:write",
+          "proposal-events:read",
           "reports:read",
           "attribution:write",
           "widgets:launch",
@@ -119,7 +120,11 @@
               "attribution.finalized",
               "fulfillment.assignment.created",
               "fulfillment.assignment.updated",
-              "fulfillment.label.voided"
+              "fulfillment.label.voided",
+              "proposal.filed",
+              "proposal.applied",
+              "proposal.rejected",
+              "proposal.expired"
             ]
           }
         },

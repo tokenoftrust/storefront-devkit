@@ -2,7 +2,7 @@ asyncapi: 2.6.0
 id: 'urn:com:tokenoftrust:storefront:private-apps:webhooks'
 info:
   title: Storefront Private Apps Webhook Spine
-  version: "1.5.0"
+  version: "1.6.0"
   description: >
     Outbound webhook events delivered to installed Storefront Private Apps. Every event
     is a CloudEvents 1.0 JSON envelope delivered over HTTPS POST and signed with HTTP
@@ -226,6 +226,42 @@ channels:
       message:
         $ref: '#/components/messages/FulfillmentLabelVoided'
 
+  proposal.filed:
+    description: >-
+      Emitted once when a sponsored agent files a proposal and it enters pending review.
+      Requires scope proposal-events:read.
+    subscribe:
+      operationId: onProposalFiled
+      message:
+        $ref: '#/components/messages/ProposalFiled'
+
+  proposal.applied:
+    description: >-
+      Emitted once when an owner-approved proposal and its domain effect commit.
+      Requires scope proposal-events:read.
+    subscribe:
+      operationId: onProposalApplied
+      message:
+        $ref: '#/components/messages/ProposalApplied'
+
+  proposal.rejected:
+    description: >-
+      Emitted once when the owner rejection commits.
+      Requires scope proposal-events:read.
+    subscribe:
+      operationId: onProposalRejected
+      message:
+        $ref: '#/components/messages/ProposalRejected'
+
+  proposal.expired:
+    description: >-
+      Emitted once when the transition of an undecided proposal to expired commits.
+      Requires scope proposal-events:read.
+    subscribe:
+      operationId: onProposalExpired
+      message:
+        $ref: '#/components/messages/ProposalExpired'
+
 components:
   messageTraits:
     cloudEventEnvelope:
@@ -287,6 +323,10 @@ components:
             - com.tokenoftrust.storefront.fulfillment.assignment.created
             - com.tokenoftrust.storefront.fulfillment.assignment.updated
             - com.tokenoftrust.storefront.fulfillment.label.voided
+            - com.tokenoftrust.storefront.proposal.filed
+            - com.tokenoftrust.storefront.proposal.applied
+            - com.tokenoftrust.storefront.proposal.rejected
+            - com.tokenoftrust.storefront.proposal.expired
         time:
           type: string
           format: date-time
@@ -494,7 +534,113 @@ components:
         purchaseId: { type: string, description: The platform purchase id of the voided label. }
         occurredAt: { type: string, format: date-time }
 
+    ProposalLifecycleData:
+      type: object
+      description: Minimized lifecycle projection for an owner-enabled tenant and stage subscription.
+      additionalProperties: false
+      required: [proposalId, kind, schemaVersion, state, transitionAt]
+      properties:
+        proposalId:
+          type: string
+          minLength: 1
+          description: Server-minted opaque proposal reference.
+        kind:
+          type: string
+          minLength: 1
+          description: Registered proposal kind.
+        schemaVersion:
+          type: integer
+          minimum: 1
+          description: Version of the registered proposal kind, independent of dataschemaversion.
+        state:
+          type: string
+          enum: [pending, applied, rejected, expired]
+        transitionAt:
+          type: string
+          format: date-time
+          description: Storage-clock time of the committed transition.
+
   messages:
+    ProposalFiled:
+      name: proposalFiled
+      messageId: proposalFiled
+      title: proposal.filed
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              type: { const: com.tokenoftrust.storefront.proposal.filed }
+              data:
+                allOf:
+                  - $ref: '#/components/schemas/ProposalLifecycleData'
+                  - type: object
+                    properties:
+                      state: { const: pending }
+
+    ProposalApplied:
+      name: proposalApplied
+      messageId: proposalApplied
+      title: proposal.applied
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              type: { const: com.tokenoftrust.storefront.proposal.applied }
+              data:
+                allOf:
+                  - $ref: '#/components/schemas/ProposalLifecycleData'
+                  - type: object
+                    properties:
+                      state: { const: applied }
+
+    ProposalRejected:
+      name: proposalRejected
+      messageId: proposalRejected
+      title: proposal.rejected
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              type: { const: com.tokenoftrust.storefront.proposal.rejected }
+              data:
+                allOf:
+                  - $ref: '#/components/schemas/ProposalLifecycleData'
+                  - type: object
+                    properties:
+                      state: { const: rejected }
+
+    ProposalExpired:
+      name: proposalExpired
+      messageId: proposalExpired
+      title: proposal.expired
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              type: { const: com.tokenoftrust.storefront.proposal.expired }
+              data:
+                allOf:
+                  - $ref: '#/components/schemas/ProposalLifecycleData'
+                  - type: object
+                    properties:
+                      state: { const: expired }
+
     AppInstalled:
       name: appInstalled
       messageId: appInstalled

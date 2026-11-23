@@ -60,6 +60,13 @@
       "pii": "none — ids, skus, quantities and money in minor units only."
     },
     {
+      "id": "proposal-events:read",
+      "grants": "Subscribe to proposal.filed, proposal.applied, proposal.rejected and proposal.expired through owner-enabled private webhook subscriptions for the installed tenant and stage.",
+      "access": "read (event delivery)",
+      "dataMinimization": "Opaque proposal id, registered kind, kind schema version, state and committed transition timestamp only.",
+      "pii": "none"
+    },
+    {
       "id": "reports:read",
       "grants": "Read limited, pre-defined report snapshots/exports (GET /reports).",
       "access": "read",
