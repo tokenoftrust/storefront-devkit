@@ -2,7 +2,7 @@ asyncapi: 2.6.0
 id: 'urn:com:tokenoftrust:storefront:private-apps:webhooks'
 info:
   title: Storefront Private Apps Webhook Spine
-  version: "1.4.0"
+  version: "1.5.0"
   description: >
     Outbound webhook events delivered to installed Storefront Private Apps. Every event
     is a CloudEvents 1.0 JSON envelope delivered over HTTPS POST and signed with HTTP
@@ -86,6 +86,39 @@ channels:
       operationId: onInventoryStocktakeCompleted
       message:
         $ref: '#/components/messages/InventoryStocktakeCompleted'
+
+  purchase_order.created:
+    description: >
+      Emitted once when a draft purchase order is created. Requires scope purchasing:read.
+      Closed payload: order id, number, supplier id, status, version, receiving location id,
+      currency and as-of; no lines, no supplier or contact data.
+    subscribe:
+      operationId: onPurchaseOrderCreated
+      message:
+        $ref: '#/components/messages/PurchaseOrderCreated'
+
+  purchase_order.updated:
+    description: >
+      Emitted once per committed change to an existing purchase order: a draft edit, send,
+      or close. Requires scope purchasing:read. Same closed payload as purchase_order.created;
+      the `version` is the order version the change committed at, so receivers order and dedupe
+      on it. A receipt emits purchase_order.received instead.
+    subscribe:
+      operationId: onPurchaseOrderUpdated
+      message:
+        $ref: '#/components/messages/PurchaseOrderUpdated'
+
+  purchase_order.received:
+    description: >
+      Emitted once per committed receipt against a purchase order, never for an idempotent
+      replay. Requires scope purchasing:read. The purchase order payload plus the receipt's
+      `receiptKey` and the lines it received (`lineNo`, `sku`, `quantity`); `status` is
+      `partially_received` or `received`. The stock movements the receipt posted emit
+      `inventory.changed` separately.
+    subscribe:
+      operationId: onPurchaseOrderReceived
+      message:
+        $ref: '#/components/messages/PurchaseOrderReceived'
 
   order.created:
     description: Emitted when an order is created. Requires scope orders:webhook. Minimized order payload.
@@ -240,6 +273,9 @@ components:
             - com.tokenoftrust.storefront.catalog.product.updated
             - com.tokenoftrust.storefront.inventory.changed
             - com.tokenoftrust.storefront.inventory.stocktake.completed
+            - com.tokenoftrust.storefront.purchase_order.created
+            - com.tokenoftrust.storefront.purchase_order.updated
+            - com.tokenoftrust.storefront.purchase_order.received
             - com.tokenoftrust.storefront.order.created
             - com.tokenoftrust.storefront.order.paid
             - com.tokenoftrust.storefront.order.fulfilled
@@ -350,6 +386,56 @@ components:
         lineCount: { type: integer, minimum: 0, description: Lines in the session, counted or not. }
         varianceCount: { type: integer, minimum: 0, description: Lines whose counted quantity differs from the frozen expected quantity; each posted one movement. }
         netDelta: { type: integer, description: Sum of the posted variances; negative when the count found less stock than expected. }
+
+    PurchaseOrderData:
+      type: object
+      additionalProperties: false
+      description: >
+        Closed eight-key payload of purchase_order.created and purchase_order.updated, scoped to
+        one commerce stage. Carries identifiers, status, version and as-of only: no lines, no
+        supplier, contact or customer data.
+      required: [poId, poNumber, supplierId, status, version, locationId, currency, asOf]
+      properties:
+        poId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        poNumber: { type: integer, minimum: 1, description: The tenant's sequential purchase order number for the stage. }
+        supplierId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        status:
+          type: string
+          enum: [draft, sent, partially_received, received, closed]
+          description: Always draft on purchase_order.created.
+        version: { type: integer, minimum: 0, description: The order version the change committed at. }
+        locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$', description: The order's receiving location. }
+        currency: { type: string, pattern: '^[A-Z]{3}$', description: The supplier's currency, fixed at creation. }
+        asOf: { type: string, format: date-time }
+
+    PurchaseOrderReceivedData:
+      type: object
+      additionalProperties: false
+      description: >
+        Closed ten-key payload of purchase_order.received: the PurchaseOrderData keys plus the
+        receipt's key and the lines it received.
+      required: [poId, poNumber, supplierId, status, version, locationId, currency, asOf, receiptKey, lines]
+      properties:
+        poId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        poNumber: { type: integer, minimum: 1 }
+        supplierId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        status: { type: string, enum: [partially_received, received] }
+        version: { type: integer, minimum: 0 }
+        locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        asOf: { type: string, format: date-time }
+        receiptKey: { type: string, pattern: '^[A-Za-z0-9._:-]{1,120}$', description: The receipt's Idempotency-Key. }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [lineNo, sku, quantity]
+            properties:
+              lineNo: { type: integer, minimum: 1 }
+              sku: { type: string, minLength: 1 }
+              quantity: { type: integer, minimum: 1, description: The quantity this receipt received on the line. }
 
     CustomerMarketingConsentUpdatedData:
       type: object
@@ -484,6 +570,48 @@ components:
           - type: object
             properties:
               data: { $ref: '#/components/schemas/InventoryStocktakeCompletedData' }
+
+    PurchaseOrderCreated:
+      name: purchaseOrderCreated
+      messageId: purchaseOrderCreated
+      title: purchase_order.created
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/PurchaseOrderData' }
+
+    PurchaseOrderUpdated:
+      name: purchaseOrderUpdated
+      messageId: purchaseOrderUpdated
+      title: purchase_order.updated
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/PurchaseOrderData' }
+
+    PurchaseOrderReceived:
+      name: purchaseOrderReceived
+      messageId: purchaseOrderReceived
+      title: purchase_order.received
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/PurchaseOrderReceivedData' }
 
     OrderCreated:
       name: orderCreated
