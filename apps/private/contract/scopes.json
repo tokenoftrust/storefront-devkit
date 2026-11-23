@@ -33,9 +33,9 @@
     },
     {
       "id": "inventory:read",
-      "grants": "Read inventory availability/quantity for the tenant's catalog (GET /inventory), list the tenant's stock locations (GET /inventory/locations), and subscribe to inventory.changed.",
+      "grants": "Read inventory availability/quantity for the tenant's catalog (GET /inventory), list the tenant's stock locations (GET /inventory/locations), read the tenant's stocktake sessions (GET /inventory/stocktakes and GET /inventory/stocktakes/{sessionId}), and subscribe to inventory.changed and inventory.stocktake.completed.",
       "access": "read",
-      "dataMinimization": "Availability, quantity, and policy per variant/SKU only, plus the mirror-ledger reading (balance, asOf) for one location. Locations are id, name, kind, fulfillable flag, status and update time. inventory.changed carries sku, locationId, balance, available and asOf only.",
+      "dataMinimization": "Availability, quantity, and policy per variant/SKU only, plus the mirror-ledger reading (balance, asOf) for one location. Locations are id, name, kind, fulfillable flag, status and update time. inventory.changed carries sku, locationId, balance, available and asOf only. A stocktake session is its id, kind, location, status, timestamps and totals, plus per-sku expected, counted and variance lines, with the actor named by kind only; inventory.stocktake.completed carries sessionId, locationId, kind, completedAt, lineCount, varianceCount and netDelta only.",
       "pii": "none"
     },
     {
