@@ -11,7 +11,7 @@
 //   POST /orders/restorefromhold       { orderId } -> order back to awaiting_shipment
 //   POST /orders/cancel                { orderId } -> order cancelled (void its label first)
 // Mock-only:
-//   POST /_mock/pickup/<shipmentId>    -> simulates the carrier scan; fires the SHIP_NOTIFY-style callback
+//   POST /_mock/pickup/<shipmentId>    -> simulates the carrier acceptance scan (not label creation / SHIP_NOTIFY)
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
 
@@ -24,7 +24,8 @@ const CARRIERS = [
 const upsTracking = () => `1Z${randomBytes(8).toString('hex').toUpperCase()}`;
 const fedexTracking = () => String(Math.floor(1e11 + Math.random() * 9e11));
 
-export function startMockLabelProvider({ port, onShipNotify = () => {} }) {
+export function startMockLabelProvider({ port, onCarrierPickup, onShipNotify = () => {} }) {
+  const notifyPickup = onCarrierPickup ?? onShipNotify;
   const orders = new Map(); // orderId -> order
   const shipments = new Map(); // shipmentId -> shipment
   let seq = 100000;
@@ -95,7 +96,7 @@ export function startMockLabelProvider({ port, onShipNotify = () => {} }) {
       if (!s || s.voided) return send(404, { Message: 'no live shipment' });
       if (orders.get(s.orderId)?.orderStatus !== 'awaiting_shipment') return send(409, { Message: 'order is not ready to ship' });
       send(200, { ok: true });
-      onShipNotify(s);
+      notifyPickup(s);
       return;
     }
 
