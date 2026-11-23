@@ -35,6 +35,9 @@
   created window, published-key lookup, replay guard) and `ApiClient` (Idempotency-Key reused on
   retry, Retry-After, bounded backoff, cursor pagination), with one error model. Build connectors
   on it instead of re-implementing auth, signatures, retries or pagination.
+- [docs/platform-and-apps.md](./docs/platform-and-apps.md): What Storefront does and what apps do —
+  the scope test, the three classes (Native, App territory, Never), the first-party-app release
+  valve, and how the line moves. Read it before deciding whether to build an app for a capability.
 - [private-apps/](./private-apps/): Stable compatibility guide for the current, language-neutral
   private-app path. The MCP recipe `recipe://storefront-private-apps-devbook` is a pointer/index,
   not a source of truth.

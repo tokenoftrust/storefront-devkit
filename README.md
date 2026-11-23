@@ -57,6 +57,10 @@ Storefront tenant rather than customizing its tenant-owned files.
   [`apps/private/recipes/fulfillment-label-station/`](./apps/private/recipes/fulfillment-label-station/),
   [`apps/private/recipes/dropship-multi-supplier/`](./apps/private/recipes/dropship-multi-supplier/)).
   The stable [`private-apps/`](./private-apps/) guide remains available for existing links.
+- **What belongs in the platform and what belongs in an app?** Read
+  [`docs/platform-and-apps.md`](./docs/platform-and-apps.md): the five-question scope test, the
+  three classes (Native, App territory, Never), the first-party-app release valve, and how the
+  line moves. It is our commitment to partners.
 - **Building a connector in JavaScript?** Vendor [`packages/connector-kit/`](./packages/connector-kit/):
   zero-dependency source for client auth (secret or `private_key_jwt`, early refresh), RFC 9421
   webhook verification with a replay guard, and an API client that reuses `Idempotency-Key` on
