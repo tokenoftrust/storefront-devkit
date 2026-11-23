@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Storefront Private Apps API
-  version: "1.4.0"
+  version: "1.5.0"
   x-contractVersion: "1"
   description: >
     Scoped, least-privilege API for installed Storefront Private Apps. All access is
@@ -63,6 +63,12 @@ tags:
       Inventory availability reads, and merchant-consented stock corrections into the tenant's
       mirror ledger. An app correction is a mirror observation, never an order decrement, a
       reservation or an authoritative provider.
+  - name: purchasing
+    description: >
+      Suppliers and multi-line purchase orders over the tenant's native purchasing records, and
+      the stock receipts a purchase-order receipt posts into the inventory ledger. Money is
+      integer minor units in the supplier's currency; quantities are safe integers. A purchase
+      order never changes stock until a receipt is posted against it.
   - name: reports
     description: Report snapshots.
   - name: attribution
@@ -850,6 +856,425 @@ paths:
         '422': { $ref: '#/components/responses/InventoryRefused' }
         '503': { $ref: '#/components/responses/InventoryRefused' }
 
+  /purchasing/suppliers:
+    get:
+      tags: [purchasing]
+      operationId: listSuppliers
+      summary: List suppliers
+      x-requiredScope: purchasing:read
+      description: >
+        Requires scope `purchasing:read`. The routed stage's suppliers in `supplierId ASC` order,
+        1..200 per page (default 50), with an opaque keyset `cursor`. Response is
+        `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, archived] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 512 }
+          description: Opaque keyset cursor from a prior page's `nextCursor`.
+      responses:
+        '200':
+          description: One page of suppliers.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplierList' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+    post:
+      tags: [purchasing]
+      operationId: createSupplier
+      summary: Create a supplier (idempotent)
+      x-requiredScope: purchasing:write
+      description: >
+        Requires scope `purchasing:write`. Creates an active supplier with its lead time in
+        days, minimum order quantity and currency. The currency is fixed at creation and is the
+        currency of every purchase order raised against the supplier. `Idempotency-Key` is
+        REQUIRED and bound to the canonical body: a same-key, same-body retry returns the
+        original supplier, another body answers 409 `conflict`. The supplier id is derived from
+        the key; a body naming `supplierId`, `status` or a timestamp is refused 400
+        `malformed`. Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/PurchasingIdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupplierCreate' }
+      responses:
+        '201':
+          description: The supplier is created, or this is the replay of the supplier under the same key.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Supplier' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '409': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+  /purchasing/suppliers/{supplierId}:
+    get:
+      tags: [purchasing]
+      operationId: getSupplier
+      summary: Read one supplier
+      x-requiredScope: purchasing:read
+      description: Requires scope `purchasing:read`. 404 `not-found` for an unknown supplier.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/SupplierId'
+      responses:
+        '200':
+          description: The supplier.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Supplier' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '404': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+    patch:
+      tags: [purchasing]
+      operationId: updateSupplier
+      summary: Update a supplier
+      x-requiredScope: purchasing:write
+      description: >
+        Requires scope `purchasing:write`. Changes any of `name`, `leadTimeDays`, `moq`, `note`
+        and `status` (`archived` refuses new purchase orders and keeps existing ones). At least
+        one field is required and `currency` cannot change. A repeat of the same patch is
+        idempotent without a key. Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/SupplierId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupplierPatch' }
+      responses:
+        '200':
+          description: The supplier after the update.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Supplier' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '404': { $ref: '#/components/responses/PurchasingRefused' }
+        '409': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+  /purchasing/suppliers/{supplierId}/costs:
+    get:
+      tags: [purchasing]
+      operationId: listSupplierCosts
+      summary: Read a supplier's unit cost history
+      x-requiredScope: purchasing:read
+      description: >
+        Requires scope `purchasing:read`. The unit costs the supplier was paid, one point per
+        received line, newest first, optionally for one SKU. Each point names the purchase order
+        and receipt that recorded it. 404 `not-found` for an unknown supplier.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/SupplierId'
+        - name: sku
+          in: query
+          schema: { type: string, minLength: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Cost points, newest first.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupplierCostList' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '404': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+  /purchasing/purchase-orders:
+    get:
+      tags: [purchasing]
+      operationId: listPurchaseOrders
+      summary: List purchase orders
+      x-requiredScope: purchasing:read
+      description: >
+        Requires scope `purchasing:read`. The routed stage's purchase orders with their lines,
+        newest (highest `poNumber`) first, 1..200 per page (default 50), with an opaque keyset
+        `cursor`. Filter by `status`, `supplierId` and `sku`. Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/PurchaseOrderStatus' }
+        - name: supplierId
+          in: query
+          schema: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        - name: sku
+          in: query
+          schema: { type: string, minLength: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 512 }
+          description: Opaque keyset cursor from a prior page's `nextCursor`.
+      responses:
+        '200':
+          description: One page of purchase orders.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderList' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+    post:
+      tags: [purchasing]
+      operationId: createPurchaseOrder
+      summary: Create a draft purchase order (idempotent)
+      x-requiredScope: purchasing:write
+      description: >
+        Requires scope `purchasing:write`. Creates a draft with 1..250 lines for an active
+        supplier, in the supplier's currency, receiving at `locationId` (`unspecified` or an
+        active declared location). Every line `sku` must be in the tenant catalog (422
+        `unknown-sku`); a SKU appears on at most one line; line numbers are assigned in order
+        from 1. The order number is the next number for the tenant and stage. `Idempotency-Key`
+        is REQUIRED and bound to the canonical body: a same-key, same-body retry returns the
+        original order, another body answers 409 `conflict`. Emits `purchase_order.created` to
+        active installs holding `purchasing:read`. Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/PurchasingIdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseOrderCreate' }
+      responses:
+        '201':
+          description: The draft is created, or this is the replay of the order under the same key.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrder' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '404': { $ref: '#/components/responses/PurchasingRefused' }
+        '409': { $ref: '#/components/responses/PurchasingRefused' }
+        '422': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+  /purchasing/purchase-orders/{poId}:
+    get:
+      tags: [purchasing]
+      operationId: getPurchaseOrder
+      summary: Read one purchase order
+      x-requiredScope: purchasing:read
+      description: Requires scope `purchasing:read`. 404 `not-found` for an unknown order.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/PurchaseOrderId'
+      responses:
+        '200':
+          description: The purchase order with its lines.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrder' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '404': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+    patch:
+      tags: [purchasing]
+      operationId: updatePurchaseOrder
+      summary: Edit a draft purchase order
+      x-requiredScope: purchasing:write
+      description: >
+        Requires scope `purchasing:write`. Edits a draft: `locationId`, `expectedAt`, `note`, and
+        `lines` (which replaces every line; the same catalog and uniqueness rules as create
+        apply). At least one field is required. A sent, received or closed order answers 409
+        `invalid-state`. `expectedVersion`, when given, refuses with 409 `conflict` unless the
+        order is still at that version. Emits `purchase_order.updated` at the new version.
+        Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/PurchaseOrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseOrderPatch' }
+      responses:
+        '200':
+          description: The order after the edit.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrder' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '404': { $ref: '#/components/responses/PurchasingRefused' }
+        '409': { $ref: '#/components/responses/PurchasingRefused' }
+        '422': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+  /purchasing/purchase-orders/{poId}/send:
+    post:
+      tags: [purchasing]
+      operationId: sendPurchaseOrder
+      summary: Send a draft purchase order
+      x-requiredScope: purchasing:write
+      description: >
+        Requires scope `purchasing:write`. Moves a draft with at least one line to `sent`; any
+        other status answers 409 `invalid-state`. The body is optional and carries only
+        `expectedVersion` (409 `conflict` unless the order is still at that version). Emits
+        `purchase_order.updated`. Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/PurchaseOrderId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseOrderTransition' }
+      responses:
+        '200':
+          description: The order after the transition.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrder' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '404': { $ref: '#/components/responses/PurchasingRefused' }
+        '409': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+  /purchasing/purchase-orders/{poId}/close:
+    post:
+      tags: [purchasing]
+      operationId: closePurchaseOrder
+      summary: Close a purchase order
+      x-requiredScope: purchasing:write
+      description: >
+        Requires scope `purchasing:write`. Ends an order in any open status; quantity not yet
+        received is abandoned and later receipts answer 409 `po-closed`. Closing a closed order
+        answers 409 `invalid-state`. The body is optional and carries only `expectedVersion`.
+        Emits `purchase_order.updated`. Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/PurchaseOrderId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseOrderTransition' }
+      responses:
+        '200':
+          description: The order after the transition.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrder' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '404': { $ref: '#/components/responses/PurchasingRefused' }
+        '409': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+  /purchasing/purchase-orders/{poId}/receipts:
+    post:
+      tags: [purchasing]
+      operationId: receivePurchaseOrder
+      summary: Record a receipt against a purchase order (atomic, idempotent, partial)
+      x-requiredScope: purchasing:write
+      description: >
+        Requires scope `purchasing:write` on an active install of the host tenant whose env
+        matches the routed stage. Receives 1..250 lines (by `lineNo`) against a `sent` or
+        `partially_received` order. One receipt is one ledger transaction: a `received` stock
+        movement per line at `locationId` (the order's receiving location by default; the
+        location must be `unspecified` or declared active), each line's received quantity, the
+        order's status and the supplier's cost history all commit together or not at all.
+        `unitCostMinor` defaults to the line's ordered cost and is recorded in the cost history.
+        A line may not receive more than it has outstanding (409 `over-receipt`); a draft is
+        409 `not-receivable`; a closed order is 409 `po-closed`; a `lineNo` the order does not
+        have is 422 `unknown-line`.
+        Server-derived fields: movement `asOf` is the server receive time, `source` the app
+        namespace and `actorId` the install. A body naming any of them is refused 400
+        `malformed`.
+        Idempotency: `Idempotency-Key` is REQUIRED, scoped to the order, and bound to the
+        canonical body. A same-key, same-body retry returns the original receipt with
+        `replayed: true` and posts nothing; another body answers 409 `conflict`.
+        Emits one `purchase_order.received` per committed receipt, and `inventory.changed` for
+        the stock it moved. A 2xx answer, replays included, rewrites the stage's availability
+        projection. Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/PurchasingIdempotencyKey'
+        - $ref: '#/components/parameters/PurchaseOrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseOrderReceiptWrite' }
+      responses:
+        '201':
+          description: The receipt is recorded, or this is the replay of the receipt under the same key.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseOrderReceipt' }
+        '400': { $ref: '#/components/responses/PurchasingRefused' }
+        '401': { $ref: '#/components/responses/PurchasingRefused' }
+        '403': { $ref: '#/components/responses/PurchasingRefused' }
+        '404': { $ref: '#/components/responses/PurchasingRefused' }
+        '409': { $ref: '#/components/responses/PurchasingRefused' }
+        '422': { $ref: '#/components/responses/PurchasingRefused' }
+        '503': { $ref: '#/components/responses/PurchasingRefused' }
+
+
   /fulfillment/assignments/{assignmentId}/shipments:
     post:
       tags: [fulfillment]
@@ -1459,6 +1884,27 @@ components:
         type: string
         minLength: 8
         maxLength: 128
+    PurchasingIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >
+        Client-generated idempotency key of a purchasing write: 8..120 characters of letters,
+        digits and `. _ : -`. Reusing a key with a different request body is rejected with 409
+        `conflict`.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9._:-]{8,120}$'
+    SupplierId:
+      name: supplierId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+    PurchaseOrderId:
+      name: poId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
     FulfillmentOrderId:
       name: orderId
       in: path
@@ -1605,6 +2051,17 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/InventoryRefusal' }
 
+    PurchasingRefused:
+      description: >
+        A refusal from a `/purchasing/*` route. Status and `code` pairs are listed on
+        `PurchasingRefusal.code`; a 400 names the request part in `field`. Always
+        `cache-control: no-store`; a refused write leaves no record, no movement and no event.
+      headers:
+        tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PurchasingRefusal' }
+
   schemas:
     Error:
       type: object
@@ -1639,6 +2096,8 @@ components:
               - customers:read:minimal
               - inventory:read
               - inventory:write
+              - purchasing:read
+              - purchasing:write
               - reports:read
               - attribution:write
               - widgets:launch
@@ -2257,6 +2716,9 @@ components:
             - app.uninstalled
             - catalog.product.updated
             - inventory.changed
+            - purchase_order.created
+            - purchase_order.updated
+            - purchase_order.received
             - order.created
             - order.paid
             - order.fulfilled
@@ -2941,6 +3403,254 @@ components:
               observedAt: { type: string, format: date-time }
               quantityDelta: { type: integer, description: The reconcile movement written; 0 when already equal. }
               balance: { type: integer }
+
+    PurchasingRefusal:
+      type: object
+      additionalProperties: false
+      required: [code, error]
+      properties:
+        code:
+          type: string
+          enum:
+            - malformed
+            - invalid
+            - invalid_token
+            - scope_denied
+            - denied
+            - stage_mismatch
+            - not-found
+            - unknown-supplier
+            - conflict
+            - invalid-state
+            - not-receivable
+            - po-closed
+            - over-receipt
+            - unknown-sku
+            - unknown-location
+            - unknown-line
+            - supplier-archived
+            - insufficient-stock
+            - balance-overflow
+            - unavailable
+          description: >
+            400 malformed (body, key, path or query outside the contract), 400 invalid (a
+            well-formed value the records refuse), 401 invalid_token (also a suspended or
+            uninstalled install), 403 scope_denied, 403 denied (tenant mismatch), 403
+            stage_mismatch (token env or install env differs from the host stage), 404 not-found,
+            404 unknown-supplier, 409 conflict (idempotency or version conflict), 409
+            invalid-state, 409 not-receivable (draft), 409 po-closed, 409 over-receipt, 422
+            unknown-sku, 422 unknown-location (undeclared or archived), 422 unknown-line, 422
+            supplier-archived, 422 insufficient-stock, 422 balance-overflow, 503 unavailable.
+        error: { type: string }
+        field:
+          type: string
+          description: >
+            The request part a 400 names: a body field, `body` for an unknown key and for an
+            empty, oversized, non-JSON or non-object body, `lines` for the line array or a
+            duplicate line, a query parameter, a path parameter, or `Idempotency-Key` for the
+            header.
+
+    PurchaseOrderStatus:
+      type: string
+      enum: [draft, sent, partially_received, received, closed]
+
+    Supplier:
+      type: object
+      additionalProperties: false
+      required: [supplierId, name, leadTimeDays, moq, currency, status, note, createdAt, updatedAt]
+      properties:
+        supplierId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        leadTimeDays: { type: integer, minimum: 0, maximum: 365 }
+        moq: { type: integer, minimum: 0, maximum: 1000000000, description: Minimum order quantity. }
+        currency: { type: string, pattern: '^[A-Z]{3}$', description: ISO 4217 code, fixed at creation. }
+        status: { type: string, enum: [active, archived] }
+        note: { type: [string, 'null'], maxLength: 1000 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    SupplierCreate:
+      type: object
+      additionalProperties: false
+      required: [name, leadTimeDays, moq, currency]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        leadTimeDays: { type: integer, minimum: 0, maximum: 365 }
+        moq: { type: integer, minimum: 0, maximum: 1000000000 }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        note: { type: [string, 'null'], minLength: 1, maxLength: 1000 }
+
+    SupplierPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        leadTimeDays: { type: integer, minimum: 0, maximum: 365 }
+        moq: { type: integer, minimum: 0, maximum: 1000000000 }
+        note: { type: [string, 'null'], minLength: 1, maxLength: 1000 }
+        status: { type: string, enum: [active, archived] }
+
+    SupplierList:
+      type: object
+      additionalProperties: false
+      required: [suppliers, nextCursor]
+      properties:
+        suppliers:
+          type: array
+          items: { $ref: '#/components/schemas/Supplier' }
+        nextCursor: { type: [string, 'null'], description: Opaque; null on the last page. }
+
+    SupplierCost:
+      type: object
+      additionalProperties: false
+      required: [supplierId, sku, unitCostMinor, currency, asOf, poId, receiptKey]
+      properties:
+        supplierId: { type: string }
+        sku: { type: string }
+        unitCostMinor: { type: integer, minimum: 0, maximum: 1000000000000, description: Minor units of `currency`. }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        asOf: { type: string, format: date-time, description: Receipt time. }
+        poId: { type: string }
+        receiptKey: { type: string, description: The receipt's Idempotency-Key. }
+
+    SupplierCostList:
+      type: object
+      additionalProperties: false
+      required: [costs]
+      properties:
+        costs:
+          type: array
+          items: { $ref: '#/components/schemas/SupplierCost' }
+
+    PurchaseOrderLine:
+      type: object
+      additionalProperties: false
+      required: [lineNo, sku, orderedQty, receivedQty, unitCostMinor]
+      properties:
+        lineNo: { type: integer, minimum: 1 }
+        sku: { type: string, description: The catalog's stored form of the SKU. }
+        orderedQty: { type: integer, minimum: 1, maximum: 1000000000 }
+        receivedQty: { type: integer, minimum: 0, description: Never above `orderedQty`. }
+        unitCostMinor: { type: integer, minimum: 0, maximum: 1000000000000, description: Minor units of the order's currency. }
+
+    PurchaseOrderLineWrite:
+      type: object
+      additionalProperties: false
+      required: [sku, orderedQty, unitCostMinor]
+      properties:
+        sku: { type: string, minLength: 1 }
+        orderedQty: { type: integer, minimum: 1, maximum: 1000000000 }
+        unitCostMinor: { type: integer, minimum: 0, maximum: 1000000000000 }
+
+    PurchaseOrder:
+      type: object
+      additionalProperties: false
+      required: [poId, poNumber, supplierId, status, locationId, currency, expectedAt, note, version, createdAt, updatedAt, closedAt, lines]
+      properties:
+        poId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        poNumber: { type: integer, minimum: 1 }
+        supplierId: { type: string }
+        status: { $ref: '#/components/schemas/PurchaseOrderStatus' }
+        locationId: { type: string, description: The receiving location. }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        expectedAt: { type: [string, 'null'], format: date-time }
+        note: { type: [string, 'null'], maxLength: 1000 }
+        version: { type: integer, minimum: 0, description: Increments on every committed change. }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        closedAt: { type: [string, 'null'], format: date-time }
+        lines:
+          type: array
+          maxItems: 250
+          items: { $ref: '#/components/schemas/PurchaseOrderLine' }
+
+    PurchaseOrderCreate:
+      type: object
+      additionalProperties: false
+      required: [supplierId, locationId, lines]
+      properties:
+        supplierId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        expectedAt: { type: [string, 'null'], format: date-time }
+        note: { type: [string, 'null'], minLength: 1, maxLength: 1000 }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 250
+          items: { $ref: '#/components/schemas/PurchaseOrderLineWrite' }
+
+    PurchaseOrderPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        expectedAt: { type: [string, 'null'], format: date-time }
+        note: { type: [string, 'null'], minLength: 1, maxLength: 1000 }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 250
+          description: Replaces every line.
+          items: { $ref: '#/components/schemas/PurchaseOrderLineWrite' }
+        expectedVersion: { type: integer, minimum: 0 }
+
+    PurchaseOrderTransition:
+      type: object
+      additionalProperties: false
+      properties:
+        expectedVersion: { type: integer, minimum: 0 }
+
+    PurchaseOrderList:
+      type: object
+      additionalProperties: false
+      required: [purchaseOrders, nextCursor]
+      properties:
+        purchaseOrders:
+          type: array
+          items: { $ref: '#/components/schemas/PurchaseOrder' }
+        nextCursor: { type: [string, 'null'], description: Opaque; null on the last page. }
+
+    PurchaseOrderReceiptWrite:
+      type: object
+      additionalProperties: false
+      required: [lines]
+      properties:
+        locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$', description: Defaults to the order's receiving location. }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 250
+          description: Each `lineNo` at most once.
+          items:
+            type: object
+            additionalProperties: false
+            required: [lineNo, quantity]
+            properties:
+              lineNo: { type: integer, minimum: 1, maximum: 250 }
+              quantity: { type: integer, minimum: 1, maximum: 1000000000 }
+              unitCostMinor: { type: integer, minimum: 0, maximum: 1000000000000, description: Defaults to the line's ordered cost. }
+
+    PurchaseOrderReceipt:
+      type: object
+      additionalProperties: false
+      required: [receiptKey, replayed, purchaseOrder, movements]
+      properties:
+        receiptKey: { type: string, description: The receipt's Idempotency-Key. }
+        replayed: { type: boolean, description: True when this is the original receipt returned for a repeated key. }
+        purchaseOrder: { $ref: '#/components/schemas/PurchaseOrder' }
+        movements:
+          type: array
+          description: The `received` stock movements the receipt posted, one per line in request order.
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, locationId, quantityDelta]
+            properties:
+              sku: { type: string }
+              locationId: { type: string }
+              quantityDelta: { type: integer, minimum: 1 }
 
     AssignmentLine:
       type: object
