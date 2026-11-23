@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Storefront Private Apps API
-  version: "1.4.0"
+  version: "1.5.0"
   x-contractVersion: "1"
   description: >
     Scoped, least-privilege API for installed Storefront Private Apps. All access is
@@ -808,6 +808,88 @@ paths:
         '401': { $ref: '#/components/responses/InventoryRefused' }
         '403': { $ref: '#/components/responses/InventoryRefused' }
         '409': { $ref: '#/components/responses/InventoryRefused' }
+        '503': { $ref: '#/components/responses/InventoryRefused' }
+
+  /inventory/stocktakes:
+    get:
+      tags: [inventory]
+      operationId: listInventoryStocktakes
+      summary: List the tenant's stocktake sessions
+      x-requiredScope: inventory:read
+      description: >
+        Requires scope `inventory:read`. Returns the stocktake sessions of the routed stage,
+        newest first, in pages of `limit` (1..200, default 50) with an opaque keyset `cursor`.
+        Read-only: an app never opens, counts, completes or abandons a stocktake, and never
+        sees an owner's subject id (`createdBy` and `completedBy` name the actor kind only).
+        A completed session posted its variances as `cycle_count` movements. A `tenant`,
+        `tenantId` or `stage` query parameter answers 403 `denied`. Response is
+        `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: status
+          in: query
+          schema: { type: string, enum: [open, completed, abandoned] }
+          description: Only sessions in this status.
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+          description: Maximum number of sessions returned per page.
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 512 }
+          description: Opaque keyset cursor returned in a prior page's `nextCursor`.
+      responses:
+        '200':
+          description: One page of stocktake sessions.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StocktakeList' }
+        '400': { $ref: '#/components/responses/InventoryRefused' }
+        '401': { $ref: '#/components/responses/InventoryRefused' }
+        '403': { $ref: '#/components/responses/InventoryRefused' }
+        '503': { $ref: '#/components/responses/InventoryRefused' }
+
+  /inventory/stocktakes/{sessionId}:
+    get:
+      tags: [inventory]
+      operationId: getInventoryStocktake
+      summary: Read one stocktake session with a page of its lines
+      x-requiredScope: inventory:read
+      description: >
+        Requires scope `inventory:read`. Returns the session, a page of its lines in `sku`
+        order (`limit` 1..250, default 100; `next` is the `after` value of the following page,
+        null on the last page) and `totals` over every line of the session. `expected` is the
+        on-hand frozen when the session opened, `counted` the latest absolute count (null until
+        counted), and `variance` is `counted` minus `expected`. A session id this tenant and
+        stage does not hold answers 404 `not-found`. Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string, pattern: '^st_[A-Za-z0-9_-]{20}$' }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 250, default: 100 }
+          description: Maximum number of lines returned per page.
+        - name: after
+          in: query
+          schema: { type: string, maxLength: 512 }
+          description: Exclusive `sku` cursor, the `next` of the previous page.
+      responses:
+        '200':
+          description: The session, a page of lines and the session totals.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StocktakeRead' }
+        '400': { $ref: '#/components/responses/InventoryRefused' }
+        '401': { $ref: '#/components/responses/InventoryRefused' }
+        '403': { $ref: '#/components/responses/InventoryRefused' }
+        '404': { $ref: '#/components/responses/InventoryRefused' }
         '503': { $ref: '#/components/responses/InventoryRefused' }
 
   /inventory/levels:
@@ -1845,6 +1927,7 @@ components:
             - scope_denied
             - denied
             - stage_mismatch
+            - not-found
             - unknown-sku
             - unknown-location
             - location-protected
@@ -1855,7 +1938,8 @@ components:
             400 malformed (body, key or query outside the contract), 400 server-derived-field,
             401 invalid_token (also a suspended or uninstalled install), 403 scope_denied,
             403 denied (tenant mismatch), 403 stage_mismatch (token env or install env differs
-            from the host stage), 422 unknown-sku, 422 unknown-location (undeclared or
+            from the host stage), 404 not-found (a stocktake session this tenant and stage does
+            not hold), 422 unknown-sku, 422 unknown-location (undeclared or
             archived), 409 location-protected, 409 balance-out-of-range,
             409 idempotency-conflict, 503 unavailable.
         error: { type: string }
@@ -1872,7 +1956,8 @@ components:
             a server-derived key, an unknown key as sent when it is identifier-shaped
             (`^[A-Za-z][A-Za-z0-9_]{0,63}$`), `body` for any other unknown key and for an empty,
             oversized, non-JSON or non-object body, `items` for the batch array or a duplicate item,
-            `locationId` for the path parameter, or `Idempotency-Key` for the header. With
+            `locationId` or `sessionId` for the path parameter, `status`, `limit` or `after`
+            for a stocktake query parameter, or `Idempotency-Key` for the header. With
             `index`, the field is inside that batch item.
 
     ReportList:
@@ -2257,6 +2342,7 @@ components:
             - app.uninstalled
             - catalog.product.updated
             - inventory.changed
+            - inventory.stocktake.completed
             - order.created
             - order.paid
             - order.fulfilled
@@ -2899,6 +2985,92 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/InventoryLocation' }
+
+    StocktakeActor:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      description: Who acted, by kind only. An id, namespace or subject id is never exposed.
+      properties:
+        kind: { type: string, enum: [owner, app, agent, system] }
+
+    Stocktake:
+      type: object
+      additionalProperties: false
+      required: [sessionId, kind, locationId, name, status, createdAt, createdBy, snapshotAt, completedAt, completedBy, abandonedAt, lineCount, varianceCount, netDelta]
+      properties:
+        sessionId: { type: string, pattern: '^st_[A-Za-z0-9_-]{20}$' }
+        kind:
+          type: string
+          enum: [full, cycle]
+          description: A `full` session froze every sku at the location, a `cycle` session only the skus it named.
+        locationId: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+        name: { type: string, maxLength: 120 }
+        status: { type: string, enum: [open, completed, abandoned] }
+        createdAt: { type: string, format: date-time }
+        createdBy: { $ref: '#/components/schemas/StocktakeActor' }
+        snapshotAt: { type: string, format: date-time, description: When the expected quantities were frozen. }
+        completedAt: { type: [string, 'null'], format: date-time }
+        completedBy:
+          oneOf:
+            - { $ref: '#/components/schemas/StocktakeActor' }
+            - { type: 'null' }
+        abandonedAt: { type: [string, 'null'], format: date-time }
+        lineCount: { type: integer, minimum: 0, description: Lines in the session, counted or not. }
+        varianceCount:
+          type: [integer, 'null']
+          minimum: 0
+          description: Lines whose variance was posted; null until the session completes.
+        netDelta:
+          type: [integer, 'null']
+          description: Sum of the posted variances; null until the session completes.
+
+    StocktakeLine:
+      type: object
+      additionalProperties: false
+      required: [sku, expected, counted, variance, varianceReason, unlisted, countedAt]
+      properties:
+        sku: { type: string, minLength: 1 }
+        expected: { type: integer, minimum: 0, description: On-hand frozen when the session opened; 0 for an unlisted sku. }
+        counted: { type: [integer, 'null'], minimum: 0, description: The latest absolute counted quantity; null until counted. }
+        variance: { type: [integer, 'null'], description: '`counted` minus `expected`; null until counted.' }
+        varianceReason:
+          type: [string, 'null']
+          enum: [miscount, damaged, expired, theft, receiving_error, other, null]
+          description: The reason recorded when the session completed with a nonzero variance.
+        unlisted: { type: boolean, description: The sku was counted although it was not in the frozen snapshot. }
+        countedAt: { type: [string, 'null'], format: date-time }
+
+    StocktakeTotals:
+      type: object
+      additionalProperties: false
+      required: [counted, uncounted, varianceUnits]
+      properties:
+        counted: { type: integer, minimum: 0, description: Lines with a counted quantity. }
+        uncounted: { type: integer, minimum: 0, description: Lines still without a counted quantity. }
+        varianceUnits: { type: integer, minimum: 0, description: Sum of the absolute variances of the counted lines. }
+
+    StocktakeList:
+      type: object
+      additionalProperties: false
+      required: [stocktakes, nextCursor]
+      properties:
+        stocktakes:
+          type: array
+          items: { $ref: '#/components/schemas/Stocktake' }
+        nextCursor: { type: [string, 'null'], description: Opaque cursor for the next page; null on the last page. }
+
+    StocktakeRead:
+      type: object
+      additionalProperties: false
+      required: [stocktake, lines, next, totals]
+      properties:
+        stocktake: { $ref: '#/components/schemas/Stocktake' }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/StocktakeLine' }
+        next: { type: [string, 'null'], description: The `after` value of the next page of lines; null on the last page. }
+        totals: { $ref: '#/components/schemas/StocktakeTotals' }
 
     InventoryLevelsWrite:
       type: object

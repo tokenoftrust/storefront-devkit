@@ -103,6 +103,7 @@
               "app.uninstalled",
               "catalog.product.updated",
               "inventory.changed",
+              "inventory.stocktake.completed",
               "order.created",
               "order.paid",
               "order.fulfilled",
