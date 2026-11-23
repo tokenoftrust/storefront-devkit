@@ -2,7 +2,7 @@
 
 **Target systems:** Shipping & label stations, multi-carrier rate/label desks, and regional/PACT Act fulfillment workflows.
 
-**Scopes required (`tot-app.json`):** `orders:read:minimal`, `orders:read:recipient`, `orders:webhook`, `fulfillment:process`
+**Scopes required (`tot-app.json`):** `orders:read-minimal`, `orders:read-recipient`, `orders:webhook`, `fulfillment:process`
 
 This recipe demonstrates how an external shipping/label station connects to Storefront Private Apps
 v1.3 to receive order release assignments, hydrate the consent-gated ship-to recipient, validate

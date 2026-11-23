@@ -204,7 +204,7 @@ node server.js
 
 Hosting needs a publicly reachable HTTPS endpoint for `WEBHOOK_PUBLIC_URL`, outbound HTTPS to the
 tenant's storefront origin, and an install granted `fulfillment:process` and
-`orders:read:recipient` with the merchant's processor configuration and owner consent in place
+`orders:read-recipient` with the merchant's processor configuration and owner consent in place
 (see [`tot-app.json`](./tot-app.json)). Configuration is environment-only; nothing in this directory
 is a real credential, tenant or address.
 

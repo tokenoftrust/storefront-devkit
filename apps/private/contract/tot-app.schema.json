@@ -67,9 +67,10 @@
         "type": "string",
         "enum": [
           "catalog:read",
-          "orders:read:minimal",
+          "orders:read-minimal",
+          "orders:read-holds",
           "orders:webhook",
-          "customers:read:minimal",
+          "customers:read-minimal",
           "inventory:read",
           "inventory:write",
           "purchasing:read",
@@ -79,7 +80,7 @@
           "attribution:write",
           "widgets:launch",
           "fulfillment:process",
-          "orders:read:recipient"
+          "orders:read-recipient"
         ]
       }
     },

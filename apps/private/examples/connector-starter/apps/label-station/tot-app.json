@@ -10,8 +10,8 @@
   "description": "Label station starter: takes Storefront fulfillment assignments, creates the order and label with a label provider (mocked), and reports label and handoff back.",
   "installMode": "external",
   "scopes": [
-    "orders:read:minimal",
-    "orders:read:recipient",
+    "orders:read-minimal",
+    "orders:read-recipient",
     "orders:webhook",
     "fulfillment:process"
   ],

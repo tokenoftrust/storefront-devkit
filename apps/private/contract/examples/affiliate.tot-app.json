@@ -12,7 +12,7 @@
   "installMode": "external",
   "scopes": [
     "catalog:read",
-    "orders:read:minimal",
+    "orders:read-minimal",
     "orders:webhook",
     "attribution:write",
     "widgets:launch"

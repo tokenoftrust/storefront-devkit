@@ -145,7 +145,7 @@ export function createLocalGateway({
       if (form.get('client_id') !== SIM_CLIENT_ID || form.get('client_secret') !== SIM_CLIENT_SECRET) return json(401, { error: 'invalid_client' });
       const token = `sim-token-${randomUUID()}`;
       tokens.add(token);
-      return json(200, { access_token: token, token_type: 'Bearer', expires_in: 300, scope: 'fulfillment:process orders:read:recipient' });
+      return json(200, { access_token: token, token_type: 'Bearer', expires_in: 300, scope: 'fulfillment:process orders:read-recipient' });
     }
 
     const bearer = (headers.authorization ?? '').replace(/^Bearer /, '');

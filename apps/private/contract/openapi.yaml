@@ -220,9 +220,9 @@ paths:
       tags: [orders]
       operationId: listOrders
       summary: List minimal orders
-      x-requiredScope: orders:read:minimal
+      x-requiredScope: orders:read-minimal
       description: >
-        Requires scope `orders:read:minimal`. Returns the minimized order shape only —
+        Requires scope `orders:read-minimal`. Returns the minimized order shape only —
         no raw checkout payload, no signed-cart material, no tax internals, customer as
         opaque hash. Paged (1..100 orders per page, default 24) in deterministic
         `(createdAt DESC, id ASC)` order with an opaque keyset `cursor` and `updatedSince`
@@ -277,14 +277,58 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /orders/holds:
+    get:
+      tags: [orders]
+      operationId: listOrderHolds
+      summary: List held orders with their hold reasons
+      x-requiredScope: orders:read-holds
+      description: >
+        Requires scope `orders:read-holds`. The routed stage's orders that are held for review,
+        each with one reason code from a closed vocabulary, newest `placedAt` first with a stable
+        tie-break, 1..100 per page (default 25) and an opaque `cursor`. The cursor is a position,
+        never an order id, and is bound to this install and stage; a foreign or altered cursor
+        answers 400 `invalid_cursor`. Each order is an opaque reference scoped to the page and
+        install: it carries no order id, item name, SKU, free text or customer field, and all six
+        `amounts` are null. A reference from one page is not valid on another. The read walks the
+        whole needs-attention queue up to a bounded number of source pages; if the bound is hit
+        or a row cannot be read, `state` is `partial` and `coverage` and `unreadableOrders` say
+        how much was seen. Nothing held is `state: complete` with an empty `orders`. An
+        unreadable or disconnected order source answers 503 `unavailable`, never an empty list.
+        The same operation is served to a sponsored agent at `/api/admin/hold-reasons`. It is a
+        Worker API: it answers identically for a tenant served from Cloudflare or CloudFront.
+        Response is `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 512 }
+          description: Opaque cursor from a prior page's `page.nextCursor`.
+      responses:
+        '200':
+          description: One page of held orders.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderHoldList' }
+        '400': { $ref: '#/components/responses/OrderHoldsRefused' }
+        '401': { $ref: '#/components/responses/OrderHoldsRefused' }
+        '403': { $ref: '#/components/responses/OrderHoldsRefused' }
+        '429': { $ref: '#/components/responses/OrderHoldsRefused' }
+        '503': { $ref: '#/components/responses/OrderHoldsRefused' }
+
   /orders/{id}:
     get:
       tags: [orders]
       operationId: getOrder
       summary: Read one minimal order
-      x-requiredScope: orders:read:minimal
+      x-requiredScope: orders:read-minimal
       description: >
-        Requires scope `orders:read:minimal`. Resolved against the host stage's ledger
+        Requires scope `orders:read-minimal`. Resolved against the host stage's ledger
         (preview ledger on a preview host, live on a publication host); a stage or env
         mismatch answers 403 `stage_mismatch`.
       parameters:
@@ -658,9 +702,9 @@ paths:
       tags: [fulfillment]
       operationId: readFulfillmentRecipient
       summary: Export the ship-to recipient of one order assigned to this install
-      x-requiredScope: orders:read:recipient
+      x-requiredScope: orders:read-recipient
       description: >
-        Requires scope `orders:read:recipient` in both the install grant and the token, a live
+        Requires scope `orders:read-recipient` in both the install grant and the token, a live
         owner consent for (install, tenant, stage, purpose `fulfillment-shipping`), and an
         active assignment of the order naming the calling install. One opaque order id in
         the path, no body, no list or search. Admission is one guarded insert into the
@@ -2144,6 +2188,17 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/PurchasingRefusal' }
 
+    OrderHoldsRefused:
+      description: >
+        A refusal from `GET /orders/holds`. Status and `code` pairs are listed on
+        `OrderHoldsRefusal.code`. Always `cache-control: no-store` and `x-robots-tag: noindex, nofollow`;
+        a refusal carries no `orders` key.
+      headers:
+        tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OrderHoldsRefusal' }
+
   schemas:
     Error:
       type: object
@@ -2173,9 +2228,10 @@ components:
             type: string
             enum:
               - catalog:read
-              - orders:read:minimal
+              - orders:read-minimal
+              - orders:read-holds
               - orders:webhook
-              - customers:read:minimal
+              - customers:read-minimal
               - inventory:read
               - inventory:write
               - purchasing:read
@@ -2185,7 +2241,7 @@ components:
               - attribution:write
               - widgets:launch
               - fulfillment:process
-              - orders:read:recipient
+              - orders:read-recipient
         widgetPlacements:
           type: array
           items:
@@ -2282,6 +2338,92 @@ components:
           type: [string, 'null']
           description: Opaque keyset cursor for the next page (also returned when a live scan is cut short, so paging continues past the scan limit), or null on the final page.
 
+    OrderHoldsRefusal:
+      type: object
+      additionalProperties: false
+      required: [error, code]
+      properties:
+        error: { type: string }
+        code:
+          type: string
+          enum: [invalid_token, scope_denied, stage_mismatch, tenant_mismatch, denied, malformed, invalid_cursor, rate_limited, unconfigured, unavailable]
+          description: >
+            400 `malformed` (an unknown query key, a repeated key or a `limit` outside 1..100) or
+            `invalid_cursor`; 401 `invalid_token`; 403 `scope_denied`, `stage_mismatch`,
+            `tenant_mismatch` or `denied`; 429 `rate_limited`; 503 `unconfigured` or `unavailable`.
+
+    OrderHoldList:
+      type: object
+      additionalProperties: false
+      required: [state, asOf, stage, coverage, unreadableOrders, orders, page]
+      properties:
+        state: { type: string, enum: [complete, partial] }
+        asOf: { type: [string, 'null'], format: date-time }
+        stage: { type: [string, 'null'], enum: [preview, publication, null] }
+        coverage:
+          type: object
+          additionalProperties: false
+          required: [pagesRead, pagesAvailable]
+          properties:
+            pagesRead: { type: integer, minimum: 0 }
+            pagesAvailable: { type: [integer, 'null'], minimum: 0 }
+        unreadableOrders: { type: integer, minimum: 0 }
+        orders:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/OrderHold' }
+        page:
+          type: object
+          additionalProperties: false
+          required: [limit, nextCursor]
+          properties:
+            limit: { type: integer, minimum: 1, maximum: 100 }
+            nextCursor:
+              type: [string, 'null']
+              description: Opaque position for the next page, or null on the final page.
+
+    OrderHold:
+      type: object
+      additionalProperties: false
+      required: [ref, placedAt, currency, itemCount, lineCount, discountCount, payment, fulfillment, held, holdReason, amounts]
+      properties:
+        ref:
+          type: string
+          pattern: '^ord_[0-9a-f]{12}_[1-9][0-9]*$'
+          description: Opaque reference valid for this page and install only. It is not an order id.
+        placedAt: { type: [string, 'null'], format: date-time }
+        currency: { type: string }
+        itemCount: { type: [integer, 'null'], minimum: 0 }
+        lineCount: { type: [integer, 'null'], minimum: 0 }
+        discountCount: { type: integer, minimum: 0 }
+        payment: { type: string, enum: [authorized, captured, refunded, unknown] }
+        fulfillment: { type: string, enum: [unfulfilled, ready_to_ship, hold_review_required, completed, unknown] }
+        held: { type: boolean, const: true }
+        holdReason:
+          type: string
+          enum:
+            - payment_capture
+            - evidence_review
+            - ship_to_address
+            - manual_review
+            - age_verification_hold
+            - verification_unknown
+            - contact_retention_expired
+            - contact_erased
+            - other
+        amounts:
+          type: object
+          additionalProperties: false
+          required: [total, subtotal, shipping, estimatedTax, taxesAndFees, discount]
+          description: Always null on this read.
+          properties:
+            total: { type: 'null' }
+            subtotal: { type: 'null' }
+            shipping: { type: 'null' }
+            estimatedTax: { type: 'null' }
+            taxesAndFees: { type: 'null' }
+            discount: { type: 'null' }
+
     Order:
       type: object
       description: >
@@ -2309,7 +2451,12 @@ components:
             required: [sku, quantity]
             properties:
               sku: { type: string }
-              handle: { type: string }
+              handle:
+                type: string
+                description: >
+                  Handle of the catalog product the sku belongs to, resolved from the tenant's
+                  catalog at the routed stage. Omitted when the sku resolves to no product or to
+                  more than one.
               quantity: { type: integer, minimum: 1 }
               lineTotal: { type: number }
         createdAt: { type: string, format: date-time }
@@ -2608,6 +2755,9 @@ components:
             required: [sku, quantity]
             properties:
               sku: { type: string }
+              handle:
+                type: string
+                description: Catalog product handle for the sku, as on `Order.lineItems`; omitted when unresolvable.
               quantity: { type: integer, minimum: 1 }
         locationId:
           type: string
