@@ -2180,6 +2180,7 @@ components:
               - inventory:write
               - purchasing:read
               - purchasing:write
+              - proposal-events:read
               - reports:read
               - attribution:write
               - widgets:launch
@@ -2816,6 +2817,10 @@ components:
             - fulfillment.assignment.created
             - fulfillment.assignment.updated
             - fulfillment.label.voided
+            - proposal.filed
+            - proposal.applied
+            - proposal.rejected
+            - proposal.expired
         state: { type: string, enum: [delivered, retrying, dead-lettered] }
         attempts: { type: integer, minimum: 0 }
         lastStatus: { type: integer }
