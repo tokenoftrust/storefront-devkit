@@ -203,6 +203,19 @@ order, marketing-consent, and attribution topics. Subscribe only to topics permi
 granted scopes. A declared topic does not imply that a public-app product or an undocumented
 capability exists.
 
+### Proposal lifecycle subscriptions
+
+Request `proposal-events:read` for owner-enabled subscriptions to `proposal.filed`,
+`proposal.applied`, `proposal.rejected`, and `proposal.expired` in the install's tenant and
+stage. These signed events carry the opaque proposal id, registered kind and its schema
+version, committed state, and transition time. A filed proposal starts in `pending`.
+Deduplicate deliveries by the CloudEvents `id`, which stays stable across retries.
+
+The `proposals:write` grant belongs to a separate sponsored-agent credential and authorizes
+filing only. Private-app installation grants and bearer tokens provide event subscription
+access via `proposal-events:read`. Proposal review and decisions require a verified
+interactive tenant-owner session on the internal Storefront admin surface.
+
 ### Signature details
 
 Discovery is `GET /.well-known/tot-app-authorization-metadata` on the storefront origin. It is

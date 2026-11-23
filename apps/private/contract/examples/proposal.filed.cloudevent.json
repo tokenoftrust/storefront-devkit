@@ -1,0 +1,18 @@
+{
+  "specversion": "1.0",
+  "id": "evt_01K00000000000000000000001",
+  "source": "/tenants/demo/storefront",
+  "type": "com.tokenoftrust.storefront.proposal.filed",
+  "time": "2026-11-23T12:00:00.000Z",
+  "datacontenttype": "application/json",
+  "dataschemaversion": "1",
+  "tenantid": "demo",
+  "appinstallid": "inst_01K00000000000000000000000",
+  "data": {
+    "proposalId": "prop_01K00000000000000000000000",
+    "kind": "purchase_order.draft",
+    "schemaVersion": 1,
+    "state": "pending",
+    "transitionAt": "2026-11-23T12:00:00.000Z"
+  }
+}
