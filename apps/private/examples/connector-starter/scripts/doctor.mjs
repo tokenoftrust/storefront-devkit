@@ -83,6 +83,9 @@ if (!cfg.webhookPublicUrl) {
     fail(`cannot reach ${cfg.webhookPublicUrl}/health (${err.name})`, `start the tunnel and the server (npm run ${app}); quick-tunnel URLs change on every restart`);
   }
   console.log(`        registered endpoint must be exactly: ${cfg.webhookEndpoint}\n        (tot app update ${cfg.installId} --app apps/${app} --webhook-endpoint ${cfg.webhookEndpoint} --tenant ${cfg.tenant})`);
+  if (app !== 'inventory-sync') {
+    console.log(`        then bind the preview processor: npm run order -- ${app} bind   (--webhook-endpoint none unbinds it)`);
+  }
 }
 
 finish();

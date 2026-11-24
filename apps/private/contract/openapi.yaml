@@ -359,9 +359,13 @@ paths:
       description: >
         Requires scope `inventory:read`. Availability/quantity/policy per SKU only, paged
         (1..100 items per page, default 50) in deterministic `sku ASC` order with an opaque
-        keyset `cursor` and `updatedSince` filter stable under concurrent writes. The tenant's
-        mirror ledger for the routed stage and one location is applied the way storefront pages
-        apply it; a SKU the ledger holds carries its `mirror` reading. The
+        keyset `cursor` and `updatedSince` filter stable under concurrent writes. `available`
+        (boolean; note that `inventory.changed` carries store-wide integer `available`),
+        `quantity` and `policy` are always store-wide across active fulfillable locations for
+        the routed stage and are unaffected by `locationId`; only `mirror` (`locationId`,
+        `balance`, `asOf`) reflects the requested `locationId`. A listing with `locationId` and
+        no `sku` still pages the whole store catalog (SKUs with no ledger row at `locationId`
+        omit `mirror`); pass `sku` for per-SKU reads. The
         reservation-authority response header states that this projection is not reservation
         authority. Enforces the per-install KV fixed-window rate limit (120 requests per
         60-second window per install, approximate across isolates under last-write-wins KV
@@ -372,11 +376,13 @@ paths:
         - name: sku
           in: query
           schema: { type: string }
-          description: Optional SKU filter.
+          description: Optional SKU filter (recommended when reading a specific SKU's `mirror` balance at `locationId`).
         - name: locationId
           in: query
           schema: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$', default: unspecified }
-          description: Ledger location to apply. Defaults to `unspecified`.
+          description: >
+            Ledger location to read `mirror` (`balance`, `asOf`) from. Defaults to `unspecified`.
+            Does not filter the catalog page and does not change store-wide `available`, `quantity` or `policy`.
         - name: cursor
           in: query
           schema: { type: string, maxLength: 512 }
@@ -2476,14 +2482,24 @@ components:
             required: [sku, available]
             properties:
               sku: { type: string }
-              available: { type: boolean }
-              quantity: { type: integer }
-              policy: { type: string, enum: [deny, continue] }
+              available:
+                type: boolean
+                description: >
+                  Store-wide shopper availability across active fulfillable locations for the routed
+                  stage (unaffected by `locationId`). Boolean in REST; in the `inventory.changed`
+                  webhook `available` is the store-wide integer quantity.
+              quantity:
+                type: integer
+                description: Store-wide available quantity across active fulfillable locations for the routed stage (unaffected by `locationId`).
+              policy:
+                type: string
+                enum: [deny, continue]
+                description: Store-wide oversell policy for the SKU (unaffected by `locationId`).
               mirror:
                 type: object
                 additionalProperties: false
                 required: [locationId, balance, asOf]
-                description: The mirror ledger reading for this SKU at the requested location.
+                description: The mirror ledger reading for this SKU at the requested `locationId` (omitted when that location holds no ledger row for the SKU).
                 properties:
                   locationId: { type: string }
                   balance: { type: integer }

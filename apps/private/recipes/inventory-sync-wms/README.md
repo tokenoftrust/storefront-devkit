@@ -47,7 +47,11 @@ curl -sS -X PUT "${TOT_GATEWAY_URL}/inventory/locations/wh-east-nj" \
 ```
 
 - `isFulfillable: false` keeps a location writable (e.g. quarantine/QA staging) while excluding its
-  balance from storefront availability.
+  balance from storefront availability. On `GET /inventory?locationId=<id>`, only `mirror` (`balance`,
+  `asOf`) is per location — `available` (boolean), `quantity`, and `policy` are always store-wide
+  across active fulfillable locations, so a non-fulfillable location can still read `available: true`
+  when stock exists elsewhere (check `mirror.balance`, not `available`, and pass `sku=<sku>` for
+  per-SKU reads since `locationId` without `sku` pages the full catalog).
 - `status: "archived"` preserves historical ledger audit rows while removing the location from
   availability and refusing new movements.
 

@@ -1,4 +1,4 @@
-# Known issues (checked 2026-11-21, tot CLI 7.5.5, connector-kit 1.1.0)
+# Known issues (checked 2026-11-24, tot CLI 7.7.0, connector-kit 1.1.0)
 
 - **Request bodies: follow `openapi.yaml`.** Shipments need UPPERCASE `carrier` / `service`
   (`UPS`, `GROUND`) and `adultSignature: "accepted" | "refused" | "absent"`. Exceptions use `code`
@@ -17,7 +17,9 @@
   goes to every install on the store that subscribes to it. The starters poll as a safety net and
   dedupe by event id.
 
-- **`bind` needs a webhook endpoint first.** Without one it answers `install_not_processor`. Set the
-  tunnel URL with `tot app update ... --webhook-endpoint` (quick start step 7), then bind.
+- **`bind` needs a webhook endpoint first (and `--webhook-endpoint none` unbinds it).** Without an
+  endpoint `bind` answers `install_not_processor`. Set the tunnel URL with
+  `tot app update ... --webhook-endpoint` (quick start step 7), then run `npm run order -- <app> bind`
+  (self-service; no store-owner approval needed).
 
 - **Release answers `fulfillment: "ready"`.** Check `assignedInstallId` to confirm the order went to your install.

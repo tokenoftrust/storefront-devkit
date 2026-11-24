@@ -44,7 +44,7 @@ Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<stor
 
 1. **Offline check & conformance certification**:
    - Run `npm test` (no credentials needed).
-   - Conformance certification (CLI 7.5.5 or later; needs the credentials from steps 2-3, because the
+   - Conformance certification (CLI 7.7.0 or later; needs the credentials from steps 2-3, because the
      app reads the store's carrier catalog and declares its location at startup). Start the app against the
      conformance run's signing key, with clean state, then certify it from a second terminal:
      ```bash
@@ -73,7 +73,8 @@ Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<stor
    cloudflared tunnel --url http://localhost:8787
    ```
    Copy the `https://…` URL into `WEBHOOK_PUBLIC_URL` in `apps/<app>/.env`. A quick-tunnel URL
-   changes every time you restart it. When it does, redo this step and step 7.
+   changes every time you restart it. When it does, redo this step, step 7, and (if you ran
+   `--webhook-endpoint none` in step 9) `npm run order -- <app> bind` in step 8.
 6. **Start the app** (terminal 2): `npm run <app>`
 7. **Point the install at your tunnel**. `npm run doctor -- <app>` prints the exact command:
    ```bash
@@ -82,16 +83,17 @@ Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<stor
    Run `npm run doctor -- <app>` again. Every check should PASS.
 8. **Label station / dropship: send a test order or run a 1-click smoke test** (terminal 3 or browser):
    ```bash
-   npm run order -- <app> bind          # once, after step 7: this install processes STARTER_LOCATION_ID
+   npm run order -- <app> bind          # after step 7 (and again after --webhook-endpoint none): binds STARTER_LOCATION_ID (no owner approval needed)
    npm run order -- <app> go            # create (2 units) + release one synthetic order
    npm run order -- <app> hold <id>     # app receives fulfillment.assignment.updated "held"
+   npm run order -- <app> release <id>  # lifts the hold: app receives fulfillment.assignment.updated "active"
    npm run order -- <app> cancel <id>   # app receives fulfillment.assignment.updated "cancelled"
    ```
    Or open **`/dashboard/<store>/apps`** in your browser and click **"Run Smoke Test"** on the `test` install card (calls `POST /api/apps/admin/test-orders?tenant=<store>` with `{"action":"smoke","installId":"<installId>"}` to exercise `bind -> create -> release -> hold -> cancel` in an isolated preview location `smoke:<installId>` without disturbing the wildcard processor).
    Watch terminal 2. Within about a minute the app picks up the order and reports back.
    **Inventory sync** needs no orders: it syncs on start and every `SYNC_SECONDS`.
 9. **When you're done**: stop the app and the tunnel, then
-   `tot app update <installId> --app apps/<app> --webhook-endpoint none --tenant <store>`.
+   `tot app update <installId> --app apps/<app> --webhook-endpoint none --tenant <store>` (this also unbinds the preview processor; re-run `npm run order -- <app> bind` next session after setting a new tunnel URL).
    Inventory sync: also run `npm run inventory-sync -- --cleanup` (zeroes and archives its location).
 
 ### What "working" looks like (log lines in terminal 2)
