@@ -19,7 +19,7 @@
 //                      WEBHOOK_PUBLIC_URL  a public tunnel to http://127.0.0.1:8787, registered as the
 //                                          webhook endpoint of the inventory-sync and dropship installs
 //                      E2E_LOCATION_ID     optional, default loc-e2e-dropship (dropship's preview location)
-//                      TOT_BIN             optional, default tot (CLI 7.5.5 or later, signed in)
+//                      TOT_BIN             optional, default tot (CLI 7.7.0 or later, signed in)
 //   ../connector-starter/apps/{inventory-sync,dropship}/.env   those apps' test-install credentials
 import { spawn, spawnSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -154,16 +154,18 @@ export async function run({ only, pauseMs }, env) {
   const TENANT = env.TOT_TENANT;
   const TUNNEL = (env.WEBHOOK_PUBLIC_URL || '').replace(/\/+$/, '');
   const LOCATION = env.E2E_LOCATION_ID || 'loc-e2e-dropship';
-  const TOT_BIN = env.TOT_BIN || 'tot';
+  const IS_WIN = process.platform === 'win32';
+  const TOT_BIN = env.TOT_BIN || (IS_WIN ? 'tot.cmd' : 'tot');
+  const sleepMs = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
   const state = (name) => join(tmpdir(), `inventory-fulfillment-e2e-${name}.json`);
 
   function tot(args) {
     for (let attempt = 1; attempt <= 4; attempt++) {
-      const r = spawnSync(TOT_BIN, [...args, '--tenant', TENANT, '--json'], { encoding: 'utf8' });
-      if (r.error) throw new Error(`could not run ${TOT_BIN} (${r.error.code}); install @tokenoftrust/cli 7.5.5 or later`);
+      const r = spawnSync(TOT_BIN, [...args, '--tenant', TENANT, '--json'], { encoding: 'utf8', shell: IS_WIN });
+      if (r.error) throw new Error(`could not run ${TOT_BIN} (${r.error.code}); install @tokenoftrust/cli 7.7.0 or later`);
       const out = `${r.stdout ?? ''}${r.stderr ?? ''}`;
       if (/mcp_http_error|mcp_unreachable/.test(out) && attempt < 4) {
-        spawnSync('sleep', ['10']);
+        sleepMs(10_000);
         continue;
       }
       try {
@@ -393,7 +395,7 @@ orders, and cleans up. Needs, in ./.env or the environment (never printed):
   TOT_TENANT, TOT_CLIENT_ID, TOT_CLIENT_SECRET   this example's test install (tot app install --env test)
   WEBHOOK_PUBLIC_URL                              tunnel to http://127.0.0.1:8787, set as the webhook endpoint
                                                   of the inventory-sync and dropship test installs
-  E2E_LOCATION_ID (default loc-e2e-dropship), TOT_BIN (default tot, CLI 7.5.5+)
+  E2E_LOCATION_ID (default loc-e2e-dropship), TOT_BIN (default tot, CLI 7.7.0+)
 and ../connector-starter/apps/{inventory-sync,dropship}/.env for those installs.`;
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

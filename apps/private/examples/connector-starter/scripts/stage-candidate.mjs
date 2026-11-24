@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Stage your app as a production candidate for the store owner to approve (tot CLI 7.5.2 or later).
+// Stage your app as a production candidate for the store owner to approve (tot CLI 7.7.0 or later).
 //   npm run stage-candidate -- <app> --jwks <public-jwks.json>          print the command (dry run)
 //   npm run stage-candidate -- <app> --generate-keys [dir]              print the command; the CLI makes an ES256 key pair
 //   npm run stage-candidate -- <app> --jwks <public-jwks.json> --yes    run it
@@ -53,7 +53,8 @@ function main() {
     console.log('\ndry run: nothing was staged. Add --yes to stage it (the store owner is asked to approve).');
     return;
   }
-  const r = spawnSync('tot', args, { stdio: 'inherit' });
+  const isWin = process.platform === 'win32';
+  const r = spawnSync(isWin ? 'tot.cmd' : 'tot', args, { stdio: 'inherit', shell: isWin });
   process.exit(r.status ?? 1);
 }
 

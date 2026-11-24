@@ -64,7 +64,7 @@ straight from connector-kit's `ApiError`; quote `requestId` when you report a pr
 ## Self-serve preview workflow (`env=test`)
 
 Developers holding `preview-access` on a store can run the preview loop without store-owner
-approval (CLI 7.5.5 or later):
+approval (CLI 7.7.0 or later):
 
 ```bash
 # 1. Lint tot-app.json offline:
@@ -115,7 +115,7 @@ archives the location. Always use `--cleanup` on a shared store preview.
 
 ## End-to-end run (`npm run e2e`)
 
-One captioned run, step by step, against a store **preview** (CLI 7.5.5 or later, signed in):
+One captioned run, step by step, against a store **preview** (CLI 7.7.0 or later, signed in):
 
 1. **Inventory API** — this example's `--live` calls with a caption per step, then cleanup.
 2. **Inventory changes** — the connector-starter inventory-sync app with its mock WMS: a receive (+12)

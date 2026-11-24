@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Synthetic preview orders, via the tot CLI 7.5.2 or later (you must be signed in: `tot login`).
+// Synthetic preview orders, via the tot CLI 7.7.0 or later (you must be signed in: `tot login`).
 //   npm run order -- <app> bind            bind this install as the preview processor for STARTER_LOCATION_ID (needs a webhook endpoint)
 //   npm run order -- <app> create          create one synthetic order (2 units) at STARTER_LOCATION_ID (preview data only, never live)
-//   npm run order -- <app> release <id>    release it to the bound install
+//   npm run order -- <app> release <id>    release it to the bound install (or lift an active hold and resume the assignment)
 //   npm run order -- <app> go              create + release in one step
 //   npm run order -- <app> hold <id>       hold it: your app gets fulfillment.assignment.updated state "held"
 //   npm run order -- <app> cancel <id>     cancel it: your app gets fulfillment.assignment.updated state "cancelled"
@@ -32,9 +32,13 @@ export function cliArgs(action, cfg, orderId) {
   }
 }
 
+const IS_WIN = process.platform === 'win32';
+const TOT_CMD = IS_WIN ? 'tot.cmd' : 'tot';
+const sleepMs = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
 function tot(cfg, args) {
   for (let attempt = 1; attempt <= 5; attempt++) {
-    const r = spawnSync('tot', [...args, '--tenant', cfg.tenant, '--json'], { encoding: 'utf8' });
+    const r = spawnSync(TOT_CMD, [...args, '--tenant', cfg.tenant, '--json'], { encoding: 'utf8', shell: IS_WIN });
     if (r.error) {
       console.error(`could not run tot (${r.error.code ?? r.error.message}). Install it: npm i -g @tokenoftrust/cli`);
       process.exit(1);
@@ -42,7 +46,7 @@ function tot(cfg, args) {
     const out = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
     if (/mcp_http_error|mcp_unreachable/.test(out) && attempt < 5) {
       console.error(`  (tot: identity check failed, retry ${attempt}/4 in 20s)`);
-      spawnSync('sleep', ['20']);
+      sleepMs(20_000);
       continue;
     }
     console.log(out);
