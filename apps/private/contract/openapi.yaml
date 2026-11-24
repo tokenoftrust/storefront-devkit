@@ -2781,6 +2781,9 @@ components:
       properties:
         lineId: { type: string }
         sku: { type: string }
+        handle:
+          type: string
+          description: Catalog product handle for the sku, as on `Order.lineItems`; omitted when unresolvable.
         locationId: { type: string }
         quantity: { type: integer, minimum: 1 }
         shipped: { type: integer, minimum: 0 }
