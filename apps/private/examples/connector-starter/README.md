@@ -145,6 +145,14 @@ more than once, and out of order.
   (`order.partially_fulfilled`, then `order.fulfilled`). `tot app test-order create --line <sku>:<qty>` adds lines.
 - **Inventory ordering.** `inventory.changed` can arrive out of order; the inventory-sync app applies
   it only when `asOf` is newer than the last one it saw for that SKU and location.
+- **Store-wide vs per-location inventory.** On `GET /inventory?locationId=<id>`, only `mirror`
+  (`balance`, `asOf`) is the reading at that location. `available`, `quantity` and `policy` are the SKU's
+  store-wide shopper availability across all active fulfillable locations, whatever `locationId` you pass.
+  So a non-fulfillable location (like this app's) can still read `available: true` when the SKU has stock
+  elsewhere: check `mirror.balance`, not `available`, to prove what one location holds. On
+  `inventory.changed`, `balance` is per location and `available` is the store-wide quantity (an integer;
+  zero or below means sold out). A listing filtered by `locationId` without `sku` pages the whole store
+  catalog (SKUs the location doesn't hold come back without `mirror`), so read your own SKUs with `sku=`.
 - **Conformance receipt.** `tot app conformance ... --certify` (quick start step 1) signs synthetic
   deliveries with an ephemeral RS256 key served at `http://127.0.0.1:37891`; `TOT_METADATA_ORIGIN` points
   the app's `AuthorizationMetadata` there. It checks signed delivery, hold/cancel, duplicate handling and
