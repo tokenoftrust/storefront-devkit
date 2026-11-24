@@ -92,7 +92,11 @@ export function createInventorySync({ tot, provider, store, locationId, fulfilla
     await pushLevels(inv, reason); // reconcile: drift is 0 when every movement arrived
   }
 
-  /** inventory.changed: apply only newer data.asOf per (sku, locationId); persisted, so it survives restarts. */
+  /**
+   * inventory.changed: apply only newer data.asOf per (sku, locationId); persisted, so it survives restarts.
+   * data.balance is on-hand at data.locationId. data.available is STORE-WIDE (all active fulfillable
+   * locations, minus allocations), not this location's, so never use it to check what this location holds.
+   */
   async function onInventoryChanged(data) {
     const k = `asof:${data.sku}\u0000${data.locationId}`;
     const last = await store.get(k);
