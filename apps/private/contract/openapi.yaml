@@ -22,9 +22,10 @@ info:
     on a publication host. Webhooks reach only installs whose env matches the event stage.
 
 
-    Operations and schemas marked `x-tot-wave: 2` with `x-tot-status: planned` are locked
+    Operations and schemas marked `x-tot-maturity: concept` are locked
     wire shapes that are not implemented yet; a server answers 404 for a planned path.
-    Everything else is implemented.
+    Operations and schemas marked `x-tot-maturity: alpha` are implemented. Unmarked
+    operations and schemas are implemented.
 
 
     Every response from `/api/apps/*` carries `tot-request-id`, refusals included, and is
@@ -1822,7 +1823,7 @@ paths:
       summary: Register the public keys a private_key_jwt client signs assertions with
       x-requiredScope: null
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       security: [{ adminSession: [] }, { operatorBearer: [] }]
       description: >
         Session-authed. Binds the install's client to `private_key_jwt`: replaces its client
@@ -1861,7 +1862,7 @@ paths:
       summary: List the tenant's production app candidates
       x-requiredScope: null
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       security: [{ adminSession: [] }, { operatorBearer: [] }]
       description: >
         Session-authed. Key ids and algorithms or the `jwksHost` only; no manifest and no key
@@ -1879,7 +1880,7 @@ paths:
       summary: Stage a production app candidate for owner approval
       x-requiredScope: null
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       security: [{ adminSession: [] }, { operatorBearer: [] }]
       description: >
         Session-authed. An owner, a console member, or the operator Bearer (with or without a
@@ -1915,7 +1916,7 @@ paths:
       summary: Approve or reject a pending production app candidate
       x-requiredScope: null
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       security: [{ adminSession: [] }]
       description: >
         Session-authed, verified human owner only: a console member and the operator Bearer
@@ -3135,13 +3136,13 @@ components:
           type: string
           const: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
           x-tot-wave: 2
-          x-tot-status: implemented
+          x-tot-maturity: alpha
           description: Present with `client_assertion` for `private_key_jwt` (RFC 7523).
         client_assertion:
           type: string
           maxLength: 16384
           x-tot-wave: 2
-          x-tot-status: implemented
+          x-tot-maturity: alpha
           description: >
             A JWT signed with RS256 or ES256 by a key registered for the client. `iss` and `sub`
             are the client id; `aud` is this host's token endpoint URL (a single value); `exp` is
@@ -3296,7 +3297,7 @@ components:
     AdminClientJwksWrite:
       type: object
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       description: Exactly one of `jwks` or `jwksUri`.
       oneOf:
         - additionalProperties: false
@@ -3313,7 +3314,7 @@ components:
     ClientPublicJwks:
       type: object
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       additionalProperties: false
       required: [keys]
       properties:
@@ -3338,7 +3339,7 @@ components:
     ClientJwksUri:
       type: string
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       format: uri
       maxLength: 2048
       description: >
@@ -3350,7 +3351,7 @@ components:
     AdminClientJwksReceipt:
       type: object
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       additionalProperties: false
       required: [installId, kids]
       properties:
@@ -3362,14 +3363,14 @@ components:
     AppCandidateStatus:
       type: string
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       description: A production app candidate is decided once; `pending_approval` holds no install.
       enum: [pending_approval, approved, rejected]
 
     AdminAppCandidateStage:
       type: object
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       description: >
         The production snapshot to stage. Client keys are `jwks` or `jwksUri`, or the manifest's
         `clientAuth` when both are absent.
@@ -3390,7 +3391,7 @@ components:
     AdminAppCandidateStaged:
       type: object
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       additionalProperties: false
       required: [candidateId, clientId, status, snapshotDigest]
       properties:
@@ -3402,7 +3403,7 @@ components:
     AdminAppCandidate:
       type: object
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       additionalProperties: false
       required: [candidateId, appId, appVersion, env, scopes, clientId, keys, jwksHost, requestConsent, snapshotDigest, status, stagedAt, decidedAt, installId]
       properties:
@@ -3435,7 +3436,7 @@ components:
     AdminAppCandidateList:
       type: object
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       additionalProperties: false
       required: [candidates]
       properties:
@@ -3446,7 +3447,7 @@ components:
     AdminAppCandidateDecision:
       type: object
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       additionalProperties: false
       required: [candidateId, snapshotDigest, decision]
       properties:
@@ -3460,7 +3461,7 @@ components:
     AdminAppCandidateDecisionResult:
       type: object
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       additionalProperties: false
       required: [candidateId, status, installId, appId, appVersion, consentGranted]
       properties:
@@ -4119,7 +4120,7 @@ components:
     CarrierProfile:
       type: object
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       description: >
         One entry of the platform carrier catalog; the catalog's codes are exactly
         `CarrierCode`. `pactEligible` is statutory eligibility only: whether the carrier may
@@ -4166,7 +4167,7 @@ components:
     ShipmentCandidateStatus:
       type: string
       x-tot-wave: 2
-      x-tot-status: planned
+      x-tot-maturity: concept
       description: >
         Planned (PA). Status of a shipment or label candidate. `pending_approval` holds the
         candidate until the merchant approves it; nothing ships and no label is bought while
@@ -4176,7 +4177,7 @@ components:
     LabelVoidedData:
       type: object
       x-tot-wave: 2
-      x-tot-status: implemented
+      x-tot-maturity: alpha
       description: >
         Mirrors the asyncapi `LabelVoidedData`: the assignment, order and voided purchase id
         of an accepted `label-voided`. The REST view then reports label `none` and the next
