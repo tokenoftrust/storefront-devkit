@@ -24,8 +24,7 @@ info:
 
     Operations and schemas marked `x-tot-maturity: concept` are locked
     wire shapes that are not implemented yet; a server answers 404 for a planned path.
-    Operations and schemas marked `x-tot-maturity: alpha` are implemented. Unmarked
-    operations and schemas are implemented.
+    Operations and schemas marked `x-tot-maturity: alpha` are implemented. Every operation carries one of the two values.
 
 
     Every response from `/api/apps/*` carries `tot-request-id`, refusals included, and is
@@ -89,6 +88,7 @@ security:
 paths:
   /app:
     get:
+      x-tot-maturity: alpha
       tags: [metadata]
       operationId: getAppInstall
       summary: Read this install's metadata
@@ -113,6 +113,7 @@ paths:
 
   /health:
     get:
+      x-tot-maturity: alpha
       tags: [metadata]
       operationId: getInstallHealth
       summary: Read this install's delivery/telemetry health
@@ -136,6 +137,7 @@ paths:
 
   /catalog/products:
     get:
+      x-tot-maturity: alpha
       tags: [catalog]
       operationId: listCatalogProducts
       summary: List published catalog products
@@ -192,6 +194,7 @@ paths:
 
   /catalog/products/{handle}:
     get:
+      x-tot-maturity: alpha
       tags: [catalog]
       operationId: getCatalogProduct
       summary: Read one published product by handle
@@ -218,6 +221,7 @@ paths:
 
   /orders:
     get:
+      x-tot-maturity: alpha
       tags: [orders]
       operationId: listOrders
       summary: List minimal orders
@@ -281,6 +285,7 @@ paths:
 
   /orders/holds:
     get:
+      x-tot-maturity: alpha
       tags: [orders]
       operationId: listOrderHolds
       summary: List held orders with their hold reasons
@@ -325,6 +330,7 @@ paths:
 
   /orders/{id}:
     get:
+      x-tot-maturity: alpha
       tags: [orders]
       operationId: getOrder
       summary: Read one minimal order
@@ -355,6 +361,7 @@ paths:
 
   /orders/{id}/accounting-ref:
     post:
+      x-tot-maturity: alpha
       tags: [orders]
       operationId: writeOrderAccountingRef
       summary: Record the external accounting or ERP reference on a manual-invoice order (idempotent)
@@ -409,6 +416,7 @@ paths:
 
   /inventory:
     get:
+      x-tot-maturity: alpha
       tags: [inventory]
       operationId: listInventory
       summary: Read inventory availability
@@ -473,6 +481,7 @@ paths:
 
   /inventory/movements:
     post:
+      x-tot-maturity: alpha
       tags: [inventory]
       operationId: recordInventoryMovement
       summary: Record one stock correction, or a WMS batch of up to 250 movements (idempotent)
@@ -540,6 +549,7 @@ paths:
 
   /reports:
     get:
+      x-tot-maturity: alpha
       tags: [reports]
       operationId: listReports
       summary: List report snapshots
@@ -572,6 +582,7 @@ paths:
 
   /attribution:
     post:
+      x-tot-maturity: alpha
       tags: [attribution]
       operationId: writeAttribution
       summary: Write an app-owned attribution/commission record (idempotent)
@@ -615,6 +626,7 @@ paths:
 
   /webhooks/deliveries:
     get:
+      x-tot-maturity: alpha
       tags: [webhooks]
       operationId: listWebhookDeliveries
       summary: List recent webhook delivery records for this install
@@ -645,6 +657,7 @@ paths:
 
   /webhooks/deliveries/{deliveryId}/replay:
     post:
+      x-tot-maturity: alpha
       tags: [webhooks]
       operationId: replayWebhookDelivery
       summary: Replay a delivery (admin/app operation)
@@ -684,6 +697,7 @@ paths:
 
   /fulfillment/assignments:
     get:
+      x-tot-maturity: alpha
       tags: [fulfillment]
       operationId: listFulfillmentAssignments
       summary: Reconciliation read of this install's active fulfillment assignments
@@ -731,6 +745,7 @@ paths:
 
   /fulfillment/carriers:
     get:
+      x-tot-maturity: alpha
       tags: [fulfillment]
       operationId: listFulfillmentCarriers
       summary: The platform carrier catalog and the carriers this tenant may ship with
@@ -762,6 +777,7 @@ paths:
 
   /fulfillment/orders/{orderId}/recipient:
     get:
+      x-tot-maturity: alpha
       tags: [fulfillment]
       operationId: readFulfillmentRecipient
       summary: Export the ship-to recipient of one order assigned to this install
@@ -810,6 +826,7 @@ paths:
 
   /fulfillment/orders/{orderId}/shipment-evidence:
     post:
+      x-tot-maturity: alpha
       tags: [fulfillment]
       operationId: recordFulfillmentShipmentEvidence
       summary: Report a label outcome, a label void or a confirmed handoff for an assigned order (idempotent)
@@ -859,6 +876,7 @@ paths:
 
   /inventory/locations:
     get:
+      x-tot-maturity: alpha
       tags: [inventory]
       operationId: listInventoryLocations
       summary: List the tenant's stock locations
@@ -884,6 +902,7 @@ paths:
 
   /inventory/locations/{locationId}:
     put:
+      x-tot-maturity: alpha
       tags: [inventory]
       operationId: putInventoryLocation
       summary: Declare or update one stock location
@@ -925,6 +944,7 @@ paths:
 
   /inventory/stocktakes:
     get:
+      x-tot-maturity: alpha
       tags: [inventory]
       operationId: listInventoryStocktakes
       summary: List the tenant's stocktake sessions
@@ -966,6 +986,7 @@ paths:
 
   /inventory/stocktakes/{sessionId}:
     get:
+      x-tot-maturity: alpha
       tags: [inventory]
       operationId: getInventoryStocktake
       summary: Read one stocktake session with a page of its lines
@@ -1007,6 +1028,7 @@ paths:
 
   /inventory/levels:
     put:
+      x-tot-maturity: alpha
       tags: [inventory]
       operationId: setInventoryLevels
       summary: Reconcile absolute on-hand levels per SKU and location (idempotent)
@@ -1047,6 +1069,7 @@ paths:
 
   /purchasing/suppliers:
     get:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: listSuppliers
       summary: List suppliers
@@ -1081,6 +1104,7 @@ paths:
         '503': { $ref: '#/components/responses/PurchasingRefused' }
 
     post:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: createSupplier
       summary: Create a supplier (idempotent)
@@ -1117,6 +1141,7 @@ paths:
 
   /purchasing/suppliers/{supplierId}:
     get:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: getSupplier
       summary: Read one supplier
@@ -1140,6 +1165,7 @@ paths:
         '503': { $ref: '#/components/responses/PurchasingRefused' }
 
     patch:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: updateSupplier
       summary: Update a supplier
@@ -1174,6 +1200,7 @@ paths:
 
   /purchasing/suppliers/{supplierId}/costs:
     get:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: listSupplierCosts
       summary: Read a supplier's unit cost history
@@ -1207,6 +1234,7 @@ paths:
 
   /purchasing/purchase-orders:
     get:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: listPurchaseOrders
       summary: List purchase orders
@@ -1247,6 +1275,7 @@ paths:
         '503': { $ref: '#/components/responses/PurchasingRefused' }
 
     post:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: createPurchaseOrder
       summary: Create a draft purchase order (idempotent)
@@ -1286,6 +1315,7 @@ paths:
 
   /purchasing/purchase-orders/{poId}:
     get:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: getPurchaseOrder
       summary: Read one purchase order
@@ -1309,6 +1339,7 @@ paths:
         '503': { $ref: '#/components/responses/PurchasingRefused' }
 
     patch:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: updatePurchaseOrder
       summary: Edit a draft purchase order
@@ -1346,6 +1377,7 @@ paths:
 
   /purchasing/purchase-orders/{poId}/send:
     post:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: sendPurchaseOrder
       summary: Send a draft purchase order
@@ -1380,6 +1412,7 @@ paths:
 
   /purchasing/purchase-orders/{poId}/close:
     post:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: closePurchaseOrder
       summary: Close a purchase order
@@ -1414,6 +1447,7 @@ paths:
 
   /purchasing/purchase-orders/{poId}/receipts:
     post:
+      x-tot-maturity: alpha
       tags: [purchasing]
       operationId: receivePurchaseOrder
       summary: Record a receipt against a purchase order (atomic, idempotent, partial)
@@ -1466,6 +1500,7 @@ paths:
 
   /fulfillment/assignments/{assignmentId}/shipments:
     post:
+      x-tot-maturity: alpha
       tags: [fulfillment]
       operationId: createAssignmentShipment
       summary: Report one shipment covering some or all lines of an assignment (idempotent)
@@ -1512,6 +1547,7 @@ paths:
 
   /fulfillment/assignments/{assignmentId}/exceptions:
     post:
+      x-tot-maturity: alpha
       tags: [fulfillment]
       operationId: createAssignmentException
       summary: Report lines of an assignment that cannot ship (idempotent)
@@ -1556,6 +1592,7 @@ paths:
       - url: https://tot-preview.tokenoftrust.store/api/apps
         description: Shared preview gateway (mints env `test` tokens)
     post:
+      x-tot-maturity: alpha
       tags: [oauth]
       operationId: issueAppToken
       summary: Exchange client credentials for a short-lived bearer token
@@ -1631,6 +1668,7 @@ paths:
       - url: https://tot-preview.tokenoftrust.store/api/apps
         description: Shared preview gateway (env test)
     post:
+      x-tot-maturity: alpha
       tags: [admin]
       operationId: adminInstallApp
       summary: Install a private app for the resolved tenant and an env
@@ -1665,6 +1703,7 @@ paths:
   /admin/update:
     servers: *adminServers
     post:
+      x-tot-maturity: alpha
       tags: [admin]
       operationId: adminUpdateInstall
       summary: Bump version, replace the manifest snapshot, or re-scope an install
@@ -1696,6 +1735,7 @@ paths:
   /admin/suspend:
     servers: *adminServers
     post:
+      x-tot-maturity: alpha
       tags: [admin]
       operationId: adminSuspendInstall
       summary: Suspend an active install
@@ -1727,6 +1767,7 @@ paths:
   /admin/resume:
     servers: *adminServers
     post:
+      x-tot-maturity: alpha
       tags: [admin]
       operationId: adminResumeInstall
       summary: Resume a suspended install
@@ -1757,6 +1798,7 @@ paths:
   /admin/uninstall:
     servers: *adminServers
     post:
+      x-tot-maturity: alpha
       tags: [admin]
       operationId: adminUninstallApp
       summary: Uninstall an install and revoke its credentials
@@ -1788,6 +1830,7 @@ paths:
   /admin/credentials/rotate:
     servers: *adminServers
     post:
+      x-tot-maturity: alpha
       tags: [admin]
       operationId: adminRotateCredentials
       summary: Issue a new client secret for an install, keeping the client id
@@ -1947,6 +1990,7 @@ paths:
   /admin/list:
     servers: *adminServers
     get:
+      x-tot-maturity: alpha
       tags: [admin]
       operationId: adminListInstalls
       summary: List the resolved tenant's installs
@@ -1967,6 +2011,7 @@ paths:
   /admin/test-orders:
     servers: *adminServers
     post:
+      x-tot-maturity: alpha
       tags: [admin]
       operationId: adminTestOrders
       summary: Drive synthetic preview orders for a test install
