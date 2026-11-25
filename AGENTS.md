@@ -25,6 +25,7 @@ publish.
    [`apps/private/recipes/inventory-sync-wms/`](./apps/private/recipes/inventory-sync-wms/),
    [`apps/private/recipes/fulfillment-label-station/`](./apps/private/recipes/fulfillment-label-station/),
    [`apps/private/recipes/dropship-multi-supplier/`](./apps/private/recipes/dropship-multi-supplier/),
+   [`apps/private/recipes/accounting-erp-sync/`](./apps/private/recipes/accounting-erp-sync/),
    and [`apps/private/samples/fulfillment-connector/`](./apps/private/samples/fulfillment-connector/)).
    [`private-apps/`](./private-apps/) remains a stable compatibility guide. The ToT MCP recipe
    `recipe://storefront-private-apps-devbook` is only a discovery index.

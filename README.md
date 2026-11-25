@@ -55,7 +55,8 @@ Storefront tenant rather than customizing its tenant-owned files.
   an end-to-end test of the inventory and fulfillment APIs ([`apps/private/examples/inventory-fulfillment-e2e/`](./apps/private/examples/inventory-fulfillment-e2e/)),
   and connector recipes ([`apps/private/recipes/inventory-sync-wms/`](./apps/private/recipes/inventory-sync-wms/),
   [`apps/private/recipes/fulfillment-label-station/`](./apps/private/recipes/fulfillment-label-station/),
-  [`apps/private/recipes/dropship-multi-supplier/`](./apps/private/recipes/dropship-multi-supplier/)).
+  [`apps/private/recipes/dropship-multi-supplier/`](./apps/private/recipes/dropship-multi-supplier/),
+  [`apps/private/recipes/accounting-erp-sync/`](./apps/private/recipes/accounting-erp-sync/)).
   The stable [`private-apps/`](./private-apps/) guide remains available for existing links.
 - **What belongs in the platform and what belongs in an app?** Read
   [`docs/platform-and-apps.md`](./docs/platform-and-apps.md): the five-question scope test, the

@@ -1,0 +1,34 @@
+{
+  "contractVersion": "1",
+  "id": "com.example.accounting-erp-sync",
+  "name": "Accounting & ERP Invoice Sync",
+  "version": "1.7.0",
+  "owner": {
+    "name": "Example ERP Integrations",
+    "email": "erp-ops@integrations.example.com",
+    "url": "https://integrations.example.com"
+  },
+  "description": "Accounting & ERP connector consuming signed order.invoiced and invoice.settled CloudEvents, hydrating Order.invoice from GET /orders/{id}, mapping invoices and settlements into QuickBooks Online (QBO), Xero (XERO), or NetSuite (NS), and writing back externalAccountingRef via POST /orders/{id}/accounting-ref.",
+  "installMode": "external",
+  "scopes": [
+    "orders:read-minimal",
+    "orders:webhook",
+    "orders:write-accounting-ref"
+  ],
+  "webhooks": {
+    "endpoint": "https://erp.integrations.example.com/webhooks/tot-invoices",
+    "topics": [
+      "order.invoiced",
+      "invoice.settled"
+    ]
+  },
+  "clientAuth": {
+    "method": "private_key_jwt",
+    "jwksUri": "https://erp.integrations.example.com/.well-known/jwks.json"
+  },
+  "telemetryMode": "sampled",
+  "retention": {
+    "eventLogDays": 30,
+    "piiRedaction": "strict"
+  }
+}

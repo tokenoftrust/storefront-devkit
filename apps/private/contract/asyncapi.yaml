@@ -2,7 +2,7 @@ asyncapi: 2.6.0
 id: 'urn:com:tokenoftrust:storefront:private-apps:webhooks'
 info:
   title: Storefront Private Apps Webhook Spine
-  version: "1.6.0"
+  version: "1.7.0"
   description: >
     Outbound webhook events delivered to installed Storefront Private Apps. Every event
     is a CloudEvents 1.0 JSON envelope delivered over HTTPS POST and signed with HTTP
@@ -215,6 +215,30 @@ channels:
       message:
         $ref: '#/components/messages/OrderPartiallyFulfilled'
 
+  order.invoiced:
+    description: >
+      Emitted once when a manual invoice is issued for an order. Requires scope orders:webhook.
+      Closed payload: order id, invoice number, settlement mode, currency, subtotal and total in
+      major units, the line items (sku, handle, quantity, lineTotal) and the issue time, plus the
+      quote id, net-terms days and due date when the invoice has them. Carries no customer
+      identity at all (read GET /orders/{id} for the install's customer hash), no purchase-order
+      number, no notes and no settlement reference.
+    subscribe:
+      operationId: onOrderInvoiced
+      message:
+        $ref: '#/components/messages/OrderInvoiced'
+
+  invoice.settled:
+    description: >
+      Emitted once when an issued invoice becomes paid. Requires scope orders:webhook. Closed
+      payload: order id, invoice number, settlement mode, currency, total in major units and the
+      settlement time. Carries no customer identity, no purchase-order number, no notes and no
+      settlement reference.
+    subscribe:
+      operationId: onInvoiceSettled
+      message:
+        $ref: '#/components/messages/InvoiceSettled'
+
   fulfillment.label.voided:
     description: >
       Emitted once when the processor's `label-voided` shipment evidence is accepted, so the
@@ -318,6 +342,8 @@ components:
             - com.tokenoftrust.storefront.order.partially_fulfilled
             - com.tokenoftrust.storefront.order.cancelled
             - com.tokenoftrust.storefront.order.updated
+            - com.tokenoftrust.storefront.order.invoiced
+            - com.tokenoftrust.storefront.invoice.settled
             - com.tokenoftrust.storefront.customer.marketing_consent.updated
             - com.tokenoftrust.storefront.attribution.finalized
             - com.tokenoftrust.storefront.fulfillment.assignment.created
@@ -379,6 +405,53 @@ components:
               handle: { type: string }
               quantity: { type: integer }
               lineTotal: { type: number }
+
+    InvoiceIssuedData:
+      type: object
+      additionalProperties: false
+      description: >
+        Closed payload of order.invoiced, scoped to one commerce stage. Carries no customer
+        identity field (a shared event row cannot carry a per-install customer hash; join to
+        GET /orders/{id} for it), no purchase-order number, no notes and no settlement reference.
+      required: [orderId, invoiceNumber, settlementMode, currency, subtotal, total, lineItems, issuedAt]
+      properties:
+        orderId: { type: string, minLength: 1, maxLength: 256 }
+        invoiceNumber: { type: string, pattern: '^INV-[0-9]{6,}$', description: The invoice number; durable per tenant and stage. }
+        quoteId: { type: string, pattern: '^bq_[0-9a-f]{32}$', description: The quote the invoice was issued from, when there is one. }
+        settlementMode: { type: string, enum: [net_terms, offline_transfer, foxy_pay_link] }
+        netTermsDays: { type: integer, minimum: 0 }
+        dueAt: { type: string, format: date-time }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        subtotal: { type: number, description: Major units. }
+        total: { type: number, description: Major units. }
+        lineItems:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, quantity]
+            properties:
+              sku: { type: string }
+              handle: { type: string }
+              quantity: { type: integer }
+              lineTotal: { type: number }
+        issuedAt: { type: string, format: date-time }
+
+    InvoiceSettledData:
+      type: object
+      additionalProperties: false
+      description: >
+        Closed six-key payload of invoice.settled, scoped to one commerce stage. Carries no
+        customer identity, no purchase-order number, no notes and no settlement reference.
+      required: [orderId, invoiceNumber, settlementMode, currency, total, settledAt]
+      properties:
+        orderId: { type: string, minLength: 1, maxLength: 256 }
+        invoiceNumber: { type: string, pattern: '^INV-[0-9]{6,}$' }
+        settlementMode: { type: string, enum: [net_terms, offline_transfer, foxy_pay_link] }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        total: { type: number, description: Major units. }
+        settledAt: { type: string, format: date-time }
 
     CatalogProductUpdateData:
       type: object
@@ -828,6 +901,34 @@ components:
           - type: object
             properties:
               data: { $ref: '#/components/schemas/OrderData' }
+
+    OrderInvoiced:
+      name: orderInvoiced
+      messageId: orderInvoiced
+      title: order.invoiced
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/InvoiceIssuedData' }
+
+    InvoiceSettled:
+      name: invoiceSettled
+      messageId: invoiceSettled
+      title: invoice.settled
+      contentType: application/cloudevents+json
+      traits:
+        - $ref: '#/components/messageTraits/cloudEventEnvelope'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/CloudEventEnvelope'
+          - type: object
+            properties:
+              data: { $ref: '#/components/schemas/InvoiceSettledData' }
 
     CustomerMarketingConsentUpdated:
       name: customerMarketingConsentUpdated

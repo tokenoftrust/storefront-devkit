@@ -1,0 +1,39 @@
+{
+  "specversion": "1.0",
+  "id": "evt_01J9Z8ERP1K2V3B4N5X6Y7Z8A1",
+  "source": "/tenants/acme/storefront",
+  "type": "com.tokenoftrust.storefront.order.invoiced",
+  "time": "2026-11-25T16:00:00.000Z",
+  "datacontenttype": "application/json",
+  "dataschemaversion": "1",
+  "tenantid": "acme",
+  "appinstallid": "inst_01J9Z8ERP00000000000000001",
+  "retrycount": 0,
+  "totrequestid": "req_erp_01J9Z8",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+  "data": {
+    "orderId": "ord_manual_1042",
+    "invoiceNumber": "INV-000104",
+    "quoteId": "bq_11111111111111111111111111111111",
+    "settlementMode": "net_terms",
+    "netTermsDays": 30,
+    "dueAt": "2026-12-25T16:00:00.000Z",
+    "currency": "USD",
+    "subtotal": 240.0,
+    "total": 255.0,
+    "lineItems": [
+      {
+        "sku": "VAPE-KIT-STARTER",
+        "handle": "starter-kit",
+        "quantity": 4,
+        "lineTotal": 200.0
+      },
+      {
+        "sku": "CUSTOM-DISPLAY-RACK",
+        "quantity": 1,
+        "lineTotal": 40.0
+      }
+    ],
+    "issuedAt": "2026-11-25T16:00:00.000Z"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "specversion": "1.0",
+  "id": "evt_01J9Z8ERP2K2V3B4N5X6Y7Z8A2",
+  "source": "/tenants/acme/storefront",
+  "type": "com.tokenoftrust.storefront.invoice.settled",
+  "time": "2026-11-26T18:30:00.000Z",
+  "datacontenttype": "application/json",
+  "dataschemaversion": "1",
+  "tenantid": "acme",
+  "appinstallid": "inst_01J9Z8ERP00000000000000001",
+  "retrycount": 0,
+  "totrequestid": "req_erp_01J9Z9",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+  "data": {
+    "orderId": "ord_manual_1042",
+    "invoiceNumber": "INV-000104",
+    "settlementMode": "net_terms",
+    "currency": "USD",
+    "total": 255.0,
+    "settledAt": "2026-11-26T18:30:00.000Z"
+  }
+}

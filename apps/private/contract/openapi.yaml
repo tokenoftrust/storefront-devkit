@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Storefront Private Apps API
-  version: "1.6.0"
+  version: "1.7.0"
   x-contractVersion: "1"
   description: >
     Scoped, least-privilege API for installed Storefront Private Apps. All access is
@@ -239,7 +239,8 @@ paths:
         On a preview host (test install)
         the orders are the preview-ledger orders, including synthetic orders from
         `POST /admin/test-orders`; on a publication host (production install) they are live
-        orders. A stage or env mismatch answers 403 `stage_mismatch`.
+        orders. A stage or env mismatch answers 403 `stage_mismatch`. Orders backed by a manual
+        invoice appear in both stages and carry the `invoice` object.
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - name: status
@@ -330,7 +331,8 @@ paths:
       description: >
         Requires scope `orders:read-minimal`. Resolved against the host stage's ledger
         (preview ledger on a preview host, live on a publication host); a stage or env
-        mismatch answers 403 `stage_mismatch`.
+        mismatch answers 403 `stage_mismatch`. An order backed by a manual invoice resolves in
+        both stages and carries the `invoice` object.
       parameters:
         - $ref: '#/components/parameters/Traceparent'
         - name: id
@@ -349,6 +351,60 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /orders/{id}/accounting-ref:
+    post:
+      tags: [orders]
+      operationId: writeOrderAccountingRef
+      summary: Record the external accounting or ERP reference on a manual-invoice order (idempotent)
+      x-requiredScope: orders:write-accounting-ref
+      description: >
+        Requires scope `orders:write-accounting-ref`. Records or idempotently replays the
+        external accounting or ERP reference (`externalAccountingRef`, 1..128 characters of
+        letters, digits and `._:-`) on one issued, paid or voided manual-invoice order for the
+        installed tenant and routed stage. `Idempotency-Key` is REQUIRED and bound to the order
+        id and canonical body: a same-key, same-body retry returns 200 with the original
+        `{ orderId, invoiceNumber, externalAccountingRef }`; a same-key retry with a different
+        body or order answers 409 `idempotency_conflict`. Writing the same reference under a new
+        key is idempotent (200); writing a different reference when one is already recorded on
+        the invoice answers 409 `accounting_ref_conflict`. An unknown order, another tenant's or
+        stage's order, or a draft invoice answers 404 `not_found`. Response and audit carry no
+        customer identity, purchase-order number, notes or settlement reference, and the write
+        cannot alter totals, tax, payment, compliance or fulfillment. Response is
+        `cache-control: no-store`.
+      parameters:
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderAccountingRefWrite' }
+      responses:
+        '200':
+          description: The external accounting reference is recorded, or this is the replay under the same key.
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+            traceparent: { $ref: '#/components/headers/Traceparent' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderAccountingRefReceipt' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`idempotency_conflict` (Idempotency-Key reused with a different order or reference) or `accounting_ref_conflict` (a different external accounting reference is already recorded on the invoice).'
+          headers:
+            tot-request-id: { $ref: '#/components/headers/TotRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /inventory:
     get:
@@ -2237,6 +2293,7 @@ components:
               - orders:read-minimal
               - orders:read-holds
               - orders:webhook
+              - orders:write-accounting-ref
               - customers:read-minimal
               - inventory:read
               - inventory:write
@@ -2467,6 +2524,57 @@ components:
               lineTotal: { type: number }
         createdAt: { type: string, format: date-time }
         fulfilledAt: { type: string, format: date-time }
+        invoice:
+          type: object
+          description: >
+            Present only on orders backed by a manual invoice, in both stages. Carries no
+            customer identity, no purchase-order number, no notes and no settlement reference.
+            Drafts are never exposed.
+          additionalProperties: false
+          required: [invoiceNumber, settlementMode, settlementStatus]
+          properties:
+            invoiceNumber:
+              type: string
+              pattern: '^INV-[0-9]{6,}$'
+              description: The invoice number; durable per tenant and stage.
+            quoteId:
+              type: string
+              pattern: '^bq_[0-9a-f]{32}$'
+              description: The quote the invoice was issued from, when there is one.
+            settlementMode: { type: string, enum: [net_terms, offline_transfer, foxy_pay_link] }
+            settlementStatus: { type: string, enum: [issued, paid, voided] }
+            netTermsDays: { type: integer, minimum: 0 }
+            dueAt: { type: string, format: date-time }
+            settledAt: { type: string, format: date-time }
+            externalAccountingRef:
+              type: string
+              pattern: '^[A-Za-z0-9._:-]{1,128}$'
+              description: The reference an accounting connector recorded for the invoice; absent until one is recorded.
+
+    OrderAccountingRefWrite:
+      type: object
+      additionalProperties: false
+      required: [externalAccountingRef]
+      properties:
+        externalAccountingRef:
+          type: string
+          pattern: '^[A-Za-z0-9._:-]{1,128}$'
+          description: External accounting or ERP reference recorded for this manual-invoice order.
+
+    OrderAccountingRefReceipt:
+      type: object
+      additionalProperties: false
+      required: [orderId, invoiceNumber, externalAccountingRef]
+      properties:
+        orderId:
+          type: string
+          pattern: '^[A-Za-z0-9._:-]{1,128}$'
+        invoiceNumber:
+          type: string
+          pattern: '^INV-[0-9]{6,}$'
+        externalAccountingRef:
+          type: string
+          pattern: '^[A-Za-z0-9._:-]{1,128}$'
 
     InventoryList:
       type: object
@@ -2981,6 +3089,8 @@ components:
             - order.partially_fulfilled
             - order.cancelled
             - order.updated
+            - order.invoiced
+            - invoice.settled
             - customer.marketing_consent.updated
             - attribution.finalized
             - fulfillment.assignment.created

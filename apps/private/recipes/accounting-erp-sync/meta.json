@@ -1,0 +1,9 @@
+{
+  "id": "private-app-recipe-accounting-erp-sync",
+  "kind": "recipe",
+  "title": "Accounting & ERP Invoice Sync Connector (QuickBooks Online, Xero & NetSuite Adapters + Accounting-Ref Writeback)",
+  "description": "Runnable Private App connector recipe for B2B manual-invoice and ERP accounting synchronization: verifies order.invoiced and invoice.settled CloudEvents, hydrates Order.invoice via GET /orders/{id}, maps invoices and settlements through plug-in adapters for QuickBooks Online (QBO), Xero (XERO), and NetSuite (NS), and writes back externalAccountingRef via idempotent POST /orders/{id}/accounting-ref.",
+  "tags": ["private-apps", "orders", "invoices", "accounting", "erp", "quickbooks", "xero", "netsuite", "webhooks", "recipe"],
+  "contract": "private-apps@1.7",
+  "requires": { "node": ">=20", "cli": ">=7.7.0" }
+}

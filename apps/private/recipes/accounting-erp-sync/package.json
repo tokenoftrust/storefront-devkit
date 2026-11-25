@@ -1,0 +1,12 @@
+{
+  "name": "storefront-private-app-recipe-accounting-erp-sync",
+  "private": true,
+  "type": "module",
+  "description": "Accounting & ERP invoice sync connector recipe (QuickBooks Online, Xero, and NetSuite adapters + idempotent externalAccountingRef writeback) for Storefront Private Apps v1.7.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node index.mjs",
+    "self-test": "node index.mjs --self-test",
+    "test": "node --test test/*.test.mjs"
+  }
+}

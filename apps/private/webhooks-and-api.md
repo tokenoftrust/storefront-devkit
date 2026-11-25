@@ -50,8 +50,10 @@ the OpenAPI definition says so.
 |---|---|
 | Token only | Read this app install (`GET /app`) and its delivery health (`GET /health`). |
 | `catalog:read` | Read published catalog products (`GET /catalog/products`, `GET /catalog/products/{handle}`), with keyset `cursor` and `updatedSince` pagination, and subscribe to `catalog.product.updated`. |
-| `orders:read-minimal` | Read minimized order lists and details (`GET /orders`, `GET /orders/{orderId}`). |
-| `orders:webhook` | Subscribe to `order.created`, `order.partially_fulfilled`, and `order.fulfilled` CloudEvents. |
+| `orders:read-minimal` | Read minimized order lists and details (`GET /orders`, `GET /orders/{id}`), including the optional `invoice` object on orders backed by a manual invoice. |
+| `orders:read-holds` | Read held orders with their closed-vocabulary hold reasons (`GET /orders/holds`). |
+| `orders:webhook` | Subscribe to `order.created`, `order.paid`, `order.partially_fulfilled`, `order.fulfilled`, `order.cancelled`, `order.updated`, `order.invoiced`, and `invoice.settled` CloudEvents. |
+| `orders:write-accounting-ref` | Record or idempotently replay the external accounting or ERP reference on an issued, paid, or voided manual-invoice order (`POST /orders/{id}/accounting-ref`). |
 | `customers:read-minimal` | Read minimal marketing consent state keyed by opaque customer id and subscribe to `customer.marketing_consent.updated`. |
 | `inventory:read` | Read availability, policy, per-location mirror-ledger readings (`GET /inventory`), and inventory locations (`GET /inventory/locations`, `GET /inventory/locations/{locationId}`), plus subscribe to `inventory.changed`. |
 | `inventory:write` | Upsert inventory locations (`PUT /inventory/locations/{locationId}`), record single or batch stock movements (`POST /inventory/movements`, `POST /inventory/adjustments`), and reconcile absolute levels with compare-and-swap (`PUT /inventory/levels`). |
