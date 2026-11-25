@@ -5,6 +5,7 @@
   "scopes": [
     {
       "id": "catalog:read",
+      "x-tot-maturity": "alpha",
       "grants": "Read published catalog products and collections for the installed tenant (GET /catalog/products, /catalog/products/{handle}).",
       "access": "read",
       "dataMinimization": "Public storefront catalog data only. No draft/internal-only fields beyond what the storefront already renders publicly.",
@@ -12,6 +13,7 @@
     },
     {
       "id": "orders:read-minimal",
+      "x-tot-maturity": "alpha",
       "grants": "Read a minimized order list and order detail (GET /orders, /orders/{id}).",
       "access": "read",
       "dataMinimization": "Order id, status, currency, line SKUs/handles, quantities, subtotals/totals, timestamps. NO raw checkout payload, NO signed-cart material, NO tax-computation internals.",
@@ -19,6 +21,7 @@
     },
     {
       "id": "orders:read-holds",
+      "x-tot-maturity": "alpha",
       "grants": "Read the tenant's held orders with the reason each is held (GET /orders/holds). One server-authorized read, paged with an opaque cursor, and the same operation the sponsored-agent door serves.",
       "access": "read",
       "dataMinimization": "Opaque page-scoped order reference, placed-at, currency, item and line counts, payment and fulfillment state, held flag and one reason code from a closed vocabulary. All six amounts are null. NO order id, item name, SKU, free text, customer field or checkout payload.",
@@ -26,6 +29,7 @@
     },
     {
       "id": "orders:webhook",
+      "x-tot-maturity": "alpha",
       "grants": "Subscribe to order lifecycle events (order.created, order.paid, order.partially_fulfilled, order.fulfilled, order.cancelled, order.updated) and manual-invoice events (order.invoiced, invoice.settled) delivered as signed CloudEvents.",
       "access": "read (event delivery)",
       "dataMinimization": "Same minimized order shape as orders:read-minimal, delivered in the event payload. order.invoiced carries the order id, invoice number, settlement mode, currency, subtotal, total, line items and issue time (plus quote id, net-terms days and due date when present); invoice.settled carries the order id, invoice number, settlement mode, currency, total and settlement time. Invoice events carry no customer identity, no purchase-order number, no notes and no settlement reference.",
@@ -33,6 +37,7 @@
     },
     {
       "id": "orders:write-accounting-ref",
+      "x-tot-maturity": "alpha",
       "grants": "Record or idempotently replay the external accounting or ERP reference on one issued, paid or voided manual-invoice order (POST /orders/{id}/accounting-ref).",
       "access": "write (external accounting reference on non-draft manual-invoice orders only)",
       "dataMinimization": "Request body is closed to externalAccountingRef (1..128 characters of letters, digits and ._:-). Writes only manual_order_invoices.external_accounting_ref, one append-only audit row and the install's idempotency record. Response is closed to orderId, invoiceNumber and externalAccountingRef. Never reads or returns customer identity, purchase-order number, notes or settlement reference, and cannot alter totals, tax, payment, compliance or fulfillment.",
@@ -40,6 +45,7 @@
     },
     {
       "id": "customers:read-minimal",
+      "x-tot-maturity": "alpha",
       "grants": "Read minimal marketing-relevant customer state (e.g. marketing consent) keyed by opaque customer id; subscribe to customer.marketing_consent.updated.",
       "access": "read",
       "dataMinimization": "Opaque customer id + marketing consent state + timestamps. NO age/identity evidence, NO verification result, NO document data, NO raw contact PII by default.",
@@ -47,6 +53,7 @@
     },
     {
       "id": "inventory:read",
+      "x-tot-maturity": "alpha",
       "grants": "Read inventory availability/quantity for the tenant's catalog (GET /inventory), list the tenant's stock locations (GET /inventory/locations), read the tenant's stocktake sessions (GET /inventory/stocktakes and GET /inventory/stocktakes/{sessionId}), and subscribe to inventory.changed and inventory.stocktake.completed.",
       "access": "read",
       "dataMinimization": "Availability, quantity, and policy per variant/SKU only, plus the mirror-ledger reading (balance, asOf) for one location. Locations are id, name, kind, fulfillable flag, status and update time. inventory.changed carries sku, locationId, balance, available and asOf only. A stocktake session is its id, kind, location, status, timestamps and totals, plus per-sku expected, counted and variance lines, with the actor named by kind only; inventory.stocktake.completed carries sessionId, locationId, kind, completedAt, lineCount, varianceCount and netDelta only.",
@@ -54,6 +61,7 @@
     },
     {
       "id": "inventory:write",
+      "x-tot-maturity": "alpha",
       "grants": "Report per-sku, per-location stock movements into the installed tenant's mirror ledger (POST /inventory/movements, one correction or a WMS batch of up to 250), reconcile absolute on-hand levels (PUT /inventory/levels, up to 250), and declare the tenant's stock locations (PUT /inventory/locations/{locationId}), as an inventory-sync integration the merchant installed.",
       "access": "write (mirror-ledger corrections and the stock-location registry only)",
       "dataMinimization": "Movement items are exactly sku, locationId, a nonzero safe-integer quantityDelta and a WMS reason; level items are exactly sku, locationId, onHand and observedAt; a location is exactly name, kind, isFulfillable and status. The platform derives each movement's asOf (receive time), source (the app's namespace), sourceEventId (from the idempotency key) and actorId (the install). Every sku must be in the tenant catalog and every location unspecified or declared active. Cannot decrement for an order, reserve stock, alter price, tax, checkout or fulfillment, or become the authoritative inventory provider. A later source on-hand observation supersedes an earlier correction.",
@@ -61,6 +69,7 @@
     },
     {
       "id": "purchasing:read",
+      "x-tot-maturity": "alpha",
       "grants": "Read the tenant's suppliers (GET /purchasing/suppliers, /purchasing/suppliers/{supplierId}), a supplier's unit-cost history (GET /purchasing/suppliers/{supplierId}/costs) and purchase orders (GET /purchasing/purchase-orders, /purchasing/purchase-orders/{poId}), and subscribe to purchase_order.created, purchase_order.updated and purchase_order.received.",
       "access": "read",
       "dataMinimization": "A supplier is its id, name, lead time, minimum order quantity, currency, status, an optional note and timestamps. A purchase order is its id, number, supplier id, status, receiving location id, currency, expected date, note, version, timestamps, the creating actor id and its lines (line number, sku, ordered quantity, received quantity, unit cost in minor units). A cost point is supplier id, sku, unit cost, currency, as-of, purchase order id and receipt key. The purchase_order events carry poId, poNumber, supplierId, status, version, locationId, currency and asOf only; purchase_order.received adds the receipt key and its lines (lineNo, sku, quantity).",
@@ -68,6 +77,7 @@
     },
     {
       "id": "purchasing:write",
+      "x-tot-maturity": "alpha",
       "grants": "Create and update suppliers (POST /purchasing/suppliers, PATCH /purchasing/suppliers/{supplierId}), create and edit draft purchase orders (POST /purchasing/purchase-orders, PATCH /purchasing/purchase-orders/{poId}), send and close them (POST /purchasing/purchase-orders/{poId}/send, /close), and record partial receipts against a sent order (POST /purchasing/purchase-orders/{poId}/receipts), as a purchasing integration the merchant installed.",
       "access": "write (supplier and purchase-order records, and the stock receipts a purchase-order receipt posts, only)",
       "dataMinimization": "Supplier bodies are exactly name, leadTimeDays, moq, currency, note and status; purchase-order bodies are exactly supplierId, locationId, expectedAt, note and lines of sku, orderedQty and unitCostMinor; a receipt is exactly an optional locationId and lines of lineNo, quantity and an optional unitCostMinor. The platform derives every id, number, version, timestamp, the creating actor (the install) and each receipt's movement source (the app's namespace). Every sku must be in the tenant catalog and every location unspecified or declared active. A receipt is one atomic, idempotent transaction that posts a received stock movement per line, advances the order and appends the supplier cost history; it cannot over-receive an order line, receive against a draft or closed order, or reach price, tax, checkout, fulfillment or any authoritative inventory provider.",
@@ -75,6 +85,7 @@
     },
     {
       "id": "proposal-events:read",
+      "x-tot-maturity": "alpha",
       "grants": "Subscribe to proposal.filed, proposal.applied, proposal.rejected and proposal.expired through owner-enabled private webhook subscriptions for the installed tenant and stage.",
       "access": "read (event delivery)",
       "dataMinimization": "Opaque proposal id, registered kind, kind schema version, state and committed transition timestamp only.",
@@ -82,6 +93,7 @@
     },
     {
       "id": "reports:read",
+      "x-tot-maturity": "alpha",
       "grants": "Read limited, pre-defined report snapshots/exports (GET /reports).",
       "access": "read",
       "dataMinimization": "Aggregate report snapshots only; no row-level PII beyond what the minimal order/customer scopes already permit.",
@@ -89,6 +101,7 @@
     },
     {
       "id": "attribution:write",
+      "x-tot-maturity": "alpha",
       "grants": "Write app-owned attribution/commission records via the idempotent POST /attribution endpoint.",
       "access": "write (app-owned surface only)",
       "dataMinimization": "Writes only into the app's own attribution namespace. Cannot alter orders, price, tax, checkout validity, or any platform record.",
@@ -96,6 +109,7 @@
     },
     {
       "id": "widgets:launch",
+      "x-tot-maturity": "alpha",
       "grants": "Activate declared sandboxed widget placements and mint short-lived widget launch tokens for the app's platform-managed iframes.",
       "access": "ui-launch (no data read/write)",
       "dataMinimization": "Launch token carries tenant, env, slot, route, optional product handle, locale, theme hints, trace id — never secrets or customer PII.",
@@ -104,6 +118,7 @@
     },
     {
       "id": "fulfillment:process",
+      "x-tot-maturity": "alpha",
       "grants": "Act as the merchant-configured fulfillment processor for orders assigned to this install: receive fulfillment.assignment.created, fulfillment.assignment.updated and fulfillment.label.voided, read the install's active assignments (GET /fulfillment/assignments), and report label outcome and confirmed handoff for an assigned order (POST /fulfillment/orders/{orderId}/shipment-evidence).",
       "access": "read + write (assigned orders only)",
       "dataMinimization": "Assignment id, opaque order id, stage, assignment state, event version, timestamps, the platform purchase id, and line SKUs/quantities. Writes are whole-order label-outcome and handoff facts (purchase id, carrier and service codes, tracking number and URL, adult-signature result) for an order whose active assignment names this install. Granting the scope assigns nothing: only the merchant's processor configuration and an operator release do. Cannot buy labels, quote rates, split an order, create returns, or alter payment, tax, price or checkout.",
@@ -111,6 +126,7 @@
     },
     {
       "id": "orders:read-recipient",
+      "x-tot-maturity": "alpha",
       "grants": "Read the ship-to recipient of one order assigned to this install (GET /fulfillment/orders/{orderId}/recipient), only while the merchant owner's consent for this install, stage and the fulfillment-shipping purpose is live.",
       "access": "read (assigned orders only, consent-gated, audited)",
       "dataMinimization": "Ship-to name, company, address lines, city, region, postal code and country of one order per request. No email, no phone, no bill-to, no customer identity group, no list, search or bulk export. Every admitted read is recorded in an append-only audit before anything is decrypted, under a per-install hourly quota.",

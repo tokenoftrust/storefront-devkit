@@ -5,6 +5,7 @@ All notable changes to the Storefront Devkit. Format loosely follows Keep a Chan
 ## Unreleased
 
 ### Changed
+- Contract: `x-tot-status` is replaced by `x-tot-maturity` in `openapi.yaml`, `asyncapi.yaml` and `scopes.json`: `alpha` for implemented, `concept` for planned shapes and seams.
 - Contract: `orders:read-holds` scope and `GET /orders/holds` (held orders with a closed-vocabulary reason, opaque page-scoped
   references, no order id or customer field), mirrored from the Storefront runtime that serves it.
 - Scope ids `orders:read:minimal`, `customers:read:minimal` and `orders:read:recipient` are now

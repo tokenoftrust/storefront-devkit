@@ -43,6 +43,7 @@ servers:
 
 channels:
   app.installed:
+    x-tot-maturity: alpha
     description: Emitted when an app install is activated for a tenant. Delivered to the install's own endpoint.
     subscribe:
       operationId: onAppInstalled
@@ -54,6 +55,7 @@ channels:
         $ref: '#/components/messages/AppInstalled'
 
   app.uninstalled:
+    x-tot-maturity: alpha
     description: Emitted when an app install is uninstalled. Final delivery before credentials/placements are revoked.
     subscribe:
       operationId: onAppUninstalled
@@ -61,6 +63,7 @@ channels:
         $ref: '#/components/messages/AppUninstalled'
 
   catalog.product.updated:
+    x-tot-maturity: alpha
     description: Emitted when a published catalog product changes. Requires scope catalog:read.
     subscribe:
       operationId: onCatalogProductUpdated
@@ -68,6 +71,7 @@ channels:
         $ref: '#/components/messages/CatalogProductUpdated'
 
   inventory.changed:
+    x-tot-maturity: alpha
     description: >
       Emitted once on every committed inventory ledger movement (app correction, source
       on-hand observation, catalog import, and order decrement). Requires scope
@@ -80,6 +84,7 @@ channels:
         $ref: '#/components/messages/InventoryChanged'
 
   inventory.stocktake.completed:
+    x-tot-maturity: alpha
     description: >
       Emitted once when a stocktake session completes and its variances are posted. Requires
       scope inventory:read. Carries the session id, location, kind, completion time and the
@@ -92,6 +97,7 @@ channels:
         $ref: '#/components/messages/InventoryStocktakeCompleted'
 
   purchase_order.created:
+    x-tot-maturity: alpha
     description: >
       Emitted once when a draft purchase order is created. Requires scope purchasing:read.
       Closed payload: order id, number, supplier id, status, version, receiving location id,
@@ -102,6 +108,7 @@ channels:
         $ref: '#/components/messages/PurchaseOrderCreated'
 
   purchase_order.updated:
+    x-tot-maturity: alpha
     description: >
       Emitted once per committed change to an existing purchase order: a draft edit, send,
       or close. Requires scope purchasing:read. Same closed payload as purchase_order.created;
@@ -113,6 +120,7 @@ channels:
         $ref: '#/components/messages/PurchaseOrderUpdated'
 
   purchase_order.received:
+    x-tot-maturity: alpha
     description: >
       Emitted once per committed receipt against a purchase order, never for an idempotent
       replay. Requires scope purchasing:read. The purchase order payload plus the receipt's
@@ -125,6 +133,7 @@ channels:
         $ref: '#/components/messages/PurchaseOrderReceived'
 
   order.created:
+    x-tot-maturity: alpha
     description: Emitted when an order is created. Requires scope orders:webhook. Minimized order payload.
     subscribe:
       operationId: onOrderCreated
@@ -132,6 +141,7 @@ channels:
         $ref: '#/components/messages/OrderCreated'
 
   order.paid:
+    x-tot-maturity: alpha
     description: >
       Emitted once per order when payment is captured or settled. Requires scope
       orders:webhook. Minimized order payload with line items and SKUs; idempotent per
@@ -142,6 +152,7 @@ channels:
         $ref: '#/components/messages/OrderPaid'
 
   order.fulfilled:
+    x-tot-maturity: alpha
     description: >
       Emitted when an order is fulfilled. Requires scope orders:webhook. With per-assignment
       shipments it is emitted once, by the shipment that ships the last unshipped line.
@@ -151,6 +162,7 @@ channels:
         $ref: '#/components/messages/OrderFulfilled'
 
   order.cancelled:
+    x-tot-maturity: alpha
     description: >
       Emitted once per order when the order is cancelled or refunded. Requires scope
       orders:webhook. Minimized order payload with status `cancelled`, line items, and SKUs;
@@ -161,6 +173,7 @@ channels:
         $ref: '#/components/messages/OrderCancelled'
 
   order.updated:
+    x-tot-maturity: alpha
     description: >
       Emitted when an existing order's line items, quantities, or totals are modified.
       Requires scope orders:webhook. Minimized order payload with line items and SKUs;
@@ -171,6 +184,7 @@ channels:
         $ref: '#/components/messages/OrderUpdated'
 
   customer.marketing_consent.updated:
+    x-tot-maturity: alpha
     description: Emitted when a customer's marketing consent changes. Requires scope customers:read-minimal. Opaque customer id only.
     subscribe:
       operationId: onCustomerMarketingConsentUpdated
@@ -178,6 +192,7 @@ channels:
         $ref: '#/components/messages/CustomerMarketingConsentUpdated'
 
   attribution.finalized:
+    x-tot-maturity: alpha
     description: Emitted when an attribution/commission record is finalized. Requires scope attribution:write.
     subscribe:
       operationId: onAttributionFinalized
@@ -185,6 +200,7 @@ channels:
         $ref: '#/components/messages/AttributionFinalized'
 
   fulfillment.assignment.created:
+    x-tot-maturity: alpha
     description: >
       Emitted when an operator release assigns an order exclusively to this install as the
       merchant-configured fulfillment processor for the order's stage. Requires scope
@@ -198,6 +214,7 @@ channels:
         $ref: '#/components/messages/FulfillmentAssignmentCreated'
 
   fulfillment.assignment.updated:
+    x-tot-maturity: alpha
     description: >
       Emitted when this install's assignment changes state: held (operator hold or a pending
       cancel or refund), active again (hold cleared, same install), or cancelled (a
@@ -210,6 +227,7 @@ channels:
         $ref: '#/components/messages/FulfillmentAssignmentUpdated'
 
   order.partially_fulfilled:
+    x-tot-maturity: alpha
     description: >
       Emitted for every accepted assignment shipment that leaves at least one assignment
       line unshipped. Requires scope orders:webhook. Same minimized order payload as
@@ -220,6 +238,7 @@ channels:
         $ref: '#/components/messages/OrderPartiallyFulfilled'
 
   order.invoiced:
+    x-tot-maturity: alpha
     description: >
       Emitted once when a manual invoice is issued for an order. Requires scope orders:webhook.
       Closed payload: order id, invoice number, settlement mode, currency, subtotal and total in
@@ -233,6 +252,7 @@ channels:
         $ref: '#/components/messages/OrderInvoiced'
 
   invoice.settled:
+    x-tot-maturity: alpha
     description: >
       Emitted once when an issued invoice becomes paid. Requires scope orders:webhook. Closed
       payload: order id, invoice number, settlement mode, currency, total in major units and the
@@ -244,6 +264,7 @@ channels:
         $ref: '#/components/messages/InvoiceSettled'
 
   fulfillment.label.voided:
+    x-tot-maturity: alpha
     description: >
       Emitted once when the processor's `label-voided` shipment evidence is accepted, so the
       processor learns of a voided label without polling. A retried identical report emits
@@ -255,6 +276,7 @@ channels:
         $ref: '#/components/messages/FulfillmentLabelVoided'
 
   proposal.filed:
+    x-tot-maturity: alpha
     description: >-
       Emitted once when a sponsored agent files a proposal and it enters pending review.
       Requires scope proposal-events:read.
@@ -264,6 +286,7 @@ channels:
         $ref: '#/components/messages/ProposalFiled'
 
   proposal.applied:
+    x-tot-maturity: alpha
     description: >-
       Emitted once when an owner-approved proposal and its domain effect commit.
       Requires scope proposal-events:read.
@@ -273,6 +296,7 @@ channels:
         $ref: '#/components/messages/ProposalApplied'
 
   proposal.rejected:
+    x-tot-maturity: alpha
     description: >-
       Emitted once when the owner rejection commits.
       Requires scope proposal-events:read.
@@ -282,6 +306,7 @@ channels:
         $ref: '#/components/messages/ProposalRejected'
 
   proposal.expired:
+    x-tot-maturity: alpha
     description: >-
       Emitted once when the transition of an undecided proposal to expired commits.
       Requires scope proposal-events:read.
