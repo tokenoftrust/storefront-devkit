@@ -59,7 +59,7 @@ channels:
         $ref: '#/components/messages/AppUninstalled'
 
   catalog.product.updated:
-    x-tot-maturity: alpha
+    x-tot-maturity: concept
     description: Emitted when a published catalog product changes. Requires scope catalog:read.
     subscribe:
       operationId: onCatalogProductUpdated
@@ -180,7 +180,7 @@ channels:
         $ref: '#/components/messages/OrderUpdated'
 
   customer.marketing_consent.updated:
-    x-tot-maturity: alpha
+    x-tot-maturity: concept
     description: Emitted when a customer's marketing consent changes. Requires scope customers:read-minimal. Opaque customer id only.
     subscribe:
       operationId: onCustomerMarketingConsentUpdated
@@ -188,7 +188,7 @@ channels:
         $ref: '#/components/messages/CustomerMarketingConsentUpdated'
 
   attribution.finalized:
-    x-tot-maturity: alpha
+    x-tot-maturity: concept
     description: Emitted when an attribution/commission record is finalized. Requires scope attribution:write.
     subscribe:
       operationId: onAttributionFinalized
