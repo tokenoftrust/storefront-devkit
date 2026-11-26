@@ -115,7 +115,7 @@ export function createMockStorefront({ skus = ['SKU-CONFORMANCE-1', 'SKU-CONFORM
  * @param {string} [options.tenant] optional expected tenantid for WebhookReceiver tenant boundary enforcement
  * @param {string} [options.appInstallId] optional expected appinstallid for WebhookReceiver boundary enforcement
  */
-export function createTot(cfg, { fetch: fetchImpl, seenEvents = new MemorySeenEventStore(), tenant, appInstallId } = {}) {
+export function createTot(cfg, { fetch: fetchImpl, seenEvents = new MemorySeenEventStore(), tenant = cfg.tenant, appInstallId = cfg.installId } = {}) {
   const io = fetchImpl ? { fetch: fetchImpl } : {};
   // Webhook signing keys are published once for the whole host (not per tenant):
   // https://storefront.tokenoftrust.store/.well-known/tot-app-authorization-metadata -> webhook_signing_keys

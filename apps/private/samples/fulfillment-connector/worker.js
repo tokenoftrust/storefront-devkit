@@ -28,7 +28,7 @@ const json = (status, body) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
 /** Build a Worker. Options are injection points for tests; a deploy uses the defaults. */
-const CONFIG_KEYS = ['TOT_APP_CLIENT_ID', 'TOT_APP_CLIENT_SECRET', 'TOT_STOREFRONT_BASE_URL', 'WEBHOOK_PUBLIC_URL', 'LABEL_PROVIDER'];
+const CONFIG_KEYS = ['TOT_APP_CLIENT_ID', 'TOT_APP_CLIENT_SECRET', 'TOT_STOREFRONT_BASE_URL', 'WEBHOOK_PUBLIC_URL', 'LABEL_PROVIDER', 'TOT_TENANT', 'TOT_APP_INSTALL_ID'];
 /** Identifies a configuration without holding its values. */
 const fingerprint = (env) => createHash('sha256').update(JSON.stringify(CONFIG_KEYS.map((k) => env[k] ?? null))).digest('hex');
 

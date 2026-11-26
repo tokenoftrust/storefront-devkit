@@ -490,24 +490,32 @@ test('offline conformance parity: label-station, dropship, and inventory-sync ce
   console.log = quiet;
   try {
     for (const appName of ['label-station', 'dropship', 'inventory-sync']) {
-      process.env.TOT_METADATA_ORIGIN = metadataOrigin;
-      process.env.MOCK_STOREFRONT = '1';
+      // Verify non-loopback HTTPS TOT_METADATA_ORIGIN without explicit MOCK_STOREFRONT=1 does NOT select mocks and fails closed when credentials are missing.
+      process.env.TOT_METADATA_ORIGIN = 'https://storefront.tokenoftrust.store';
+      delete process.env.MOCK_STOREFRONT;
       delete process.env.TOT_TENANT;
       delete process.env.TOT_INSTALL_ID;
       delete process.env.TOT_CLIENT_ID;
       delete process.env.TOT_CLIENT_SECRET;
+      const incompleteHttpsCfg = loadConfig(appName);
+      assert.equal(incompleteHttpsCfg.mockStorefront, false, `${appName} refuses implicit mock mode on non-loopback HTTPS TOT_METADATA_ORIGIN`);
+      assert.throws(() => createTot(incompleteHttpsCfg), /missing in .*TOT_TENANT/, `${appName} fails closed when HTTPS TOT_METADATA_ORIGIN has incomplete live config`);
 
+      // Loopback TOT_METADATA_ORIGIN without live credentials enables implicit conformance mode with the CLI fixture identity ('conformance' / 'conformance-install').
+      process.env.TOT_METADATA_ORIGIN = metadataOrigin;
+      delete process.env.MOCK_STOREFRONT;
       const cfg = loadConfig(appName);
-      assert.equal(cfg.mockStorefront, true, `${appName} enables mockStorefront when TOT_METADATA_ORIGIN / MOCK_STOREFRONT is set`);
+      assert.equal(cfg.mockStorefront, true, `${appName} enables mockStorefront when loopback TOT_METADATA_ORIGIN is set`);
+      assert.equal(cfg.tenant, 'conformance');
+      assert.equal(cfg.installId, 'conformance-install');
       cfg.port = 0;
       cfg.webhookPublicUrl = 'https://conformance.example';
       cfg.webhookEndpoint = 'https://conformance.example/webhooks';
 
       const store = createMemoryStateStore();
+      // Wire the exact production entry point (`createTot(cfg, { seenEvents: seenEventsFrom(store) })` + `startWebhookServer`) with no test-only tenant/appInstallId overrides.
       const tot = createTot(cfg, {
         seenEvents: seenEventsFrom(store),
-        tenant: 'example.com',
-        appInstallId: 'inst-1',
       });
       assert.ok(tot.mock, `${appName} exposes in-process mock Storefront`);
 
@@ -546,9 +554,15 @@ test('offline conformance parity: label-station, dropship, and inventory-sync ce
         appName === 'inventory-sync'
           ? { sku: 'SKU-CONFORMANCE-1', locationId: cfg.locationId, balance: 15, available: 15, asOf: '2026-11-26T00:00:00.000Z' }
           : { assignmentId: 'asg_conf_1', orderId: 'ord_conf_1', stage: 'preview', state: 'held', eventVersion: 2, occurredAt: '2026-11-26T00:00:00.000Z' };
+      const conformanceEvent = (tName, id, data) => ({
+        ...cloudEvent(tName, id, data),
+        source: '/tenants/conformance/storefront',
+        tenantid: 'conformance',
+        appinstallid: 'conformance-install',
+      });
 
       // 1. Valid Ed25519 delivery (tot app conformance) -> 202
-      const edEvent = cloudEvent(topic, `evt-ed-${appName}`, payload);
+      const edEvent = conformanceEvent(topic, `evt-ed-${appName}`, payload);
       const edSigned = signWebhook(cfg.webhookEndpoint, edEvent);
       const resEd = await fetch(url, { method: 'POST', headers: edSigned.headers, body: edSigned.body });
       assert.equal(resEd.status, 202, `${appName} accepts Ed25519 signed delivery`);
@@ -563,7 +577,7 @@ test('offline conformance parity: label-station, dropship, and inventory-sync ce
         appName === 'inventory-sync'
           ? { ...payload, asOf: '2026-11-26T00:01:00.000Z', balance: 14 }
           : { ...payload, state: 'cancelled', eventVersion: 3 };
-      const rsaEvent = cloudEvent(topic, `evt-rsa-${appName}`, rsaPayload);
+      const rsaEvent = conformanceEvent(topic, `evt-rsa-${appName}`, rsaPayload);
       const rsaSigned = signWebhook(cfg.webhookEndpoint, rsaEvent, {
         alg: 'rsa-v1_5-sha256',
         keyid: 'webhook-signing-1',
@@ -573,7 +587,7 @@ test('offline conformance parity: label-station, dropship, and inventory-sync ce
       assert.equal(resRsa.status, 202, `${appName} accepts RSA webhook-signing-1 delivery`);
 
       // 4. Fail-closed: invalid signature -> 401 signature_invalid
-      const badSigEvent = cloudEvent(topic, `evt-badsig-${appName}`, payload);
+      const badSigEvent = conformanceEvent(topic, `evt-badsig-${appName}`, payload);
       const badSigSigned = signWebhook(cfg.webhookEndpoint, badSigEvent);
       const tamperedHeaders = { ...badSigSigned.headers, signature: 'sig1=:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==:' };
       const resBadSig = await fetch(url, { method: 'POST', headers: tamperedHeaders, body: badSigSigned.body });
@@ -581,7 +595,7 @@ test('offline conformance parity: label-station, dropship, and inventory-sync ce
       assert.equal((await resBadSig.json()).code, 'signature_invalid');
 
       // 5. Fail-closed: expired timestamp -> 401 signature_expired
-      const expiredEvent = cloudEvent(topic, `evt-exp-${appName}`, payload);
+      const expiredEvent = conformanceEvent(topic, `evt-exp-${appName}`, payload);
       const expiredSigned = signWebhook(cfg.webhookEndpoint, expiredEvent, {
         created: Math.floor(Date.now() / 1000) - 600,
       });
@@ -590,7 +604,7 @@ test('offline conformance parity: label-station, dropship, and inventory-sync ce
       assert.equal((await resExpired.json()).code, 'signature_expired');
 
       // 6. Fail-closed: wrong key -> 401 signature_invalid / unknown_key
-      const wrongKeyEvent = cloudEvent(topic, `evt-wrongkey-${appName}`, payload);
+      const wrongKeyEvent = conformanceEvent(topic, `evt-wrongkey-${appName}`, payload);
       const wrongKeySigned = signWebhook(cfg.webhookEndpoint, wrongKeyEvent, {
         privateKey: wrongEdPair.privateKey,
       });
@@ -598,9 +612,10 @@ test('offline conformance parity: label-station, dropship, and inventory-sync ce
       assert.equal(resWrongKey.status, 401);
       assert.equal((await resWrongKey.json()).code, 'signature_invalid');
 
-      // 7. Fail-closed: wrong tenant payload -> 403 tenant_mismatch
+      // 7. Fail-closed: wrong tenant payload -> 403 tenant_mismatch (and does not poison replay store)
+      const sharedMismatchId = `evt-wrongtenant-${appName}`;
       const wrongTenantEvent = {
-        ...cloudEvent(topic, `evt-wrongtenant-${appName}`, payload),
+        ...conformanceEvent(topic, sharedMismatchId, payload),
         tenantid: 'other.example.com',
         source: '/tenants/other.example.com/storefront',
       };
@@ -608,6 +623,21 @@ test('offline conformance parity: label-station, dropship, and inventory-sync ce
       const resWrongTenant = await fetch(url, { method: 'POST', headers: wrongTenantSigned.headers, body: wrongTenantSigned.body });
       assert.equal(resWrongTenant.status, 403);
       assert.equal((await resWrongTenant.json()).code, 'tenant_mismatch');
+
+      // 8. Fail-closed: wrong appinstallid payload -> 403 tenant_mismatch (and does not poison replay store)
+      const wrongInstallEvent = {
+        ...conformanceEvent(topic, sharedMismatchId, payload),
+        appinstallid: 'inst_wrong',
+      };
+      const wrongInstallSigned = signWebhook(cfg.webhookEndpoint, wrongInstallEvent);
+      const resWrongInstall = await fetch(url, { method: 'POST', headers: wrongInstallSigned.headers, body: wrongInstallSigned.body });
+      assert.equal(resWrongInstall.status, 403);
+      assert.equal((await resWrongInstall.json()).code, 'tenant_mismatch');
+
+      // Delivering the genuine event with the same ID succeeds with 202 (replay store was untouched by 403 rejections)
+      const genuineAfterMismatch = signWebhook(cfg.webhookEndpoint, conformanceEvent(topic, sharedMismatchId, payload));
+      const resGenuineAfterMismatch = await fetch(url, { method: 'POST', headers: genuineAfterMismatch.headers, body: genuineAfterMismatch.body });
+      assert.equal(resGenuineAfterMismatch.status, 202);
     }
   } finally {
     console.log = origLog;

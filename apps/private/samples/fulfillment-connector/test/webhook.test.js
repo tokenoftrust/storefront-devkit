@@ -83,13 +83,19 @@ test('held and cancelled updates are recorded without reading the recipient', as
   assert.equal(app.connector.assignmentState('asg_01J9Z4A8M1K2V3B4N5X6Y7Z8C9').state, 'cancelled');
 });
 
-test('a signed delivery with mismatched source tenant is rejected with 403 tenant_mismatch without consuming the event id', async () => {
+test('a signed delivery with mismatched source tenant or wrong configured tenant/appInstallId is rejected with 403 tenant_mismatch without consuming the event id', async () => {
   const { gateway, app } = setup();
-  const event = { ...createdEvent(), tenantid: 'other-store', source: '/tenants/acme/storefront' };
-  const bad = await app.handleDelivery(gateway.deliver(event));
-  assert.equal(bad.status, 403);
-  assert.equal(bad.body.code, 'tenant_mismatch');
-  assert.equal(bad.work, null);
+  for (const event of [
+    { ...createdEvent(), tenantid: 'other-store', source: '/tenants/acme/storefront' },
+    { ...createdEvent(), tenantid: 'other-store', source: '/tenants/other-store/storefront' },
+    { ...createdEvent(), appinstallid: 'inst_wrong' },
+  ]) {
+    const bad = await app.handleDelivery(gateway.deliver(event));
+    assert.equal(bad.status, 403);
+    assert.equal(bad.body.code, 'tenant_mismatch');
+    assert.equal(bad.work, null);
+    assert.equal(gateway.calls.recipientReads, 0);
+  }
 
   const genuine = await app.handleDelivery(gateway.deliver(createdEvent()));
   assert.equal(genuine.status, 202);

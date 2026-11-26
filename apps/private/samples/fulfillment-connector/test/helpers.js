@@ -4,7 +4,7 @@ import { createLogger } from '../src/log.js';
 import { createLocalGateway, SIM_BASE_URL, SIM_CLIENT_ID, SIM_CLIENT_SECRET, SIM_WEBHOOK_URL } from '../sim/local-gateway.js';
 
 /** A connector wired to a fresh local gateway, with captured log lines. */
-export function setup({ simulate = {}, gatewayOptions, now } = {}) {
+export function setup({ simulate = {}, gatewayOptions, tenant = 'acme', appInstallId = 'inst_01J9Z2R4H5T3W1P8D6F0K9M2C7', now } = {}) {
   const gateway = createLocalGateway(gatewayOptions);
   const lines = [];
   const app = createConnectorApp({
@@ -12,6 +12,8 @@ export function setup({ simulate = {}, gatewayOptions, now } = {}) {
     clientId: SIM_CLIENT_ID,
     clientSecret: SIM_CLIENT_SECRET,
     webhookUrl: SIM_WEBHOOK_URL,
+    tenant,
+    appInstallId,
     simulate,
     fetchImpl: gateway.fetch,
     logger: createLogger((line) => lines.push(line)),

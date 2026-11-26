@@ -50,7 +50,9 @@ function parseStorefrontBaseUrl(raw) {
   if (!claims || typeof claims !== 'object' || claims.env !== 'test' || typeof claims.exp !== 'number' || !Number.isFinite(claims.exp)) {
     throw new ConfigRefused(variable);
   }
-  return { origin: url.origin, capability: `${match[1]}.${match[2]}`, expiresAtMs: claims.exp * 1000 };
+  const hostTenant = /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\.tokenoftrust\.store$/i.exec(url.hostname)?.[1]?.toLowerCase();
+  const tenant = hostTenant && hostTenant !== 'storefront' ? hostTenant : undefined;
+  return { origin: url.origin, capability: `${match[1]}.${match[2]}`, expiresAtMs: claims.exp * 1000, tenant };
 }
 
 /**
@@ -62,10 +64,14 @@ export function loadConfig(env = process.env) {
   const storefront = parseStorefrontBaseUrl(env.TOT_STOREFRONT_BASE_URL);
   const webhookUrl = parseUrl(env.WEBHOOK_PUBLIC_URL, 'WEBHOOK_PUBLIC_URL');
   if (webhookUrl.protocol !== 'https:') throw new ConfigRefused('WEBHOOK_PUBLIC_URL');
+  const explicitTenant = typeof env.TOT_TENANT === 'string' && env.TOT_TENANT !== '' ? env.TOT_TENANT : storefront.tenant;
+  const appInstallId = typeof env.TOT_APP_INSTALL_ID === 'string' && env.TOT_APP_INSTALL_ID !== '' ? env.TOT_APP_INSTALL_ID : undefined;
   return {
     config: {
       clientId: env.TOT_APP_CLIENT_ID,
       baseUrl: storefront.origin,
+      ...(explicitTenant ? { tenant: explicitTenant } : {}),
+      ...(appInstallId ? { appInstallId } : {}),
       // The signature covers @target-uri as the registered endpoint string, so it is kept verbatim.
       webhookUrl: env.WEBHOOK_PUBLIC_URL,
       port: Number(env.PORT || 8787),

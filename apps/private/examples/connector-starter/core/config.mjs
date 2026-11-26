@@ -1,6 +1,7 @@
 // Loads apps/<app>/.env (KEY=VALUE lines) on top of process.env.
 // Secrets live only in that gitignored file. Never print them.
 import { existsSync, readFileSync } from 'node:fs';
+import { isIP } from 'node:net';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,6 +11,20 @@ export const APPS = ['label-station', 'dropship', 'inventory-sync'];
 export function appDir(app) {
   if (!APPS.includes(app)) throw new Error(`unknown app "${app}" (expected one of: ${APPS.join(', ')})`);
   return join(ROOT, 'apps', app);
+}
+
+/** True only when input is a valid HTTP(S) URL whose hostname is IPv4/IPv6 loopback or localhost. */
+export function isLoopbackOrigin(input) {
+  if (!input || typeof input !== 'string') return false;
+  let url;
+  try {
+    url = new URL(input);
+  } catch {
+    return false;
+  }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.hash) return false;
+  const { hostname } = url;
+  return hostname === 'localhost' || hostname === '[::1]' || hostname === '::1' || (isIP(hostname) === 4 && hostname.startsWith('127.'));
 }
 
 function parseEnvFile(path) {
@@ -38,18 +53,18 @@ export function loadConfig(app) {
   const metadataOrigin = (env.TOT_METADATA_ORIGIN || host).replace(/\/+$/, '');
   const webhookPublicUrl = (env.WEBHOOK_PUBLIC_URL || '').replace(/\/+$/, '');
   const missing = ['TOT_TENANT', 'TOT_INSTALL_ID', 'TOT_CLIENT_ID', 'TOT_CLIENT_SECRET'].filter((k) => !env[k]);
-  // Offline mock/conformance mode: explicit MOCK_STOREFRONT=1 or running against a local TOT_METADATA_ORIGIN
-  // (e.g. `tot app conformance`) before store credentials exist.
-  const mockStorefront = env.MOCK_STOREFRONT === '1' || (Boolean(env.TOT_METADATA_ORIGIN) && missing.length > 0);
+  // Offline mock/conformance mode: explicit MOCK_STOREFRONT=1, or a verified loopback TOT_METADATA_ORIGIN
+  // (e.g. `tot app conformance` on http://127.0.0.1:37891) before store credentials exist.
+  const mockStorefront = env.MOCK_STOREFRONT === '1' || (isLoopbackOrigin(env.TOT_METADATA_ORIGIN) && missing.length > 0);
   const cfg = {
     app,
     dir,
     envPath,
     envFound,
-    tenant: env.TOT_TENANT || (mockStorefront ? 'conformance.example' : ''),
+    tenant: env.TOT_TENANT || (mockStorefront ? 'conformance' : ''),
     host,
     metadataOrigin,
-    installId: env.TOT_INSTALL_ID || (mockStorefront ? `inst_mock_${app}` : ''),
+    installId: env.TOT_INSTALL_ID || (mockStorefront ? 'conformance-install' : ''),
     clientId: env.TOT_CLIENT_ID || (mockStorefront ? `client_mock_${app}` : ''),
     clientSecret: env.TOT_CLIENT_SECRET || '',
     webhookPublicUrl,

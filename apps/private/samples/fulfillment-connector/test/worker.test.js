@@ -73,15 +73,30 @@ test('fetch: a redelivery of the same event id is a 200 duplicate in the same is
   assert.equal(pending.length, 1);
 });
 
-test('fetch: other paths are 404, and a delivery signed for another endpoint is 401', async () => {
+test('fetch: other paths are 404, a delivery signed for another endpoint is 401, and a wrong-tenant or wrong-install delivery is 403 without consuming the event id', async () => {
   const { gateway, worker } = setupWorker();
-  const { ctx } = context();
+  const { pending, ctx } = context();
   const elsewhere = await worker.fetch(request(gateway.deliver(event()), 'https://fulfillment.example.com/other'), env, ctx);
   assert.equal(elsewhere.status, 404);
   const wrongTarget = gateway.deliver(event(), { targetUri: 'https://elsewhere.example.com/webhooks/tot' });
   const res = await worker.fetch(request(wrongTarget), env, ctx);
   assert.equal(res.status, 401);
   assert.equal((await res.json()).code, 'signature_invalid');
+
+  const wrongTenant = gateway.deliver({ ...event(), tenantid: 'other-store', source: '/tenants/other-store/storefront' });
+  const resTenant = await worker.fetch(request(wrongTenant), env, ctx);
+  assert.equal(resTenant.status, 403);
+  assert.equal((await resTenant.json()).code, 'tenant_mismatch');
+
+  const wrongInstall = gateway.deliver({ ...event(), appinstallid: 'inst_wrong' });
+  const resInstall = await worker.fetch(request(wrongInstall), { ...env, TOT_APP_INSTALL_ID: 'inst_01J9Z2R4H5T3W1P8D6F0K9M2C7' }, ctx);
+  assert.equal(resInstall.status, 403);
+  assert.equal((await resInstall.json()).code, 'tenant_mismatch');
+  assert.equal(pending.length, 0);
+
+  const genuine = await worker.fetch(request(gateway.deliver(event())), { ...env, TOT_APP_INSTALL_ID: 'inst_01J9Z2R4H5T3W1P8D6F0K9M2C7' }, ctx);
+  assert.equal(genuine.status, 202);
+  await Promise.all(pending);
 });
 
 test('scheduled: the cron reconciliation fulfills an assignment whose delivery was lost', async () => {

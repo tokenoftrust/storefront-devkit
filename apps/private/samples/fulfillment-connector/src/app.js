@@ -19,6 +19,8 @@ export function createConnectorApp({
   clientId,
   clientSecret,
   webhookUrl,
+  tenant,
+  appInstallId,
   simulate = {},
   fetchImpl = (...args) => fetch(...args),
   logger = createLogger(),
@@ -41,6 +43,8 @@ export function createConnectorApp({
     eventIds: createEventIdStore(),
     connector,
     logger,
+    tenant,
+    appInstallId,
     now,
   });
   return { handleDelivery, connector, logger };
