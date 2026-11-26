@@ -8,6 +8,7 @@ const CAPABILITY = previewCapabilityFor({ tenantId: 'acme', env: 'test', exp: 4_
 const ENV = {
   TOT_APP_CLIENT_ID: 'placeholder-client-id',
   TOT_APP_CLIENT_SECRET: 'placeholder-client-secret',
+  TOT_APP_INSTALL_ID: 'inst_01J9Z2R4H5T3W1P8D6F0K9M2C7',
   TOT_STOREFRONT_BASE_URL: `https://acme.tokenoftrust.store/?__preview=${CAPABILITY}`,
   WEBHOOK_PUBLIC_URL: 'https://fulfillment.example.com/webhooks/tot',
 };
@@ -17,10 +18,14 @@ const refusedFor = (variable) => (err) => err instanceof ConfigRefused && err.co
 test('configuration comes from the environment and fails closed', () => {
   const config = readConfig(ENV);
   assert.equal(config.baseUrl, 'https://acme.tokenoftrust.store');
+  assert.equal(config.tenant, 'acme');
+  assert.equal(config.appInstallId, ENV.TOT_APP_INSTALL_ID);
   assert.equal(config.webhookUrl, ENV.WEBHOOK_PUBLIC_URL);
   assert.equal(config.port, 8787);
   assert.equal(readConfig({ ...ENV, WEBHOOK_PUBLIC_URL: 'https://Fulfillment.example.com' }).webhookUrl, 'https://Fulfillment.example.com');
   assert.throws(() => readConfig({ ...ENV, TOT_APP_CLIENT_SECRET: '' }), refusedFor('TOT_APP_CLIENT_SECRET'));
+  assert.throws(() => readConfig({ ...ENV, TOT_APP_INSTALL_ID: '' }), refusedFor('TOT_APP_INSTALL_ID'));
+  assert.throws(() => readConfig({ ...ENV, TOT_APP_INSTALL_ID: undefined }), refusedFor('TOT_APP_INSTALL_ID'));
   assert.throws(() => readConfig({ ...ENV, WEBHOOK_PUBLIC_URL: 'http://fulfillment.example.com/hook' }), refusedFor('WEBHOOK_PUBLIC_URL'));
   assert.throws(() => readConfig({ ...ENV, WEBHOOK_PUBLIC_URL: 'not a url' }), refusedFor('WEBHOOK_PUBLIC_URL'));
 });

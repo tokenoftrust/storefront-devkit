@@ -9,7 +9,7 @@
 import { Buffer } from 'node:buffer';
 import { ConnectorError } from './log.js';
 
-const REQUIRED = ['TOT_APP_CLIENT_ID', 'TOT_APP_CLIENT_SECRET', 'TOT_STOREFRONT_BASE_URL', 'WEBHOOK_PUBLIC_URL'];
+const REQUIRED = ['TOT_APP_CLIENT_ID', 'TOT_APP_CLIENT_SECRET', 'TOT_APP_INSTALL_ID', 'TOT_STOREFRONT_BASE_URL', 'WEBHOOK_PUBLIC_URL'];
 // Exactly one nonempty __preview of two base64url segments, and nothing else.
 const PREVIEW_QUERY = /^\?__preview=([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/;
 
@@ -65,13 +65,12 @@ export function loadConfig(env = process.env) {
   const webhookUrl = parseUrl(env.WEBHOOK_PUBLIC_URL, 'WEBHOOK_PUBLIC_URL');
   if (webhookUrl.protocol !== 'https:') throw new ConfigRefused('WEBHOOK_PUBLIC_URL');
   const explicitTenant = typeof env.TOT_TENANT === 'string' && env.TOT_TENANT !== '' ? env.TOT_TENANT : storefront.tenant;
-  const appInstallId = typeof env.TOT_APP_INSTALL_ID === 'string' && env.TOT_APP_INSTALL_ID !== '' ? env.TOT_APP_INSTALL_ID : undefined;
   return {
     config: {
       clientId: env.TOT_APP_CLIENT_ID,
+      appInstallId: env.TOT_APP_INSTALL_ID,
       baseUrl: storefront.origin,
       ...(explicitTenant ? { tenant: explicitTenant } : {}),
-      ...(appInstallId ? { appInstallId } : {}),
       // The signature covers @target-uri as the registered endpoint string, so it is kept verbatim.
       webhookUrl: env.WEBHOOK_PUBLIC_URL,
       port: Number(env.PORT || 8787),

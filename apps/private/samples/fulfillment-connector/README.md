@@ -149,12 +149,13 @@ a description of how the platform is built.
 The sample deploys as its own Worker, `tot-fulfillment-connector-sample`, on your `workers.dev`
 subdomain. It is separate from any storefront Worker and shares nothing with one.
 [`wrangler.toml`](./wrangler.toml) holds no account id and no secrets: `wrangler` uses the account
-you are logged in to, and all five settings are Worker secrets.
+you are logged in to, and all six settings are Worker secrets.
 
 ```sh
 npx wrangler login
 npx wrangler secret put TOT_APP_CLIENT_ID
 npx wrangler secret put TOT_APP_CLIENT_SECRET
+npx wrangler secret put TOT_APP_INSTALL_ID        # inst_... from the approved setup flow
 npx wrangler secret put TOT_STOREFRONT_BASE_URL   # https://<tenant>.tokenoftrust.store/?__preview=<capability>
 npx wrangler secret put WEBHOOK_PUBLIC_URL        # https://tot-fulfillment-connector-sample.<subdomain>.workers.dev/webhooks/tot
 npx wrangler secret put LABEL_PROVIDER            # carrier (your provider) or simulated (nothing ships)
@@ -186,7 +187,7 @@ only), for example in a Durable Object, D1 or KV.
 ## Host it on Node
 
 ```sh
-TOT_APP_CLIENT_ID=... TOT_APP_CLIENT_SECRET=... \
+TOT_APP_CLIENT_ID=... TOT_APP_CLIENT_SECRET=... TOT_APP_INSTALL_ID=inst_... \
 TOT_STOREFRONT_BASE_URL='https://<tenant>.tokenoftrust.store/?__preview=<capability>' \
 WEBHOOK_PUBLIC_URL=https://<your-host>/webhooks/tot \
 LABEL_PROVIDER=carrier \
@@ -196,6 +197,7 @@ node server.js
 | Variable | Required | Meaning |
 |---|---|---|
 | `TOT_APP_CLIENT_ID`, `TOT_APP_CLIENT_SECRET` | yes | Installation credentials from the approved setup flow. Server-side only. |
+| `TOT_APP_INSTALL_ID` | yes | Installation ID (`inst_...`) bound to this deployed connector; inbound webhooks for any other `appinstallid` are refused with `403 tenant_mismatch`. |
 | `TOT_STOREFRONT_BASE_URL` | yes | The tenant's host-routed storefront root (https) with its preview capability as the only query parameter, `?__preview=<capability>`. Treat it as a secret. The API is `/api/apps/v1`; the token endpoint and the webhook signing keys are discovered from `/.well-known/tot-app-authorization-metadata`. See [Preview stage transport](#preview-stage-transport). |
 | `WEBHOOK_PUBLIC_URL` | yes | The exact HTTPS URL registered as `webhooks.endpoint` in [`tot-app.json`](./tot-app.json). It is the signed `@target-uri`, so it must match byte for byte. |
 | `LABEL_PROVIDER` | yes | `carrier` (your provider) or `simulated` (fabricated labels, nothing ships). See [Label provider](#label-provider). |

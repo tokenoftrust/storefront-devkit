@@ -14,6 +14,7 @@ export const SIM_BASE_URL = 'https://acme.tokenoftrust.store';
 export const SIM_WEBHOOK_URL = 'https://fulfillment.example.com/webhooks/tot';
 export const SIM_CLIENT_ID = 'sim-client-id';
 export const SIM_CLIENT_SECRET = 'sim-client-secret-not-a-real-secret';
+export const SIM_APP_INSTALL_ID = 'inst_01J9Z2R4H5T3W1P8D6F0K9M2C7';
 
 /**
  * A synthetic preview capability in the platform's shape: a base64url JSON

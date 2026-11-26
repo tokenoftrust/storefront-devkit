@@ -11,6 +11,7 @@ import { createLogger } from '../src/log.js';
 import {
   createLocalGateway,
   example,
+  SIM_APP_INSTALL_ID,
   SIM_BASE_URL,
   SIM_CLIENT_ID,
   SIM_CLIENT_SECRET,
@@ -23,6 +24,7 @@ import { createWorker } from '../worker.js';
 const CONFIG = {
   TOT_APP_CLIENT_ID: SIM_CLIENT_ID,
   TOT_APP_CLIENT_SECRET: SIM_CLIENT_SECRET,
+  TOT_APP_INSTALL_ID: SIM_APP_INSTALL_ID,
   TOT_STOREFRONT_BASE_URL: SIM_PREVIEW_BASE_URL,
   WEBHOOK_PUBLIC_URL: SIM_WEBHOOK_URL,
 };

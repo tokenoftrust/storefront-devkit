@@ -9,7 +9,7 @@ import { createConnectorApp } from './src/app.js';
 import { parseSimulationFlags } from './src/config.js';
 import { createSimulatedLabelProvider, SIMULATED_LABELS_FIELDS } from './src/label-provider.js';
 import { createLogger, withFields } from './src/log.js';
-import { createLocalGateway, example, SIM_BASE_URL, SIM_CLIENT_ID, SIM_CLIENT_SECRET, SIM_WEBHOOK_URL } from './sim/local-gateway.js';
+import { createLocalGateway, example, SIM_APP_INSTALL_ID, SIM_BASE_URL, SIM_CLIENT_ID, SIM_CLIENT_SECRET, SIM_WEBHOOK_URL } from './sim/local-gateway.js';
 
 const simulate = parseSimulationFlags();
 const gateway = createLocalGateway();
@@ -18,6 +18,8 @@ const app = createConnectorApp({
   clientId: SIM_CLIENT_ID,
   clientSecret: SIM_CLIENT_SECRET,
   webhookUrl: SIM_WEBHOOK_URL,
+  tenant: 'acme',
+  appInstallId: SIM_APP_INSTALL_ID,
   simulate,
   fetchImpl: gateway.fetch,
   logger: withFields(createLogger(), SIMULATED_LABELS_FIELDS),

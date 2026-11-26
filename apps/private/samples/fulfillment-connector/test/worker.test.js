@@ -8,6 +8,7 @@ import { createLogger } from '../src/log.js';
 import {
   createLocalGateway,
   example,
+  SIM_APP_INSTALL_ID,
   SIM_CLIENT_ID,
   SIM_CLIENT_SECRET,
   SIM_PREVIEW_BASE_URL,
@@ -19,6 +20,7 @@ import { createWorker } from '../worker.js';
 const env = {
   TOT_APP_CLIENT_ID: SIM_CLIENT_ID,
   TOT_APP_CLIENT_SECRET: SIM_CLIENT_SECRET,
+  TOT_APP_INSTALL_ID: SIM_APP_INSTALL_ID,
   TOT_STOREFRONT_BASE_URL: SIM_PREVIEW_BASE_URL,
   WEBHOOK_PUBLIC_URL: SIM_WEBHOOK_URL,
   LABEL_PROVIDER: 'simulated',
@@ -89,12 +91,12 @@ test('fetch: other paths are 404, a delivery signed for another endpoint is 401,
   assert.equal((await resTenant.json()).code, 'tenant_mismatch');
 
   const wrongInstall = gateway.deliver({ ...event(), appinstallid: 'inst_wrong' });
-  const resInstall = await worker.fetch(request(wrongInstall), { ...env, TOT_APP_INSTALL_ID: 'inst_01J9Z2R4H5T3W1P8D6F0K9M2C7' }, ctx);
+  const resInstall = await worker.fetch(request(wrongInstall), env, ctx);
   assert.equal(resInstall.status, 403);
   assert.equal((await resInstall.json()).code, 'tenant_mismatch');
   assert.equal(pending.length, 0);
 
-  const genuine = await worker.fetch(request(gateway.deliver(event())), { ...env, TOT_APP_INSTALL_ID: 'inst_01J9Z2R4H5T3W1P8D6F0K9M2C7' }, ctx);
+  const genuine = await worker.fetch(request(gateway.deliver(event())), env, ctx);
   assert.equal(genuine.status, 202);
   await Promise.all(pending);
 });
@@ -133,6 +135,12 @@ test('missing configuration is a fixed 503 and nothing runs', async () => {
   assert.equal(pending.length, 0);
   assert.equal(gateway.calls.requests.length, 0);
   assert.equal(JSON.parse(lines.at(-1)).variable, 'TOT_APP_CLIENT_ID');
+
+  const { TOT_APP_INSTALL_ID: _ignored, ...withoutInstallId } = env;
+  const resNoInstall = await worker.fetch(new Request(SIM_WEBHOOK_URL, { method: 'POST', body: '{}' }), withoutInstallId, ctx);
+  assert.equal(resNoInstall.status, 503);
+  assert.deepEqual(await resNoInstall.json(), { code: 'config_invalid' });
+  assert.equal(JSON.parse(lines.at(-1)).variable, 'TOT_APP_INSTALL_ID');
 });
 
 test('wrangler.toml names its own worker, uses a cron trigger, and carries no account id or secret', () => {
