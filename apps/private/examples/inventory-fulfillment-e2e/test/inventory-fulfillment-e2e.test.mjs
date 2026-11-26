@@ -6,9 +6,12 @@ import {
   createInventoryApiClient,
   createInventoryMirror,
   createSimulatedGateway,
+  inventoryChangedEvent,
   runLive,
   runSelfTest,
 } from '../index.mjs';
+import { AuthorizationMetadata, WebhookReceiver } from '../vendor/connector-kit/index.js';
+import { createTestWebhookSigner } from './webhook-signer.mjs';
 
 const BASE_URL = 'https://storefront.tokenoftrust.store';
 
@@ -120,4 +123,20 @@ test('--live refuses to start without credentials and never echoes them', async 
     assert.doesNotMatch(err.message, /do-not-print/);
     return true;
   });
+});
+
+test('webhook receiver verifies both RSA (webhook-signing-1) and Ed25519 (conformance) deliveries from bare-origin metadata and rejects wrong-tenant payloads with 403 tenant_mismatch', async () => {
+  const edSigner = createTestWebhookSigner({ endpoint: FIXTURE.webhookEndpoint, keyid: 'conformance-ed-1', alg: 'ed25519' });
+  const gateway = createSimulatedGateway({ signingJwk: edSigner.jwk, tenantId: 'giantvapes.com' });
+  const receiver = new WebhookReceiver({
+    endpoint: FIXTURE.webhookEndpoint,
+    keys: new AuthorizationMetadata({ origin: BASE_URL, fetch: gateway }),
+    tenant: 'giantvapes.com',
+  });
+  const sampleData = { sku: FIXTURE.catalogSku, locationId: FIXTURE.location.locationId, balance: 10, available: 0, asOf: '2026-11-26T00:00:00.000Z' };
+  const okRes = await receiver.receive(edSigner.sign(inventoryChangedEvent(sampleData, { id: 'evt_ed_e2e_1', tenantId: 'giantvapes.com' })), async () => {});
+  assert.deepEqual(okRes, { status: 202, body: { accepted: true } });
+
+  const wrongTenantRes = await receiver.receive(edSigner.sign(inventoryChangedEvent(sampleData, { id: 'evt_ed_e2e_2', tenantId: 'other.com' })), async () => {});
+  assert.deepEqual(wrongTenantRes, { status: 403, body: { accepted: false, code: 'tenant_mismatch' } });
 });

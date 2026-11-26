@@ -135,13 +135,40 @@ test('Content-Digest: sha-256 is required; missing, other-only and malformed val
   assert.equal(verifyContentDigest(`${sha512}, ${contentDigestFor(body)}`, body).ok, true);
 });
 
-test('only public RS256 signing keys are imported from webhook_signing_keys', async () => {
+test('only public RS256 or Ed25519 signing keys are imported from webhook_signing_keys', async () => {
   const jwk = rsa.publicKey.export({ format: 'jwk' });
   assert.equal((await importWebhookSigningKey({ ...jwk, kid: 'a', alg: 'RS256', use: 'sig' }))[0], 'a');
   assert.equal(await importWebhookSigningKey({ ...jwk, kid: 'b', alg: 'PS512' }), null);
   assert.equal(await importWebhookSigningKey({ ...jwk, kid: 'c', use: 'enc' }), null);
   assert.equal(await importWebhookSigningKey({ ...rsa.privateKey.export({ format: 'jwk' }), kid: 'd' }), null);
   assert.equal(await importWebhookSigningKey({ ...jwk, alg: 'RS256' }), null);
+
+  const ed = generateKeyPairSync('ed25519');
+  const edPub = ed.publicKey.export({ format: 'jwk' });
+  const edImported = await importWebhookSigningKey({ ...edPub, kid: 'webhook-signing-1', alg: 'EdDSA', use: 'sig' });
+  assert.equal(edImported[0], 'webhook-signing-1');
+  assert.equal(await importWebhookSigningKey({ ...ed.privateKey.export({ format: 'jwk' }), kid: 'ed-priv' }), null);
+});
+
+test('accepts an Ed25519-signed delivery (tot app conformance) and refuses algorithm confusion', async () => {
+  const ed = generateKeyPairSync('ed25519');
+  const edPub = ed.publicKey.export({ format: 'jwk' });
+  const edEntry = await importWebhookSigningKey({ ...edPub, kid: 'webhook-signing-1', alg: 'EdDSA', use: 'sig' });
+  keys.set(edEntry[0], edEntry[1]);
+
+  const headers = signDelivery({ rawBody: body, targetUri: SIM_WEBHOOK_URL, privateKey: ed.privateKey, keyid: 'webhook-signing-1', alg: 'ed25519' });
+  const result = await verify(headers);
+  assert.equal(result.ok, true);
+  assert.deepEqual([result.label, result.keyid, result.alg], ['sig1', 'webhook-signing-1', 'ed25519']);
+
+  // Algorithm confusion: Ed25519 key with rsa-v1_5-sha256 header
+  const confusedRsa = { ...headers, 'signature-input': headers['signature-input'].replace('alg="ed25519"', 'alg="rsa-v1_5-sha256"') };
+  assert.equal((await verify(confusedRsa)).code, 'signature_invalid');
+
+  // Algorithm confusion: RSA key k1 with ed25519 header
+  const rsaHeaders = signDelivery({ rawBody: body, targetUri: SIM_WEBHOOK_URL, privateKey: rsa.privateKey, keyid: 'k1' });
+  const confusedEd = { ...rsaHeaders, 'signature-input': rsaHeaders['signature-input'].replace('alg="rsa-v1_5-sha256"', 'alg="ed25519"') };
+  assert.equal((await verify(confusedEd)).code, 'signature_invalid');
 });
 
 test('structured-field dictionaries keep the raw member text for @signature-params', () => {

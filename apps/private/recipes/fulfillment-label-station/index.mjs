@@ -70,8 +70,14 @@ export function deriveIdempotencyKey(prefix, payload) {
  * One `/api/apps/v1` call through the vendored connector-kit `ApiClient` (retries, `Retry-After`,
  * `Idempotency-Key`). A non-2xx answer resolves `{ status, ok: false, body: { code } }`.
  */
-function createRequest({ baseUrl, accessToken, fetchImpl }) {
-  const api = new ApiClient({ origin: baseUrl, auth: { getAccessToken: async () => accessToken }, fetch: fetchImpl });
+function createRequest({ baseUrl, tenant, tenantId, accessToken, auth, fetchImpl }) {
+  const store = tenant ?? tenantId;
+  const api = new ApiClient({
+    origin: baseUrl,
+    ...(store ? { tenant: store } : {}),
+    auth: auth ?? { getAccessToken: async () => accessToken },
+    fetch: fetchImpl,
+  });
   return async function request(method, path, { query, body, idempotencyKey } = {}) {
     try {
       const res = await api.request({ method, path, query, body, idempotencyKey });
@@ -83,10 +89,10 @@ function createRequest({ baseUrl, accessToken, fetchImpl }) {
   };
 }
 
-export function createLabelStationConnector({ baseUrl, accessToken, fetchImpl = fetch }) {
+export function createLabelStationConnector({ baseUrl, tenant, tenantId, accessToken, auth, fetchImpl = fetch }) {
   const seenEvents = new Set();
 
-  const request = createRequest({ baseUrl, accessToken, fetchImpl });
+  const request = createRequest({ baseUrl, tenant, tenantId, accessToken, auth, fetchImpl });
 
   return {
     listCarriers() {
@@ -130,8 +136,22 @@ export function createLabelStationConnector({ baseUrl, accessToken, fetchImpl = 
  * connector-kit `WebhookReceiver`, then hands only verified, first-seen events to the connector.
  * `endpoint` is the registered `webhooks.endpoint` exactly as written in `tot-app.json`.
  */
-export function createLabelStationWebhookReceiver({ origin, endpoint, connector, keys = new AuthorizationMetadata({ origin }), seenEvents }) {
-  const receiver = new WebhookReceiver({ endpoint, keys, seenEvents });
+export function createLabelStationWebhookReceiver({
+  origin,
+  endpoint,
+  connector,
+  tenant,
+  appInstallId,
+  keys = new AuthorizationMetadata({ origin }),
+  seenEvents,
+}) {
+  const receiver = new WebhookReceiver({
+    endpoint,
+    keys,
+    seenEvents,
+    ...(tenant ? { tenant } : {}),
+    ...(appInstallId ? { appInstallId } : {}),
+  });
   return {
     handleRequest: (request) =>
       receiver.handleRequest(request, async (event) => {
@@ -165,7 +185,7 @@ export function createSimulatedLabelStationGateway({ pactAct = true } = {}) {
       const url = new URL(input);
       const method = (init.method ?? 'GET').toUpperCase();
       const headers = Object.fromEntries(Object.entries(init.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
-      const path = url.pathname.replace(/^\/api\/apps\/v1/, '');
+      const path = url.pathname.replace(/^(?:\/[^/]+)?\/api\/apps\/v1/, '');
 
       if (method === 'GET' && path === '/fulfillment/carriers') {
         return json(200, carrierCatalogResponse({ pactEnabled: pactAct, adultSignatureRequired: assignment.adultSignatureRequired }));
@@ -294,7 +314,8 @@ export function createSimulatedLabelStationGateway({ pactAct = true } = {}) {
 export async function runSelfTest() {
   const sim = createSimulatedLabelStationGateway({ pactAct: true });
   const connector = createLabelStationConnector({
-    baseUrl: 'https://tot-preview.tokenoftrust.store',
+    baseUrl: 'https://storefront.tokenoftrust.store',
+    tenant: 'acme',
     accessToken: 'sim-label-station-token',
     fetchImpl: sim.fetchImpl,
   });

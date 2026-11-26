@@ -6,8 +6,12 @@ info:
   description: >
     Outbound webhook events delivered to installed Storefront Private Apps. Every event
     is a CloudEvents 1.0 JSON envelope delivered over HTTPS POST and signed with HTTP
-    Message Signatures (RFC 9421). The app verifies the signature against the gateway's
-    published keys (JWKS / `/.well-known/tot-app-authorization-metadata`). Delivery is
+    Message Signatures (RFC 9421, label `sig1`, `alg="rsa-v1_5-sha256"` or `alg="ed25519"`).
+    The app verifies the signature against the gateway's published `webhook_signing_keys`
+    at `GET /.well-known/tot-app-authorization-metadata` on the bare storefront origin
+    (for example `https://storefront.tokenoftrust.store/.well-known/tot-app-authorization-metadata`;
+    note that `/.well-known/jwks.json` publishes the OAuth bearer-token key `app-gateway-1`,
+    not webhook signing keys such as `webhook-signing-1`). Delivery is
     at-least-once with retries, dead-lettering, and admin/app replay; receivers dedupe on
     the CloudEvents `id`. No event grants an app the ability to approve restricted sales
     or change any compliance obligation (see forbidden-scopes.json).

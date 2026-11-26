@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash, generateKeyPairSync, sign as cryptoSign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { StaticSigningKeys } from '../vendor/connector-kit/index.js';
 import {
   classifyThresholdTransition,
   createSimulatedWmsGateway,
@@ -29,7 +31,8 @@ test('self-test exercises multi-location upsert, CAS reconciliation recovery, 7 
 test('duplicate inventory.changed CloudEvent ids are deduplicated without re-firing transitions', () => {
   const sim = createSimulatedWmsGateway();
   const connector = createWmsInventoryConnector({
-    baseUrl: 'https://tot-preview.tokenoftrust.store',
+    baseUrl: 'https://storefront.tokenoftrust.store',
+    tenant: 'acme',
     accessToken: 'sim-wms-token',
     fetchImpl: sim.fetchImpl,
   });
@@ -51,17 +54,56 @@ test('classifyThresholdTransition distinguishes low_stock, out_of_stock, and bac
 
 test('an unsigned delivery is refused by the kit receiver and never reaches the connector', async () => {
   const connector = createWmsInventoryConnector({
-    baseUrl: 'https://tot-preview.tokenoftrust.store',
+    baseUrl: 'https://storefront.tokenoftrust.store',
+    tenant: 'acme',
     accessToken: 'sim-wms-token',
     fetchImpl: createSimulatedWmsGateway().fetchImpl,
   });
   const fixture = readFileSync(new URL('../fixtures/inventory.changed.cloudevent.json', import.meta.url), 'utf8');
   const receiver = createWmsWebhookReceiver({
-    origin: 'https://tot-preview.tokenoftrust.store',
+    origin: 'https://storefront.tokenoftrust.store',
     endpoint: 'https://connector.example.com/webhooks/tot',
     connector,
   });
   const res = await receiver.handleRequest(new Request('https://connector.example.com/webhooks/tot', { method: 'POST', body: fixture }));
   assert.equal(res.status, 400);
   assert.equal(connector.handleInventoryChangedWebhook(JSON.parse(fixture)).duplicate, false);
+});
+
+test('WMS webhook receiver verifies Ed25519 deliveries and fails closed on wrong tenant or expired signature', async () => {
+  const edPair = generateKeyPairSync('ed25519');
+  const edJwk = { ...edPair.publicKey.export({ format: 'jwk' }), kid: 'conformance-ed-1', alg: 'EdDSA', use: 'sig' };
+  const keys = new StaticSigningKeys({ keys: [edJwk] });
+  const endpoint = 'https://connector.example.com/webhooks/tot';
+  const connector = createWmsInventoryConnector({
+    baseUrl: 'https://storefront.tokenoftrust.store',
+    tenant: 'acme',
+    accessToken: 'sim-wms-token',
+    fetchImpl: createSimulatedWmsGateway().fetchImpl,
+  });
+  const receiver = createWmsWebhookReceiver({
+    origin: 'https://storefront.tokenoftrust.store',
+    endpoint,
+    connector,
+    tenant: 'acme',
+    keys,
+  });
+  const fixture = JSON.parse(readFileSync(new URL('../fixtures/inventory.changed.cloudevent.json', import.meta.url), 'utf8'));
+
+  const signReq = (ev, { created = Math.floor(Date.now() / 1000) } = {}) => {
+    const body = JSON.stringify(ev);
+    const digest = `sha-256=:${createHash('sha256').update(body).digest('base64')}:`;
+    const params = `("@method" "@target-uri" "content-digest");created=${created};keyid="conformance-ed-1";alg="ed25519"`;
+    const base = `"@method": POST\n"@target-uri": ${endpoint}\n"content-digest": ${digest}\n"@signature-params": ${params}`;
+    const sig = cryptoSign(null, Buffer.from(base), edPair.privateKey).toString('base64');
+    return new Request(endpoint, {
+      method: 'POST',
+      headers: { 'content-digest': digest, 'signature-input': `sig1=${params}`, signature: `sig1=:${sig}:` },
+      body,
+    });
+  };
+
+  assert.equal((await receiver.handleRequest(signReq({ ...fixture, id: 'evt_wms_ed_1' }))).status, 202);
+  assert.equal((await receiver.handleRequest(signReq({ ...fixture, id: 'evt_wms_exp' }, { created: Math.floor(Date.now() / 1000) - 600 }))).status, 401);
+  assert.equal((await receiver.handleRequest(signReq({ ...fixture, id: 'evt_wms_tenant', tenantid: 'other', source: '/tenants/other/storefront' }))).status, 403);
 });

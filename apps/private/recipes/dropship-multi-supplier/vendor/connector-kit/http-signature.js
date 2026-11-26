@@ -1,17 +1,21 @@
 // Webhook authenticity primitives, as apps/private/webhooks-and-api.md
 // specifies: a Content-Digest carrying sha-256 (RFC 9530) and one RFC 9421
 // signature labelled `sig1` covering "@method" "@target-uri" "content-digest",
-// with created/keyid/alg parameters and alg `rsa-v1_5-sha256`. Most callers use
-// WebhookReceiver, which applies these in order; they are exported for callers
-// that need a single step.
+// with created/keyid/alg parameters and alg `rsa-v1_5-sha256` or `ed25519`.
+// Most callers use WebhookReceiver, which applies these in order; they are
+// exported for callers that need a single step.
 import { base64Encode, constantTimeEqual, sha256, toBytes, utf8 } from './encoding.js';
 import { parseDictionary, StructuredFieldError } from './structured-fields.js';
 
 export const SIGNATURE_LABEL = 'sig1';
 export const SIGNATURE_ALG = 'rsa-v1_5-sha256';
+export const ED25519_SIGNATURE_ALG = 'ed25519';
+export const SIGNATURE_ALGORITHMS = Object.freeze([SIGNATURE_ALG, ED25519_SIGNATURE_ALG]);
 export const REQUIRED_COMPONENTS = Object.freeze(['@method', '@target-uri', 'content-digest']);
-/** Web Crypto parameters for a webhook signing key (JWK alg RS256). */
+/** Web Crypto parameters for an RSA webhook signing key (JWK alg RS256). */
 export const RSA_VERIFY_ALGORITHM = Object.freeze({ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' });
+/** Web Crypto parameters for an Ed25519 webhook signing key (JWK crv Ed25519 / alg EdDSA). */
+export const ED25519_VERIFY_ALGORITHM = Object.freeze({ name: 'Ed25519' });
 
 function fail(code, reason) {
   return { ok: false, code, reason };
@@ -101,7 +105,9 @@ export async function verifyMessageSignature({
   const expires = input.params.get('expires');
   if (!Number.isInteger(created)) return fail('signature_malformed', 'created is required');
   if (typeof keyid !== 'string' || keyid === '') return fail('signature_malformed', 'keyid is required');
-  if (alg !== SIGNATURE_ALG) return fail('unsupported_alg', `alg must be ${SIGNATURE_ALG}`);
+  if (!SIGNATURE_ALGORITHMS.includes(alg)) {
+    return fail('unsupported_alg', `alg must be ${SIGNATURE_ALGORITHMS.join(' or ')}`);
+  }
   const nowSeconds = Math.floor(now / 1000);
   if (nowSeconds - created > maxAgeSeconds) return fail('signature_expired', 'created is too old');
   if (created - nowSeconds > maxClockSkewSeconds) return fail('signature_expired', 'created is in the future');
@@ -112,6 +118,11 @@ export async function verifyMessageSignature({
   const key = await resolveKey(keyid);
   if (!key) return fail('unknown_key', 'keyid is not a published webhook signing key');
 
+  const verifyAlgorithm = alg === ED25519_SIGNATURE_ALG ? ED25519_VERIFY_ALGORITHM : RSA_VERIFY_ALGORITHM;
+  if (key.algorithm?.name && key.algorithm.name !== verifyAlgorithm.name) {
+    return fail('signature_invalid', 'key algorithm does not match signature alg');
+  }
+
   const lines = [];
   for (const name of names) {
     const value = componentValue(name, { method, targetUri, headers });
@@ -121,7 +132,7 @@ export async function verifyMessageSignature({
   lines.push(`"@signature-params": ${input.raw}`);
   let verified = false;
   try {
-    verified = await crypto.subtle.verify(RSA_VERIFY_ALGORITHM, key, signature.value.bytes, utf8(lines.join('\n')));
+    verified = await crypto.subtle.verify(verifyAlgorithm, key, signature.value.bytes, utf8(lines.join('\n')));
   } catch {
     verified = false;
   }

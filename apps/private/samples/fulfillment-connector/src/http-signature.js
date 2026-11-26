@@ -10,11 +10,15 @@ import { parseDictionary, StructuredFieldError } from './structured-fields.js';
 
 export const SIGNATURE_LABEL = 'sig1';
 export const SIGNATURE_ALG = 'rsa-v1_5-sha256';
+export const ED25519_SIGNATURE_ALG = 'ed25519';
+export const SIGNATURE_ALGORITHMS = [SIGNATURE_ALG, ED25519_SIGNATURE_ALG];
 export const REQUIRED_COMPONENTS = ['@method', '@target-uri', 'content-digest'];
 export const MAX_SIGNATURE_AGE_SECONDS = 300;
 export const MAX_CLOCK_SKEW_SECONDS = 60;
-/** Web Crypto parameters for a webhook signing key (JWK alg RS256). */
+/** Web Crypto parameters for an RSA webhook signing key (JWK alg RS256). */
 export const RSA_VERIFY_ALGORITHM = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' };
+/** Web Crypto parameters for an Ed25519 webhook signing key (JWK crv Ed25519 / alg EdDSA). */
+export const ED25519_VERIFY_ALGORITHM = { name: 'Ed25519' };
 
 function fail(code, reason) {
   return { ok: false, code, reason };
@@ -91,7 +95,7 @@ export async function verifyMessageSignature({ method, targetUri, headers, resol
   const expires = input.params.get('expires');
   if (!Number.isInteger(created)) return fail('signature_malformed', 'created is required');
   if (typeof keyid !== 'string' || keyid === '') return fail('signature_malformed', 'keyid is required');
-  if (alg !== SIGNATURE_ALG) return fail('unsupported_alg', `alg must be ${SIGNATURE_ALG}`);
+  if (!SIGNATURE_ALGORITHMS.includes(alg)) return fail('unsupported_alg', `alg must be ${SIGNATURE_ALGORITHMS.join(' or ')}`);
   const nowSeconds = Math.floor(now / 1000);
   if (nowSeconds - created > MAX_SIGNATURE_AGE_SECONDS) return fail('signature_expired', 'created is too old');
   if (created - nowSeconds > MAX_CLOCK_SKEW_SECONDS) return fail('signature_expired', 'created is in the future');
@@ -102,6 +106,11 @@ export async function verifyMessageSignature({ method, targetUri, headers, resol
   const resolved = await resolveKey(keyid);
   if (!resolved) return fail('unknown_key', 'keyid is not a published webhook signing key');
 
+  const verifyAlgorithm = alg === ED25519_SIGNATURE_ALG ? ED25519_VERIFY_ALGORITHM : RSA_VERIFY_ALGORITHM;
+  if (resolved.key?.algorithm?.name && resolved.key.algorithm.name !== verifyAlgorithm.name) {
+    return fail('signature_invalid', 'key algorithm does not match signature alg');
+  }
+
   const lines = [];
   for (const name of names) {
     const value = componentValue(name, { method, targetUri, headers });
@@ -111,7 +120,7 @@ export async function verifyMessageSignature({ method, targetUri, headers, resol
   lines.push(`"@signature-params": ${input.raw}`);
   let verified = false;
   try {
-    verified = await crypto.subtle.verify(RSA_VERIFY_ALGORITHM, resolved.key, signature.value.bytes, Buffer.from(lines.join('\n'), 'utf8'));
+    verified = await crypto.subtle.verify(verifyAlgorithm, resolved.key, signature.value.bytes, Buffer.from(lines.join('\n'), 'utf8'));
   } catch {
     verified = false;
   }

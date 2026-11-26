@@ -51,7 +51,8 @@ test('duplicate order.invoiced and invoice.settled CloudEvent ids are deduplicat
   });
 
   const connector = createAccountingErpConnector({
-    baseUrl: 'https://tot-preview.tokenoftrust.store',
+    baseUrl: 'https://storefront.tokenoftrust.store',
+    tenant: 'acme',
     accessToken: 'sim-erp-token',
     erpProvider: 'QBO',
     fetchImpl: sim.fetchImpl,
@@ -120,13 +121,14 @@ test('QBO, XERO, and NS adapters produce PII-free ERP payloads with freight line
 test('an unsigned delivery is refused by the kit receiver and never reaches the accounting connector', async () => {
   const sim = createSimulatedAccountingGateway();
   const connector = createAccountingErpConnector({
-    baseUrl: 'https://tot-preview.tokenoftrust.store',
+    baseUrl: 'https://storefront.tokenoftrust.store',
+    tenant: 'acme',
     accessToken: 'sim-erp-token',
     fetchImpl: sim.fetchImpl,
   });
   const fixture = readFileSync(new URL('../fixtures/order.invoiced.cloudevent.json', import.meta.url), 'utf8');
   const receiver = createAccountingWebhookReceiver({
-    origin: 'https://tot-preview.tokenoftrust.store',
+    origin: 'https://storefront.tokenoftrust.store',
     endpoint: 'https://erp.integrations.example.com/webhooks/tot-invoices',
     connector,
   });

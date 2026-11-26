@@ -18,5 +18,7 @@ export {
   verifyMessageSignature,
   SIGNATURE_LABEL,
   SIGNATURE_ALG,
+  ED25519_SIGNATURE_ALG,
+  SIGNATURE_ALGORITHMS,
   REQUIRED_COMPONENTS,
 } from './http-signature.js';

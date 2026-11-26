@@ -133,7 +133,7 @@
           }
         },
         "signatureKeyId": {
-          "description": "Optional keyid the app expects in the HTTP Message Signature 'Signature-Input'. If omitted, the gateway advertises the active keyid via its JWKS/signature-metadata endpoint.",
+          "description": "Optional keyid the app expects in the HTTP Message Signature 'Signature-Input' (e.g. 'webhook-signing-1'). If omitted, the gateway advertises active webhook signing keys in 'webhook_signing_keys' at GET /.well-known/tot-app-authorization-metadata on the bare storefront host (distinct from /.well-known/jwks.json, which publishes OAuth bearer token keys).",
           "type": "string",
           "maxLength": 128
         }

@@ -17,7 +17,7 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { ApiClient, ApiError } from './vendor/connector-kit/index.js';
+import { ApiClient, ApiError, AuthorizationMetadata, WebhookReceiver } from './vendor/connector-kit/index.js';
 
 const FIXTURE = JSON.parse(
   readFileSync(new URL('./fixtures/multi-supplier-routing.json', import.meta.url), 'utf8'),
@@ -85,8 +85,14 @@ export function planStone2MultiVendorSplit({ orderId, cartLines, locationBinding
  * One `/api/apps/v1` call through the vendored connector-kit `ApiClient` (retries, `Retry-After`,
  * `Idempotency-Key`). A non-2xx answer resolves `{ status, ok: false, body: { code } }`.
  */
-function createRequest({ baseUrl, accessToken, fetchImpl }) {
-  const api = new ApiClient({ origin: baseUrl, auth: { getAccessToken: async () => accessToken }, fetch: fetchImpl });
+function createRequest({ baseUrl, tenant, tenantId, accessToken, auth, fetchImpl }) {
+  const store = tenant ?? tenantId;
+  const api = new ApiClient({
+    origin: baseUrl,
+    ...(store ? { tenant: store } : {}),
+    auth: auth ?? { getAccessToken: async () => accessToken },
+    fetch: fetchImpl,
+  });
   return async function request(method, path, { query, body, idempotencyKey } = {}) {
     try {
       const res = await api.request({ method, path, query, body, idempotencyKey });
@@ -98,8 +104,9 @@ function createRequest({ baseUrl, accessToken, fetchImpl }) {
   };
 }
 
-export function createMultiSupplierRoutingConnector({ baseUrl, accessToken, fetchImpl = fetch }) {
-  const request = createRequest({ baseUrl, accessToken, fetchImpl });
+export function createMultiSupplierRoutingConnector({ baseUrl, tenant, tenantId, accessToken, auth, fetchImpl = fetch }) {
+  const seenEvents = new Set();
+  const request = createRequest({ baseUrl, tenant, tenantId, accessToken, auth, fetchImpl });
 
   return {
     upsertVendorLocation(locationId, { name, kind = 'dropship_vendor', isFulfillable = true, status = 'active' }) {
@@ -125,6 +132,45 @@ export function createMultiSupplierRoutingConnector({ baseUrl, accessToken, fetc
         idempotencyKey: key,
       });
     },
+    handleAssignmentWebhook(event) {
+      if (seenEvents.has(event.id)) return { duplicate: true, state: null };
+      seenEvents.add(event.id);
+      return {
+        duplicate: false,
+        assignmentId: event.data.assignmentId,
+        orderId: event.data.orderId,
+        stage: event.data.stage,
+        state: event.data.state,
+      };
+    },
+  };
+}
+
+/**
+ * Verifies a delivery (body digest, RFC 9421 signature, replay guard) with the vendored
+ * connector-kit `WebhookReceiver`, then hands only verified, first-seen events to the connector.
+ */
+export function createDropshipWebhookReceiver({
+  origin,
+  endpoint,
+  connector,
+  tenant,
+  appInstallId,
+  keys = new AuthorizationMetadata({ origin }),
+  seenEvents,
+}) {
+  const receiver = new WebhookReceiver({
+    endpoint,
+    keys,
+    seenEvents,
+    ...(tenant ? { tenant } : {}),
+    ...(appInstallId ? { appInstallId } : {}),
+  });
+  return {
+    handleRequest: (request) =>
+      receiver.handleRequest(request, async (event) => {
+        connector.handleAssignmentWebhook(event);
+      }),
   };
 }
 
@@ -157,7 +203,7 @@ export function createSimulatedMultiSupplierGateway() {
       const url = new URL(input);
       const method = (init.method ?? 'GET').toUpperCase();
       const headers = Object.fromEntries(Object.entries(init.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
-      const path = url.pathname.replace(/^\/api\/apps\/v1/, '');
+      const path = url.pathname.replace(/^(?:\/[^/]+)?\/api\/apps\/v1/, '');
 
       const locMatch = /^\/inventory\/locations\/([^/]+)$/.exec(path);
       if (method === 'PUT' && locMatch) {
@@ -228,7 +274,8 @@ export function createSimulatedMultiSupplierGateway() {
 export async function runSelfTest() {
   const sim = createSimulatedMultiSupplierGateway();
   const connector = createMultiSupplierRoutingConnector({
-    baseUrl: 'https://tot-preview.tokenoftrust.store',
+    baseUrl: 'https://storefront.tokenoftrust.store',
+    tenant: 'acme',
     accessToken: 'sim-dropship-token',
     fetchImpl: sim.fetchImpl,
   });

@@ -4,8 +4,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { generateKeyPairSync, createSign, createHash } from 'node:crypto';
-import { createTot } from '../core/tot.mjs';
+import { generateKeyPairSync, createSign, createHash, sign as cryptoSign } from 'node:crypto';
+import { createServer } from 'node:http';
+import { loadConfig } from '../core/config.mjs';
+import { createMockStorefront, createTot } from '../core/tot.mjs';
 import { log } from '../core/log.mjs';
 import { createFileStateStore, createMemoryStateStore, seenEventsFrom } from '../core/state.mjs';
 import { startWebhookServer } from '../core/server.mjs';
@@ -436,4 +438,180 @@ test('inventory sync: GET /reports?windowDays=30 returns velocity rows for the s
   const h = await invHarness(t);
   const rows = await h.sync.report(['SKU-A']);
   assert.deepEqual(rows.map((r) => [r.sku, r.soldUnits, r.daysOfCover]), [['SKU-A', 6, 150]]);
+});
+
+test('offline conformance parity: label-station, dropship, and inventory-sync certify cleanly against mock Storefront with Ed25519 and RSA webhook signing and fail closed on invalid signature, expired timestamp, wrong key, and wrong tenant', async (t) => {
+  const edPair = generateKeyPairSync('ed25519');
+  const rsaPair = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const wrongEdPair = generateKeyPairSync('ed25519');
+  const edJwk = { ...edPair.publicKey.export({ format: 'jwk' }), kid: 'conformance-ed25519-1', alg: 'EdDSA', use: 'sig' };
+  const rsaJwk = { ...rsaPair.publicKey.export({ format: 'jwk' }), kid: 'webhook-signing-1', alg: 'RS256', use: 'sig' };
+
+  const metaServer = createServer((req, res) => {
+    if (req.method === 'GET' && req.url === '/.well-known/tot-app-authorization-metadata') {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'public, max-age=300' });
+      res.end(
+        JSON.stringify({
+          issuer: 'https://storefront.tokenoftrust.store',
+          token_endpoint: 'https://storefront.tokenoftrust.store/api/apps/oauth/token',
+          webhook_signing_keys: { keys: [edJwk, rsaJwk] },
+        }),
+      );
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  await new Promise((r) => metaServer.listen(0, '127.0.0.1', r));
+  t.after(() => metaServer.close());
+  const metadataOrigin = baseOf(metaServer);
+
+  function signWebhook(endpoint, event, { alg = 'ed25519', keyid = 'conformance-ed25519-1', privateKey = edPair.privateKey, created = Math.floor(Date.now() / 1000) } = {}) {
+    const body = JSON.stringify(event);
+    const digest = `sha-256=:${createHash('sha256').update(body).digest('base64')}:`;
+    const params = `("@method" "@target-uri" "content-digest");created=${created};keyid="${keyid}";alg="${alg}"`;
+    const base = `"@method": POST\n"@target-uri": ${endpoint}\n"content-digest": ${digest}\n"@signature-params": ${params}`;
+    const sig =
+      alg === 'ed25519'
+        ? cryptoSign(null, Buffer.from(base), privateKey).toString('base64')
+        : createSign('sha256').update(base).sign(privateKey, 'base64');
+    return {
+      headers: {
+        'content-type': 'application/cloudevents+json',
+        'content-digest': digest,
+        'signature-input': `sig1=${params}`,
+        signature: `sig1=:${sig}:`,
+      },
+      body,
+    };
+  }
+
+  const origEnv = { ...process.env };
+  const origLog = console.log;
+  console.log = quiet;
+  try {
+    for (const appName of ['label-station', 'dropship', 'inventory-sync']) {
+      process.env.TOT_METADATA_ORIGIN = metadataOrigin;
+      process.env.MOCK_STOREFRONT = '1';
+      delete process.env.TOT_TENANT;
+      delete process.env.TOT_INSTALL_ID;
+      delete process.env.TOT_CLIENT_ID;
+      delete process.env.TOT_CLIENT_SECRET;
+
+      const cfg = loadConfig(appName);
+      assert.equal(cfg.mockStorefront, true, `${appName} enables mockStorefront when TOT_METADATA_ORIGIN / MOCK_STOREFRONT is set`);
+      cfg.port = 0;
+      cfg.webhookPublicUrl = 'https://conformance.example';
+      cfg.webhookEndpoint = 'https://conformance.example/webhooks';
+
+      const store = createMemoryStateStore();
+      const tot = createTot(cfg, {
+        seenEvents: seenEventsFrom(store),
+        tenant: 'example.com',
+        appInstallId: 'inst-1',
+      });
+      assert.ok(tot.mock, `${appName} exposes in-process mock Storefront`);
+
+      let handlers;
+      if (appName === 'label-station') {
+        const mockProvider = await startMockLabelProvider({ port: 0 });
+        t.after(() => mockProvider.close());
+        const station = createLabelStation({ tot, provider: labelProviderClient(baseOf(mockProvider)), store, log: quiet });
+        await station.discoverCarriers();
+        assert.deepEqual([...station.carriers.keys()], ['UPS', 'FEDEX']);
+        handlers = station.handlers;
+      } else if (appName === 'dropship') {
+        const mockProvider = await startMockDropshipPlatform({ port: 0, shipSeconds: 0 });
+        t.after(() => mockProvider.close());
+        const dropship = createDropship({ tot, provider: dropshipProviderClient(baseOf(mockProvider)), store, log: quiet });
+        handlers = dropship.handlers;
+      } else {
+        const sample = await tot.call('GET', '/inventory', { query: { limit: 3 } });
+        assert.equal(sample.ok, true);
+        const skus = sample.body.items.map((i) => i.sku);
+        const mockProvider = await startMockWms({ port: 0, skus, driftSeconds: 0 });
+        t.after(() => mockProvider.close());
+        const sync = createInventorySync({ tot, provider: wmsProviderClient(baseOf(mockProvider)), store, locationId: cfg.locationId, log: quiet });
+        assert.equal(await sync.declareLocation(), true);
+        await sync.sync('startup');
+        handlers = sync.handlers;
+      }
+
+      const server = startWebhookServer({ cfg, tot, handlers });
+      await new Promise((r) => server.once('listening', r));
+      t.after(() => server.close());
+      const url = `${baseOf(server)}/webhooks`;
+
+      const topic = appName === 'inventory-sync' ? 'inventory.changed' : 'fulfillment.assignment.updated';
+      const payload =
+        appName === 'inventory-sync'
+          ? { sku: 'SKU-CONFORMANCE-1', locationId: cfg.locationId, balance: 15, available: 15, asOf: '2026-11-26T00:00:00.000Z' }
+          : { assignmentId: 'asg_conf_1', orderId: 'ord_conf_1', stage: 'preview', state: 'held', eventVersion: 2, occurredAt: '2026-11-26T00:00:00.000Z' };
+
+      // 1. Valid Ed25519 delivery (tot app conformance) -> 202
+      const edEvent = cloudEvent(topic, `evt-ed-${appName}`, payload);
+      const edSigned = signWebhook(cfg.webhookEndpoint, edEvent);
+      const resEd = await fetch(url, { method: 'POST', headers: edSigned.headers, body: edSigned.body });
+      assert.equal(resEd.status, 202, `${appName} accepts Ed25519 signed delivery`);
+
+      // 2. Duplicate Ed25519 delivery -> 200 duplicate
+      const resDup = await fetch(url, { method: 'POST', headers: edSigned.headers, body: edSigned.body });
+      assert.equal(resDup.status, 200);
+      assert.deepEqual(await resDup.json(), { accepted: true, duplicate: true });
+
+      // 3. Valid RSA delivery (webhook-signing-1) -> 202
+      const rsaPayload =
+        appName === 'inventory-sync'
+          ? { ...payload, asOf: '2026-11-26T00:01:00.000Z', balance: 14 }
+          : { ...payload, state: 'cancelled', eventVersion: 3 };
+      const rsaEvent = cloudEvent(topic, `evt-rsa-${appName}`, rsaPayload);
+      const rsaSigned = signWebhook(cfg.webhookEndpoint, rsaEvent, {
+        alg: 'rsa-v1_5-sha256',
+        keyid: 'webhook-signing-1',
+        privateKey: rsaPair.privateKey,
+      });
+      const resRsa = await fetch(url, { method: 'POST', headers: rsaSigned.headers, body: rsaSigned.body });
+      assert.equal(resRsa.status, 202, `${appName} accepts RSA webhook-signing-1 delivery`);
+
+      // 4. Fail-closed: invalid signature -> 401 signature_invalid
+      const badSigEvent = cloudEvent(topic, `evt-badsig-${appName}`, payload);
+      const badSigSigned = signWebhook(cfg.webhookEndpoint, badSigEvent);
+      const tamperedHeaders = { ...badSigSigned.headers, signature: 'sig1=:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==:' };
+      const resBadSig = await fetch(url, { method: 'POST', headers: tamperedHeaders, body: badSigSigned.body });
+      assert.equal(resBadSig.status, 401);
+      assert.equal((await resBadSig.json()).code, 'signature_invalid');
+
+      // 5. Fail-closed: expired timestamp -> 401 signature_expired
+      const expiredEvent = cloudEvent(topic, `evt-exp-${appName}`, payload);
+      const expiredSigned = signWebhook(cfg.webhookEndpoint, expiredEvent, {
+        created: Math.floor(Date.now() / 1000) - 600,
+      });
+      const resExpired = await fetch(url, { method: 'POST', headers: expiredSigned.headers, body: expiredSigned.body });
+      assert.equal(resExpired.status, 401);
+      assert.equal((await resExpired.json()).code, 'signature_expired');
+
+      // 6. Fail-closed: wrong key -> 401 signature_invalid / unknown_key
+      const wrongKeyEvent = cloudEvent(topic, `evt-wrongkey-${appName}`, payload);
+      const wrongKeySigned = signWebhook(cfg.webhookEndpoint, wrongKeyEvent, {
+        privateKey: wrongEdPair.privateKey,
+      });
+      const resWrongKey = await fetch(url, { method: 'POST', headers: wrongKeySigned.headers, body: wrongKeySigned.body });
+      assert.equal(resWrongKey.status, 401);
+      assert.equal((await resWrongKey.json()).code, 'signature_invalid');
+
+      // 7. Fail-closed: wrong tenant payload -> 403 tenant_mismatch
+      const wrongTenantEvent = {
+        ...cloudEvent(topic, `evt-wrongtenant-${appName}`, payload),
+        tenantid: 'other.example.com',
+        source: '/tenants/other.example.com/storefront',
+      };
+      const wrongTenantSigned = signWebhook(cfg.webhookEndpoint, wrongTenantEvent);
+      const resWrongTenant = await fetch(url, { method: 'POST', headers: wrongTenantSigned.headers, body: wrongTenantSigned.body });
+      assert.equal(resWrongTenant.status, 403);
+      assert.equal((await resWrongTenant.json()).code, 'tenant_mismatch');
+    }
+  } finally {
+    console.log = origLog;
+    for (const k of Object.keys(process.env)) if (!(k in origEnv)) delete process.env[k];
+    Object.assign(process.env, origEnv);
+  }
 });

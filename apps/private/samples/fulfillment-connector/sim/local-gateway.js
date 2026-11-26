@@ -36,7 +36,10 @@ export function signDelivery({ rawBody, targetUri, privateKey, keyid, alg = 'rsa
   const contentDigest = digest ?? contentDigestFor(rawBody);
   const params = `("@method" "@target-uri" "content-digest");created=${created};keyid="${keyid}";alg="${alg}"`;
   const base = [`"@method": POST`, `"@target-uri": ${targetUri}`, `"content-digest": ${contentDigest}`, `"@signature-params": ${params}`].join('\n');
-  const signature = cryptoSign('sha256', Buffer.from(base), { key: privateKey, padding: constants.RSA_PKCS1_PADDING });
+  const signature =
+    privateKey?.asymmetricKeyType === 'ed25519'
+      ? cryptoSign(null, Buffer.from(base), privateKey)
+      : cryptoSign('sha256', Buffer.from(base), { key: privateKey, padding: constants.RSA_PKCS1_PADDING });
   return {
     'content-type': 'application/cloudevents+json',
     'content-digest': contentDigest,

@@ -425,7 +425,11 @@ export async function runSelfTest() {
   assert.equal(row.unsoldUnits, 0, 'quarantined stock is not unsold availability');
 
   // 6. Signed inventory.changed deliveries, verified against published keys and applied in asOf order.
-  const receiver = new WebhookReceiver({ endpoint: FIXTURE.webhookEndpoint, keys: new AuthorizationMetadata({ origin: baseUrl, fetch: gateway }) });
+  const receiver = new WebhookReceiver({
+    endpoint: FIXTURE.webhookEndpoint,
+    keys: new AuthorizationMetadata({ origin: baseUrl, fetch: gateway }),
+    tenant: tenantId,
+  });
   const mirror = createInventoryMirror();
   const forSku = gateway.events.filter((e) => e.sku === FIXTURE.catalogSku && e.locationId === loc);
   const newest = forSku.at(-1);

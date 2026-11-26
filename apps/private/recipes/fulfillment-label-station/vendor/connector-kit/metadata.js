@@ -1,9 +1,9 @@
 // Gateway discovery: `GET /.well-known/tot-app-authorization-metadata` on the
 // storefront origin publishes `token_endpoint` and `webhook_signing_keys`, a JWK
-// Set of the RSA public keys (alg RS256) that sign webhook deliveries. The
-// document is cached for its `Cache-Control` max-age. An unknown keyid forces
-// one refetch (keys rotate), rate-limited, before a delivery is rejected.
-import { RSA_VERIFY_ALGORITHM } from './http-signature.js';
+// Set of the public keys (RSA RS256 or OKP Ed25519/EdDSA) that sign webhook
+// deliveries. The document is cached for its `Cache-Control` max-age. An unknown
+// keyid forces one refetch (keys rotate), rate-limited, before a delivery is rejected.
+import { ED25519_VERIFY_ALGORITHM, RSA_VERIFY_ALGORITHM } from './http-signature.js';
 import { TransportError } from './errors.js';
 
 export const METADATA_PATH = '/.well-known/tot-app-authorization-metadata';
@@ -60,17 +60,34 @@ function maxAgeSeconds(cacheControl) {
   return m ? Number(m[1]) : DEFAULT_MAX_AGE_SECONDS;
 }
 
-/** Import one published webhook signing key; anything but a public RS256 signing key yields null. */
+/** Import one published webhook signing key; anything but a public RS256 or Ed25519 signing key yields null. */
 export async function importWebhookSigningKey(jwk) {
-  if (!jwk || jwk.kty !== 'RSA' || typeof jwk.kid !== 'string' || jwk.d !== undefined) return null;
-  if (jwk.use !== undefined && jwk.use !== 'sig') return null;
-  if (jwk.alg !== undefined && jwk.alg !== 'RS256') return null;
-  try {
-    const key = await crypto.subtle.importKey('jwk', { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256', ext: true }, RSA_VERIFY_ALGORITHM, false, ['verify']);
-    return { kid: jwk.kid, key };
-  } catch {
+  if (!jwk || typeof jwk !== 'object' || typeof jwk.kid !== 'string' || jwk.kid === '') return null;
+  if (jwk.d !== undefined || jwk.p !== undefined || jwk.q !== undefined || jwk.dp !== undefined || jwk.dq !== undefined || jwk.qi !== undefined || jwk.oth !== undefined) {
     return null;
   }
+  if (jwk.use !== undefined && jwk.use !== 'sig') return null;
+  if (jwk.kty === 'RSA') {
+    if (jwk.alg !== undefined && jwk.alg !== 'RS256') return null;
+    if (typeof jwk.n !== 'string' || jwk.n === '' || typeof jwk.e !== 'string' || jwk.e === '') return null;
+    try {
+      const key = await crypto.subtle.importKey('jwk', { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256', ext: true }, RSA_VERIFY_ALGORITHM, false, ['verify']);
+      return { kid: jwk.kid, key };
+    } catch {
+      return null;
+    }
+  }
+  if (jwk.kty === 'OKP' && jwk.crv === 'Ed25519') {
+    if (jwk.alg !== undefined && jwk.alg !== 'EdDSA' && jwk.alg !== 'ed25519') return null;
+    if (typeof jwk.x !== 'string' || jwk.x === '') return null;
+    try {
+      const key = await crypto.subtle.importKey('jwk', { kty: 'OKP', crv: 'Ed25519', x: jwk.x, ext: true }, ED25519_VERIFY_ALGORITHM, false, ['verify']);
+      return { kid: jwk.kid, key };
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 async function importKeySet(jwks) {

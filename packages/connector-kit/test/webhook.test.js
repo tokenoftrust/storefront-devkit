@@ -7,7 +7,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   AuthorizationMetadata,
+  ED25519_SIGNATURE_ALG,
   MemorySeenEventStore,
+  SIGNATURE_ALG,
+  SIGNATURE_ALGORITHMS,
   StaticSigningKeys,
   WebhookReceiver,
   contentDigestFor,
@@ -213,4 +216,210 @@ test('handleRequest answers a fetch Request', async () => {
   assert.equal(res.headers.get('cache-control'), 'no-store');
   assert.deepEqual(await res.json(), { accepted: true });
   assert.deepEqual(seen, ['com.tokenoftrust.storefront.inventory.changed']);
+});
+
+async function signDeliveryWithKey({
+  privateKey,
+  alg,
+  keyid,
+  targetUri = VECTOR.targetUri,
+  created = VECTOR.created,
+  body = VECTOR.body,
+}) {
+  const contentDigest = await contentDigestFor(body);
+  const sigParams = `("@method" "@target-uri" "content-digest");created=${created};keyid="${keyid}";alg="${alg}"`;
+  const base = `"@method": POST\n"@target-uri": ${targetUri}\n"content-digest": ${contentDigest}\n"@signature-params": ${sigParams}`;
+  const signAlgo = alg === ED25519_SIGNATURE_ALG ? { name: 'Ed25519' } : { name: 'RSASSA-PKCS1-v1_5' };
+  const sigBytes = new Uint8Array(await crypto.subtle.sign(signAlgo, privateKey, new TextEncoder().encode(base)));
+  const sigB64 = Buffer.from(sigBytes).toString('base64');
+  return {
+    method: 'POST',
+    headers: {
+      'content-digest': contentDigest,
+      'signature-input': `sig1=${sigParams}`,
+      signature: `sig1=:${sigB64}:`,
+    },
+    body: new TextEncoder().encode(body),
+  };
+}
+
+test('Ed25519 signed webhook deliveries (tot app conformance) verify and reject tampering, expiry, wrong key, and algorithm confusion', async () => {
+  assert.deepEqual(SIGNATURE_ALGORITHMS, [SIGNATURE_ALG, ED25519_SIGNATURE_ALG]);
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+  const publicJwk = {
+    ...(await crypto.subtle.exportKey('jwk', pair.publicKey)),
+    kid: 'webhook-signing-1',
+    alg: 'EdDSA',
+    use: 'sig',
+  };
+  const imported = await importWebhookSigningKey(publicJwk);
+  assert.ok(imported);
+  assert.equal(imported.kid, 'webhook-signing-1');
+
+  const signed = await signDeliveryWithKey({
+    privateKey: pair.privateKey,
+    alg: 'ed25519',
+    keyid: 'webhook-signing-1',
+  });
+  const edReceiver = (overrides = {}) =>
+    new WebhookReceiver({
+      endpoint: VECTOR.targetUri,
+      keys: new StaticSigningKeys({ keys: [publicJwk] }),
+      now: () => AT_CREATED,
+      ...overrides,
+    });
+
+  const ok = await edReceiver().verify(signed);
+  assert.equal(ok.ok, true);
+  assert.equal(ok.keyid, 'webhook-signing-1');
+  assert.equal(ok.event.id, 'evt_KITVECTOR0001');
+
+  // Tampered body with recalculated digest fails Ed25519 signature check
+  const tamperedBody = VECTOR.body.replace('"balance":12', '"balance":0');
+  const tamperedHeaders = { ...signed.headers, 'content-digest': await contentDigestFor(tamperedBody) };
+  assert.deepEqual(await edReceiver().verify({ ...signed, body: tamperedBody, headers: tamperedHeaders }), {
+    ok: false,
+    status: 401,
+    code: 'signature_invalid',
+  });
+
+  // Expired timestamp with Ed25519 fails closed
+  assert.deepEqual(await edReceiver({ now: () => (VECTOR.created + 301) * 1000 }).verify(signed), {
+    ok: false,
+    status: 401,
+    code: 'signature_expired',
+  });
+
+  // Wrong Ed25519 key under the same keyid fails closed with signature_invalid
+  const wrongPair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+  const wrongPublicJwk = {
+    ...(await crypto.subtle.exportKey('jwk', wrongPair.publicKey)),
+    kid: 'webhook-signing-1',
+    alg: 'EdDSA',
+    use: 'sig',
+  };
+  assert.deepEqual(await edReceiver({ keys: new StaticSigningKeys({ keys: [wrongPublicJwk] }) }).verify(signed), {
+    ok: false,
+    status: 401,
+    code: 'signature_invalid',
+  });
+
+  // Algorithm confusion: Ed25519 key published under kid, but header claims rsa-v1_5-sha256
+  const rsaClaimHeaders = {
+    ...signed.headers,
+    'signature-input': signed.headers['signature-input'].replace('alg="ed25519"', 'alg="rsa-v1_5-sha256"'),
+  };
+  assert.deepEqual(await edReceiver().verify({ ...signed, headers: rsaClaimHeaders }), {
+    ok: false,
+    status: 401,
+    code: 'signature_invalid',
+  });
+
+  // Algorithm confusion: RSA key published under kid, but header claims ed25519
+  const edClaimOnRsa = {
+    ...VECTOR.headers,
+    'signature-input': VECTOR.headers['signature-input'].replace('alg="rsa-v1_5-sha256"', 'alg="ed25519"'),
+  };
+  assert.deepEqual(await receiver().verify(delivery({ headers: edClaimOnRsa })), {
+    ok: false,
+    status: 401,
+    code: 'signature_invalid',
+  });
+});
+
+test('importWebhookSigningKey rejects private key material and malformed JWKs for both RSA and Ed25519', async () => {
+  const edPair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+  const privateEdJwk = { ...(await crypto.subtle.exportKey('jwk', edPair.privateKey)), kid: 'ed-priv' };
+  const publicEdJwk = { ...(await crypto.subtle.exportKey('jwk', edPair.publicKey)), kid: 'ed-pub' };
+
+  assert.equal(await importWebhookSigningKey(privateEdJwk), null, 'Ed25519 private key with d must be rejected');
+  assert.equal(await importWebhookSigningKey({ ...publicEdJwk, crv: 'Ed448' }), null);
+  assert.equal(await importWebhookSigningKey({ ...publicEdJwk, alg: 'RS256' }), null);
+  assert.equal(await importWebhookSigningKey({ ...publicEdJwk, use: 'enc' }), null);
+  assert.equal(await importWebhookSigningKey({ ...publicEdJwk, kid: '' }), null);
+  assert.equal(await importWebhookSigningKey({ ...VECTOR.jwk, d: 'secret' }), null);
+  assert.equal(await importWebhookSigningKey({ ...VECTOR.jwk, p: 'secret-prime' }), null);
+  assert.ok(await importWebhookSigningKey({ ...publicEdJwk, alg: undefined }), 'Ed25519 public key without alg is accepted');
+});
+
+test('wrong-tenant, wrong-install, and mismatched-source webhook payloads fail closed with 403 tenant_mismatch without poisoning seenEvents', async () => {
+  const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+  const publicJwk = {
+    ...(await crypto.subtle.exportKey('jwk', pair.publicKey)),
+    kid: 'webhook-signing-1',
+    alg: 'EdDSA',
+    use: 'sig',
+  };
+  const seenEvents = new MemorySeenEventStore();
+  const r = new WebhookReceiver({
+    endpoint: VECTOR.targetUri,
+    keys: new StaticSigningKeys({ keys: [publicJwk] }),
+    tenant: 'acme',
+    appInstallId: 'inst_vector_0001',
+    seenEvents,
+    now: () => AT_CREATED,
+  });
+
+  // 1. Valid signature but payload is for another tenant
+  const otherTenantEvent = {
+    ...JSON.parse(VECTOR.body),
+    tenantid: 'other-store',
+    source: '/tenants/other-store/storefront',
+  };
+  const otherTenantDelivery = await signDeliveryWithKey({
+    privateKey: pair.privateKey,
+    alg: 'ed25519',
+    keyid: 'webhook-signing-1',
+    body: JSON.stringify(otherTenantEvent),
+  });
+  assert.deepEqual(await r.verify(otherTenantDelivery), {
+    ok: false,
+    status: 403,
+    code: 'tenant_mismatch',
+  });
+
+  // 2. Valid signature and tenantid='acme', but source path claims '/tenants/other-store/storefront'
+  const mismatchedSourceEvent = {
+    ...JSON.parse(VECTOR.body),
+    tenantid: 'acme',
+    source: '/tenants/other-store/storefront',
+  };
+  const mismatchedSourceDelivery = await signDeliveryWithKey({
+    privateKey: pair.privateKey,
+    alg: 'ed25519',
+    keyid: 'webhook-signing-1',
+    body: JSON.stringify(mismatchedSourceEvent),
+  });
+  assert.deepEqual(await r.verify(mismatchedSourceDelivery), {
+    ok: false,
+    status: 403,
+    code: 'tenant_mismatch',
+  });
+
+  // 3. Valid signature and tenantid='acme', but appinstallid belongs to another installation
+  const wrongInstallEvent = {
+    ...JSON.parse(VECTOR.body),
+    appinstallid: 'abi_OTHER_INSTALL',
+  };
+  const wrongInstallDelivery = await signDeliveryWithKey({
+    privateKey: pair.privateKey,
+    alg: 'ed25519',
+    keyid: 'webhook-signing-1',
+    body: JSON.stringify(wrongInstallEvent),
+  });
+  assert.deepEqual(await r.verify(wrongInstallDelivery), {
+    ok: false,
+    status: 403,
+    code: 'tenant_mismatch',
+  });
+
+  // Replay key for evt_KITVECTOR0001 must still be unclaimed after all 3 tenant_mismatch refusals
+  const validDelivery = await signDeliveryWithKey({
+    privateKey: pair.privateKey,
+    alg: 'ed25519',
+    keyid: 'webhook-signing-1',
+    body: VECTOR.body,
+  });
+  const accepted = await r.receive(validDelivery, async () => {});
+  assert.deepEqual(accepted, { status: 202, body: { accepted: true } });
 });

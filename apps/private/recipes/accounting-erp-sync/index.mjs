@@ -184,8 +184,14 @@ export const ERP_ADAPTERS = Object.freeze({
   },
 });
 
-function createRequest({ baseUrl, accessToken, fetchImpl }) {
-  const api = new ApiClient({ origin: baseUrl, auth: { getAccessToken: async () => accessToken }, fetch: fetchImpl });
+function createRequest({ baseUrl, tenant, tenantId, accessToken, auth, fetchImpl }) {
+  const store = tenant ?? tenantId;
+  const api = new ApiClient({
+    origin: baseUrl,
+    ...(store ? { tenant: store } : {}),
+    auth: auth ?? { getAccessToken: async () => accessToken },
+    fetch: fetchImpl,
+  });
   return async function request(method, path, { query, body, idempotencyKey } = {}) {
     try {
       const res = await api.request({ method, path, query, body, idempotencyKey });
@@ -199,7 +205,10 @@ function createRequest({ baseUrl, accessToken, fetchImpl }) {
 
 export function createAccountingErpConnector({
   baseUrl,
+  tenant,
+  tenantId,
   accessToken,
+  auth,
   erpProvider = 'QBO',
   fetchImpl = fetch,
 }) {
@@ -211,7 +220,7 @@ export function createAccountingErpConnector({
   const seenEvents = new Set();
   const erpInvoicesByOrder = new Map();
   const erpSettlementsByOrder = new Map();
-  const request = createRequest({ baseUrl, accessToken, fetchImpl });
+  const request = createRequest({ baseUrl, tenant, tenantId, accessToken, auth, fetchImpl });
 
   return {
     getOrder(orderId) {
@@ -338,10 +347,18 @@ export function createAccountingWebhookReceiver({
   origin,
   endpoint,
   connector,
+  tenant,
+  appInstallId,
   keys = new AuthorizationMetadata({ origin }),
   seenEvents,
 }) {
-  const receiver = new WebhookReceiver({ endpoint, keys, seenEvents });
+  const receiver = new WebhookReceiver({
+    endpoint,
+    keys,
+    seenEvents,
+    ...(tenant ? { tenant } : {}),
+    ...(appInstallId ? { appInstallId } : {}),
+  });
   return {
     handleRequest: (request) =>
       receiver.handleRequest(request, async (event) => {
@@ -380,7 +397,7 @@ export function createSimulatedAccountingGateway() {
       const headers = Object.fromEntries(
         Object.entries(init.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]),
       );
-      const path = url.pathname.replace(/^\/api\/apps\/v1/, '');
+      const path = url.pathname.replace(/^(?:\/[^/]+)?\/api\/apps\/v1/, '');
 
       if (method === 'GET' && path === '/orders') {
         const list = Array.from(orders.values());
@@ -493,7 +510,8 @@ export async function runSelfTest() {
     });
 
     const connector = createAccountingErpConnector({
-      baseUrl: 'https://tot-preview.tokenoftrust.store',
+      baseUrl: 'https://storefront.tokenoftrust.store',
+      tenant: 'acme',
       accessToken: 'sim-erp-token',
       erpProvider: provider,
       fetchImpl: sim.fetchImpl,

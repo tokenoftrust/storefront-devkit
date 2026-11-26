@@ -37,16 +37,20 @@ export function loadConfig(app) {
   // Where webhook signing keys are read from: the API host, or http://127.0.0.1:37891 under `tot app conformance`.
   const metadataOrigin = (env.TOT_METADATA_ORIGIN || host).replace(/\/+$/, '');
   const webhookPublicUrl = (env.WEBHOOK_PUBLIC_URL || '').replace(/\/+$/, '');
+  const missing = ['TOT_TENANT', 'TOT_INSTALL_ID', 'TOT_CLIENT_ID', 'TOT_CLIENT_SECRET'].filter((k) => !env[k]);
+  // Offline mock/conformance mode: explicit MOCK_STOREFRONT=1 or running against a local TOT_METADATA_ORIGIN
+  // (e.g. `tot app conformance`) before store credentials exist.
+  const mockStorefront = env.MOCK_STOREFRONT === '1' || (Boolean(env.TOT_METADATA_ORIGIN) && missing.length > 0);
   const cfg = {
     app,
     dir,
     envPath,
     envFound,
-    tenant: env.TOT_TENANT || '',
+    tenant: env.TOT_TENANT || (mockStorefront ? 'conformance.example' : ''),
     host,
     metadataOrigin,
-    installId: env.TOT_INSTALL_ID || '',
-    clientId: env.TOT_CLIENT_ID || '',
+    installId: env.TOT_INSTALL_ID || (mockStorefront ? `inst_mock_${app}` : ''),
+    clientId: env.TOT_CLIENT_ID || (mockStorefront ? `client_mock_${app}` : ''),
     clientSecret: env.TOT_CLIENT_SECRET || '',
     webhookPublicUrl,
     // The exact string registered with `tot app update --webhook-endpoint`. Signatures cover it character for character.
@@ -58,10 +62,11 @@ export function loadConfig(app) {
     locationId: env.STARTER_LOCATION_ID || (app === 'inventory-sync' ? 'loc-starter-wms' : `loc-starter-${app}`),
     // Connector progress (core/state.mjs). .run/ is gitignored.
     statePath: env.STATE_FILE || join(ROOT, '.run', `${app}-state.json`),
+    mockStorefront,
+    missing,
     env,
     manifest,
   };
-  cfg.missing = ['TOT_TENANT', 'TOT_INSTALL_ID', 'TOT_CLIENT_ID', 'TOT_CLIENT_SECRET'].filter((k) => !env[k]);
   return cfg;
 }
 

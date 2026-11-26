@@ -44,17 +44,19 @@ Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<stor
 
 1. **Offline check & conformance certification**:
    - Run `npm test` (no credentials needed).
-   - Conformance certification (CLI 7.7.0 or later; needs the credentials from steps 2-3, because the
-     app reads the store's carrier catalog and declares its location at startup). Start the app against the
-     conformance run's signing key, with clean state, then certify it from a second terminal:
+   - Conformance certification (CLI 7.7.0 or later) can run **offline against the in-process mock Storefront**
+     before you have store or vendor sandbox credentials (whenever `TOT_METADATA_ORIGIN` is set without
+     `apps/<app>/.env` credentials, or with `MOCK_STOREFRONT=1`), or against your test store install after steps 2-3.
+     Start the app against the conformance run's signing key (`Ed25519` `alg="ed25519"` or `RS256` `alg="rsa-v1_5-sha256"`),
+     with clean state, then certify it from a second terminal:
      ```bash
-     TOT_METADATA_ORIGIN=http://127.0.0.1:37891 WEBHOOK_PUBLIC_URL=http://127.0.0.1:8787 \
+     MOCK_STOREFRONT=1 TOT_METADATA_ORIGIN=http://127.0.0.1:37891 WEBHOOK_PUBLIC_URL=http://127.0.0.1:8787 \
        STATE_FILE=.run/conformance-<app>.json npm run <app>
      tot app conformance --url http://127.0.0.1:8787/webhooks --archetype <app> --certify \
        --app-id com.example.<app>-starter --receipt ./conformance-<app>.json
      ```
-     inventory-sync writes its WMS baseline to your test location on startup; run
-     `npm run inventory-sync -- --cleanup` afterwards on a shared store preview.
+     If you run conformance against a live store preview (without `MOCK_STOREFRONT=1`), `inventory-sync` writes its WMS
+     baseline to your test location on startup; run `npm run inventory-sync -- --cleanup` afterwards on a shared store preview.
 2. **Install your app on the store (test environment)**:
    ```bash
    tot app install --app apps/<app> --env test --tenant <store>
@@ -156,9 +158,12 @@ more than once, and out of order.
   zero or below means sold out). A listing filtered by `locationId` without `sku` pages the whole store
   catalog (SKUs the location doesn't hold come back without `mirror`), so read your own SKUs with `sku=`.
 - **Conformance receipt.** `tot app conformance ... --certify` (quick start step 1) signs synthetic
-  deliveries with an ephemeral RS256 key served at `http://127.0.0.1:37891`; `TOT_METADATA_ORIGIN` points
-  the app's `AuthorizationMetadata` there. It checks signed delivery, hold/cancel, duplicate handling and
-  stale inventory, and writes a receipt you can attach to your review.
+  deliveries with an ephemeral Ed25519 (`alg="ed25519"`, `kty="OKP"`, `crv="Ed25519"`) or RS256
+  (`alg="rsa-v1_5-sha256"`) key served at `http://127.0.0.1:37891/.well-known/tot-app-authorization-metadata`;
+  `TOT_METADATA_ORIGIN` points the app's `AuthorizationMetadata` there, and `MOCK_STOREFRONT=1` lets
+  each starter certify offline against an in-process mock Storefront while vendor sandbox credentials are
+  sourced. It checks signed delivery, hold/cancel, duplicate handling and stale inventory, and writes a
+  receipt you can attach to your review.
 - **Hosting.** See [`../../hosting/`](../../hosting/) to run it somewhere other than your laptop.
 
 Request bodies follow [`contract/openapi.yaml`](../../contract/openapi.yaml) 1.4.0, the source of

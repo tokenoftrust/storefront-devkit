@@ -8,7 +8,7 @@
 // only way signing keys are refreshed. Its `token_endpoint` is accepted only as
 // the exact same-origin OAuth path; the scoped preview transport enforces the
 // same rule on the request itself. Failures throw fixed codes, never remote text.
-import { RSA_VERIFY_ALGORITHM } from './http-signature.js';
+import { ED25519_VERIFY_ALGORITHM, RSA_VERIFY_ALGORITHM } from './http-signature.js';
 import { ConnectorError } from './log.js';
 import { METADATA_PATH, TOKEN_PATH } from './preview-transport.js';
 
@@ -30,17 +30,34 @@ function sameTokenEndpoint(published, expected) {
   }
 }
 
-/** Import one published webhook signing key; anything but a public RS256 signing key is skipped. */
+/** Import one published webhook signing key; anything but a public RS256 or Ed25519 signing key is skipped. */
 export async function importWebhookSigningKey(jwk) {
-  if (!jwk || jwk.kty !== 'RSA' || typeof jwk.kid !== 'string' || jwk.d !== undefined) return null;
-  if (jwk.use !== undefined && jwk.use !== 'sig') return null;
-  if (jwk.alg !== undefined && jwk.alg !== 'RS256') return null;
-  try {
-    const key = await crypto.subtle.importKey('jwk', { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256' }, RSA_VERIFY_ALGORITHM, false, ['verify']);
-    return [jwk.kid, { key }];
-  } catch {
+  if (!jwk || typeof jwk !== 'object' || typeof jwk.kid !== 'string' || jwk.kid === '') return null;
+  if (jwk.d !== undefined || jwk.p !== undefined || jwk.q !== undefined || jwk.dp !== undefined || jwk.dq !== undefined || jwk.qi !== undefined || jwk.oth !== undefined) {
     return null;
   }
+  if (jwk.use !== undefined && jwk.use !== 'sig') return null;
+  if (jwk.kty === 'RSA') {
+    if (jwk.alg !== undefined && jwk.alg !== 'RS256') return null;
+    if (typeof jwk.n !== 'string' || jwk.n === '' || typeof jwk.e !== 'string' || jwk.e === '') return null;
+    try {
+      const key = await crypto.subtle.importKey('jwk', { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256' }, RSA_VERIFY_ALGORITHM, false, ['verify']);
+      return [jwk.kid, { key }];
+    } catch {
+      return null;
+    }
+  }
+  if (jwk.kty === 'OKP' && jwk.crv === 'Ed25519') {
+    if (jwk.alg !== undefined && jwk.alg !== 'EdDSA' && jwk.alg !== 'ed25519') return null;
+    if (typeof jwk.x !== 'string' || jwk.x === '') return null;
+    try {
+      const key = await crypto.subtle.importKey('jwk', { kty: 'OKP', crv: 'Ed25519', x: jwk.x }, ED25519_VERIFY_ALGORITHM, false, ['verify']);
+      return [jwk.kid, { key }];
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 export function createGatewayMetadata({ baseUrl, fetchImpl = (...args) => fetch(...args), now = () => Date.now() }) {

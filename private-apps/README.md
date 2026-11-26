@@ -54,7 +54,7 @@ repository.
   (`tot-app.json`, `fixtures/`, `server.js`, Dockerfile); `tot app dev` (`validate` / `emit` /
   `verify` / `mint`) is the local harness that signs fixture CloudEvents exactly like the real
   gateway so your verification code exercises the real path; `tot app conformance --url <loopbackWebhookUrl> --archetype <label-station|dropship|inventory-sync> [--certify --app-id <id> --receipt <path>]`
-  runs the signed RS256 CloudEvents + duplicate-replay checklist against your local connector
+  runs the signed Ed25519 / RS256 CloudEvents + duplicate-replay checklist against your local connector
   and emits a deterministic SHA-256 conformance certification receipt (`tot-connector-certification.v1`).
 - **No published npm library** — this devkit intentionally does not distribute an npm library or
   platform runtime. Implement against the documented standards and use the CLI's fixtures to test

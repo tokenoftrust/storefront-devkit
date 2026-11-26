@@ -154,7 +154,9 @@ Branch on `code`, never on `error`.
 
 ### Runnable example
 
-Set `TOT_GATEWAY_URL` (for example `https://tot-preview.tokenoftrust.store/api/apps/v1`) and
+Set `TOT_GATEWAY_URL` (for example `https://storefront.tokenoftrust.store/<tenant>/api/apps/v1` on a
+shared-host `env=test` or live store, or `https://acme.tokenoftrust.store/api/apps/v1` on a
+dedicated store host) and
 `TOT_APP_TOKEN` (a bearer token carrying `inventory:read` and `inventory:write`), then record a
 delta, replay the same `Idempotency-Key` to confirm the identical `receiptId`, and read back the
 mirror balance:
@@ -220,17 +222,20 @@ interactive tenant-owner session on the internal Storefront admin surface.
 
 ### Signature details
 
-Discovery is `GET /.well-known/tot-app-authorization-metadata` on the storefront origin. It is
-public JSON, cacheable for the `max-age` its `Cache-Control` states (300 seconds). Two fields
+Discovery is `GET /.well-known/tot-app-authorization-metadata` on the bare storefront origin (for
+example `https://storefront.tokenoftrust.store/.well-known/tot-app-authorization-metadata`, even when
+OAuth and API calls use a tenant path `https://storefront.tokenoftrust.store/<tenant>/api/apps/...`).
+It is public JSON, cacheable for the `max-age` its `Cache-Control` states (300 seconds). Two fields
 matter to a webhook receiver:
 
 | Field | Meaning |
 |---|---|
-| `webhook_signing_keys` | A JWK Set (`{"keys": [...]}`) of the public keys that sign webhook deliveries. Each key is `kty: "RSA"`, `alg: "RS256"`, `use: "sig"`, identified by `kid`. Absent when the storefront has no webhook signing key configured. |
-| `token_endpoint` | Where to exchange installation credentials for a bearer token with a form-encoded `POST` using `grant_type=client_credentials`. Use the install's authentication method. The response carries `access_token`, `token_type`, `expires_in` and `scope`. |
+| `webhook_signing_keys` | A JWK Set (`{"keys": [...]}`) of the public keys that sign webhook deliveries (for example `kid: "webhook-signing-1"`). Each key is either an RSA public key (`kty: "RSA"`, `alg: "RS256"`, `use: "sig"`) or an Ed25519 public key (`kty: "OKP"`, `crv: "Ed25519"`, `alg: "EdDSA"`, `use: "sig"`, as used by `tot app conformance`), identified by `kid`. Absent when the storefront has no webhook signing key configured. |
+| `token_endpoint` | Where to exchange installation credentials for a bearer token with a form-encoded `POST` using `grant_type=client_credentials` (for a shared-host store with a `tenant` slug, `ConnectorAuthClient` and `ApiClient` resolve `/<tenant>/api/apps/oauth/token` and `/<tenant>/api/apps/v1`). Use the install's authentication method. The response carries `access_token`, `token_type`, `expires_in` and `scope`. |
 
-`jwks_uri` in the same document publishes the keys of the bearer tokens the gateway issues. It is
-not the webhook key set; verify deliveries only against `webhook_signing_keys`.
+`jwks_uri` (`/.well-known/jwks.json`, e.g. `kid: "app-gateway-1"`) in the same document publishes
+the keys of the OAuth bearer tokens the gateway issues. It is **not** the webhook key set; verify
+webhook deliveries only against `webhook_signing_keys` from `/.well-known/tot-app-authorization-metadata`.
 
 Every delivery is a `POST` with `Content-Type: application/cloudevents+json` and three signing
 headers:
@@ -238,10 +243,11 @@ headers:
 | Header | Value the platform sends |
 |---|---|
 | `Content-Digest` | `sha-256=:<base64 of SHA-256 over the exact body bytes>:` (RFC 9530). |
-| `Signature-Input` | `sig1=("@method" "@target-uri" "content-digest");created=<unix seconds>;keyid="<kid>";alg="rsa-v1_5-sha256"` |
+| `Signature-Input` | `sig1=("@method" "@target-uri" "content-digest");created=<unix seconds>;keyid="<kid>";alg="rsa-v1_5-sha256"` (or `alg="ed25519"`) |
 | `Signature` | `sig1=:<base64 signature>:` |
 
-The signature is RFC 9421 `rsa-v1_5-sha256` (RSASSA-PKCS1-v1_5 with SHA-256) under the label
+The signature is RFC 9421 `rsa-v1_5-sha256` (RSASSA-PKCS1-v1_5 with SHA-256) or `ed25519` (Ed25519,
+used by `tot app conformance`) under the label
 `sig1`. It covers exactly `@method` (`POST`), `@target-uri` (the app's registered
 `webhooks.endpoint`, character for character as registered) and `content-digest`, followed by
 the `@signature-params` line. Each delivery attempt, including a retry or replay, is signed
@@ -255,12 +261,16 @@ A verifier MUST accept a delivery that meets all of the following, and MUST reje
 - The `sig1` covered components include `@method`, `@target-uri` and `content-digest`. The
   signature base is rebuilt from the received `Signature-Input`, component by component, with
   `@target-uri` set to the endpoint the app registered, never to a value read from the request.
-- `alg` is present and equals `rsa-v1_5-sha256`. Any other or missing `alg` is a rejection.
+- `alg` is present and equals `rsa-v1_5-sha256` or `ed25519`, and matches the resolved key's
+  algorithm (`RSASSA-PKCS1-v1_5` vs `Ed25519`). Any other, missing, or mismatched `alg` is a rejection.
 - `keyid` names a key in `webhook_signing_keys`. On an unknown `keyid`, refetch the metadata
   once (keys rotate), with a rate limit, before rejecting.
 - `created` is recent. Choose and document a window; the reference sample accepts five minutes
   of age and one minute of clock skew.
 - The signature verifies against that key over the rebuilt base.
+- The CloudEvents envelope `source` (`/tenants/<tenantid>/...`) and, for single-tenant or
+  install-pinned receivers, `tenantid` and `appinstallid` match the expected tenant and installation
+  before claiming the event id in the replay store (`403 tenant_mismatch` on mismatch).
 
 ## Fulfillment connector
 

@@ -31,8 +31,11 @@ function envelopeProblem(event) {
   for (const key of ENVELOPE_REQUIRED) if (!(key in event)) return `missing ${key}`;
   if (event.specversion !== '1.0') return 'specversion';
   if (event.dataschemaversion !== '1') return 'dataschemaversion';
-  if (typeof event.id !== 'string' || event.id === '') return 'id';
-  if (typeof event.type !== 'string' || !event.type.startsWith(TYPE_PREFIX)) return 'type';
+  if (event.datacontenttype !== 'application/json') return 'datacontenttype';
+  for (const key of ['id', 'source', 'type', 'time', 'tenantid', 'appinstallid']) {
+    if (typeof event[key] !== 'string' || event[key] === '') return key;
+  }
+  if (!event.type.startsWith(TYPE_PREFIX)) return 'type';
   if (!FULFILLMENT_TYPES.has(event.type)) return null;
   const data = event.data;
   if (!data || typeof data !== 'object' || Array.isArray(data)) return 'data';
@@ -46,7 +49,17 @@ function envelopeProblem(event) {
   return null;
 }
 
-export function createWebhookHandler({ targetUri, resolveSigningKey, eventIds, connector, logger, now = () => Date.now() }) {
+const SOURCE_TENANT = /^\/tenants\/([^/]+)(?:\/|$)/;
+
+function tenantProblem(event, expectedTenant, expectedAppInstallId) {
+  const sourceMatch = SOURCE_TENANT.exec(event.source);
+  if (sourceMatch && sourceMatch[1] !== event.tenantid) return 'source_tenant_mismatch';
+  if (expectedTenant !== undefined && event.tenantid !== expectedTenant) return 'tenant_mismatch';
+  if (expectedAppInstallId !== undefined && event.appinstallid !== expectedAppInstallId) return 'appinstall_mismatch';
+  return null;
+}
+
+export function createWebhookHandler({ targetUri, resolveSigningKey, eventIds, connector, logger, tenant, appInstallId, now = () => Date.now() }) {
   /**
    * Handle one delivery. `headers` are lowercased; `rawBody` is the exact
    * request bytes. Returns the response plus `work`, the accepted event's
@@ -73,6 +86,7 @@ export function createWebhookHandler({ targetUri, resolveSigningKey, eventIds, c
     }
     const problem = envelopeProblem(event);
     if (problem) return reject(400, `envelope_invalid:${problem}`);
+    if (tenantProblem(event, tenant, appInstallId)) return reject(403, 'tenant_mismatch');
 
     if (eventIds.has(event.id)) {
       logger.info('duplicate delivery ignored', { eventId: event.id, retrycount: event.retrycount });

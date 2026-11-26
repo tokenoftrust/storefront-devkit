@@ -92,16 +92,21 @@ Token refusals throw `AuthError` whose `code` is the OAuth `error` (`invalid_cli
 ## `WebhookReceiver`
 
 ```js
-new WebhookReceiver({ endpoint, keys, seenEvents?, maxAgeSeconds = 300, maxClockSkewSeconds = 60,
+new WebhookReceiver({ endpoint, keys, tenant?, appInstallId?, seenEvents?, maxAgeSeconds = 300, maxClockSkewSeconds = 60,
   replayTtlSeconds = 604800, maxBodyBytes = 1048576, now? })
 ```
 
 - `endpoint` is your registered `webhooks.endpoint`, character for character. It is the signed
   `@target-uri`; the kit never reads it from the request.
 - `keys` resolves a `keyid` to a public key: `new AuthorizationMetadata({ origin })` reads
-  `webhook_signing_keys` from `/.well-known/tot-app-authorization-metadata`, caches it for its
+  `webhook_signing_keys` (RSA `RS256` or Ed25519 `EdDSA`, e.g. `webhook-signing-1`) from
+  `/.well-known/tot-app-authorization-metadata` on the bare storefront origin, caches it for its
   `max-age`, and refetches once (at most every 30 s) on an unknown keyid. `new StaticSigningKeys(jwks)`
-  pins a key set (tests, air-gapped setups).
+  pins a key set (tests, air-gapped setups). Note that `/.well-known/jwks.json` publishes the
+  OAuth bearer-token key (`app-gateway-1`), not webhook signing keys.
+- `tenant` and `appInstallId` optionally bind the receiver to a single store slug and/or
+  installation id; any delivery whose envelope `tenantid`, `appinstallid`, or `/tenants/<slug>/...`
+  `source` mismatches is refused with `403 tenant_mismatch` before the replay store is touched.
 - `seenEvents` is the replay guard: `{ claim(key, ttlSeconds) -> Promise<boolean>, release(key) }`.
   `claim` must be atomic (a unique-key insert with an expiry). The default `MemorySeenEventStore`
   is per-process; a deployment with more than one instance or any restart needs a durable store.
@@ -109,9 +114,10 @@ new WebhookReceiver({ endpoint, keys, seenEvents?, maxAgeSeconds = 300, maxClock
 
 Checks, in order: method `POST`, body size, `Content-Digest` sha-256 over the raw bytes, `sig1`
 `Signature-Input`/`Signature` (covers `@method`, `@target-uri`, `content-digest`; `alg`
-`rsa-v1_5-sha256`; `created` within `maxAgeSeconds` old and `maxClockSkewSeconds` ahead; `expires`
-not passed), keyid lookup, signature, JSON, CloudEvents envelope (`specversion` 1.0, the required
-attributes, a `com.tokenoftrust.storefront.` type, object `data`), then the replay guard.
+`rsa-v1_5-sha256` or `ed25519`; `created` within `maxAgeSeconds` old and `maxClockSkewSeconds` ahead; `expires`
+not passed), keyid lookup and key-type-to-algorithm match, signature, JSON, CloudEvents envelope (`specversion` 1.0,
+`dataschemaversion` `"1"`, `datacontenttype` `"application/json"`, the required attributes, a
+`com.tokenoftrust.storefront.` type, object `data`), tenant/installation boundary check, then the replay guard.
 Event-specific `data` validation is yours, against [`asyncapi.yaml`](../../apps/private/contract/asyncapi.yaml).
 
 | Method | Result |
@@ -123,7 +129,7 @@ Event-specific `data` validation is yours, against [`asyncapi.yaml`](../../apps/
 `body` must be the exact raw bytes (`Uint8Array`, `ArrayBuffer`, or the unmodified string). Refusal
 codes and statuses are in `WEBHOOK_REFUSALS`: `method_not_allowed` 405, `body_too_large` 413,
 `digest_*` 400, `signature_*`/`unsupported_alg`/`unknown_key` 401, `body_not_json` and
-`envelope_invalid` 400, `replayed_event` 200 (acknowledged, never handed to you).
+`envelope_invalid` 400, `tenant_mismatch` 403, `replayed_event` 200 (acknowledged, never handed to you).
 
 A delivery is a notification, not an authorization: reconcile through the API before acting.
 

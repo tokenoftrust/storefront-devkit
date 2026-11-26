@@ -240,6 +240,7 @@ export const WEBHOOK_REFUSALS: Readonly<{
   signature_invalid: 401;
   body_not_json: 400;
   envelope_invalid: 400;
+  tenant_mismatch: 403;
   replayed_event: 200;
 }>;
 
@@ -281,6 +282,8 @@ export class MemorySeenEventStore implements SeenEventStore {
 export interface WebhookReceiverOptions {
   endpoint: string;
   keys: SigningKeys;
+  tenant?: string;
+  appInstallId?: string;
   seenEvents?: SeenEventStore;
   maxAgeSeconds?: number;
   maxClockSkewSeconds?: number;
@@ -306,12 +309,14 @@ export type WebhookVerification = (WebhookContext & { ok: true; event: WebhookEv
 export type WebhookReceiveResult =
   | { status: 202; body: { accepted: true; duplicate?: never }; error?: never }
   | { status: 200; body: { accepted: true; duplicate: true }; error?: never }
-  | { status: 400 | 401 | 405 | 413; body: { accepted: false; code: Exclude<WebhookRefusalCode, 'replayed_event'> }; error?: never }
+  | { status: 400 | 401 | 403 | 405 | 413; body: { accepted: false; code: Exclude<WebhookRefusalCode, 'replayed_event'> }; error?: never }
   | { status: 500; body: { accepted: false; code: 'handler_failed' }; error: unknown };
 
 export class WebhookReceiver {
   constructor(options: WebhookReceiverOptions);
   endpoint: string;
+  tenant?: string;
+  appInstallId?: string;
   verify(delivery: WebhookDelivery): Promise<WebhookVerification>;
   release(replayKey: string): Promise<void>;
   receive(delivery: WebhookDelivery, onEvent: WebhookHandler): Promise<WebhookReceiveResult>;
@@ -322,10 +327,13 @@ export function normalizeHeaders(headers?: WebhookHeaders | null): Record<string
 
 export const SIGNATURE_LABEL: 'sig1';
 export const SIGNATURE_ALG: 'rsa-v1_5-sha256';
+export const ED25519_SIGNATURE_ALG: 'ed25519';
+export const SIGNATURE_ALGORITHMS: readonly ['rsa-v1_5-sha256', 'ed25519'];
 export const REQUIRED_COMPONENTS: readonly ['@method', '@target-uri', 'content-digest'];
 
 type VerificationFailure<Code> = { ok: false; code: Code; reason: string };
 type SignatureRefusalCode = Extract<WebhookRefusalCode, `signature_${string}` | 'unsupported_alg' | 'unknown_key'>;
+type WebhookSignatureAlgorithm = typeof SIGNATURE_ALGORITHMS[number];
 
 export function contentDigestFor(body: RawBody): Promise<string>;
 export function verifyContentDigest(
@@ -341,7 +349,7 @@ export function verifyMessageSignature(input: {
   maxAgeSeconds?: number;
   maxClockSkewSeconds?: number;
 }): Promise<
-  | (WebhookContext & { ok: true; label: typeof SIGNATURE_LABEL; alg: typeof SIGNATURE_ALG })
+  | (WebhookContext & { ok: true; label: typeof SIGNATURE_LABEL; alg: WebhookSignatureAlgorithm })
   | VerificationFailure<SignatureRefusalCode>
 >;
 

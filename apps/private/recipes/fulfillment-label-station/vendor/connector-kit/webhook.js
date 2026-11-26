@@ -28,6 +28,7 @@ export const WEBHOOK_REFUSALS = Object.freeze({
   signature_invalid: 401,
   body_not_json: 400,
   envelope_invalid: 400,
+  tenant_mismatch: 403,
   // A replay is acknowledged with 200 so the sender stops, and never reaches the application.
   replayed_event: 200,
 });
@@ -77,11 +78,23 @@ function envelopeProblem(event) {
   if (!event || typeof event !== 'object' || Array.isArray(event)) return 'not an object';
   for (const key of ENVELOPE_REQUIRED) if (!(key in event)) return `missing ${key}`;
   if (event.specversion !== '1.0') return 'specversion';
-  for (const key of ['id', 'source', 'type', 'tenantid', 'appinstallid']) {
+  if (event.dataschemaversion !== '1') return 'dataschemaversion';
+  if (event.datacontenttype !== 'application/json') return 'datacontenttype';
+  for (const key of ['id', 'source', 'type', 'time', 'tenantid', 'appinstallid']) {
     if (typeof event[key] !== 'string' || event[key] === '') return key;
   }
   if (!event.type.startsWith(EVENT_TYPE_PREFIX)) return 'type';
   if (!event.data || typeof event.data !== 'object' || Array.isArray(event.data)) return 'data';
+  return null;
+}
+
+const SOURCE_TENANT = /^\/tenants\/([^/]+)(?:\/|$)/;
+
+function tenantProblem(event, expectedTenant, expectedAppInstallId) {
+  const sourceMatch = SOURCE_TENANT.exec(event.source);
+  if (sourceMatch && sourceMatch[1] !== event.tenantid) return 'source_tenant_mismatch';
+  if (expectedTenant !== undefined && event.tenantid !== expectedTenant) return 'tenant_mismatch';
+  if (expectedAppInstallId !== undefined && event.appinstallid !== expectedAppInstallId) return 'appinstall_mismatch';
   return null;
 }
 
@@ -90,6 +103,8 @@ export class WebhookReceiver {
    * @param {object} options
    * @param {string} options.endpoint The webhook endpoint exactly as registered in tot-app.json (the signed `@target-uri`).
    * @param {{ resolveSigningKey(keyid: string): Promise<CryptoKey|null> }} options.keys AuthorizationMetadata or StaticSigningKeys.
+   * @param {string} [options.tenant] Optional expected `tenantid` for single-tenant receivers; mismatched events are refused with 403 `tenant_mismatch`.
+   * @param {string} [options.appInstallId] Optional expected `appinstallid`; mismatched events are refused with 403 `tenant_mismatch`.
    * @param {{ claim(key: string, ttlSeconds: number): Promise<boolean>, release(key: string): Promise<void> }} [options.seenEvents]
    * @param {number} [options.maxAgeSeconds] Oldest acceptable signature `created` (default 300).
    * @param {number} [options.maxClockSkewSeconds] Furthest-future acceptable `created` (default 60).
@@ -100,6 +115,8 @@ export class WebhookReceiver {
   constructor({
     endpoint,
     keys,
+    tenant,
+    appInstallId,
     seenEvents = new MemorySeenEventStore(),
     maxAgeSeconds = 300,
     maxClockSkewSeconds = 60,
@@ -112,11 +129,19 @@ export class WebhookReceiver {
       throw new TypeError('endpoint must be the absolute webhook URL registered in tot-app.json');
     }
     if (!keys || typeof keys.resolveSigningKey !== 'function') throw new TypeError('keys must provide resolveSigningKey(keyid)');
+    if (tenant !== undefined && (typeof tenant !== 'string' || tenant === '')) {
+      throw new TypeError('tenant must be a non-empty store slug');
+    }
+    if (appInstallId !== undefined && (typeof appInstallId !== 'string' || appInstallId === '')) {
+      throw new TypeError('appInstallId must be a non-empty installation id');
+    }
     if (!seenEvents || typeof seenEvents.claim !== 'function' || typeof seenEvents.release !== 'function') {
       throw new TypeError('seenEvents must provide claim(key, ttlSeconds) and release(key)');
     }
     this.endpoint = endpoint;
     this.keys = keys;
+    this.tenant = tenant;
+    this.appInstallId = appInstallId;
     this.seenEvents = seenEvents;
     this.maxAgeSeconds = maxAgeSeconds;
     this.maxClockSkewSeconds = maxClockSkewSeconds;
@@ -166,6 +191,7 @@ export class WebhookReceiver {
       return refuse('body_not_json');
     }
     if (envelopeProblem(event)) return refuse('envelope_invalid');
+    if (tenantProblem(event, this.tenant, this.appInstallId)) return refuse('tenant_mismatch');
 
     const replayKey = `${event.tenantid}/${event.id}`;
     if (!(await this.seenEvents.claim(replayKey, this.replayTtlSeconds))) return refuse('replayed_event');
