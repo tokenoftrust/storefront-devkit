@@ -62,7 +62,10 @@ Replace `<app>` with `label-station`, `dropship` or `inventory-sync`, and `<stor
    tot app install --app apps/<app> --env test --tenant <store>
    ```
    It prints `installId`, `clientId` and a **secret, shown once**. Lost it? `tot app rotate <installId> --tenant <store>`
-   prints a new one, and the old one stops working.
+   prints a new one, and the old one stops working. On a shared store where another developer already
+   installed `com.example.<app>`, add your own suffix to `"id"` in `apps/<app>/tot-app.json` (e.g.
+   `"com.example.<app>-<yourname>"`) and re-run `tot app install` — never run `tot app update` on
+   another developer's install.
 3. **Save the credentials**:
    ```bash
    cp apps/<app>/.env.example apps/<app>/.env

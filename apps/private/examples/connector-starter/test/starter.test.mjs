@@ -18,7 +18,7 @@ import { startMockDropshipPlatform } from '../apps/dropship/mock-dropship-platfo
 import { createDropship, providerClient as dropshipProviderClient } from '../apps/dropship/connector.mjs';
 import { startMockWms } from '../apps/inventory-sync/mock-wms.mjs';
 import { createInventorySync, providerClient as wmsProviderClient } from '../apps/inventory-sync/connector.mjs';
-import { cliArgs } from '../scripts/test-order.mjs';
+import { cliArgs, parseTotJson } from '../scripts/test-order.mjs';
 import { candidateArgs } from '../scripts/stage-candidate.mjs';
 import { assignment, createFakeStorefront } from './fake-storefront.mjs';
 
@@ -153,6 +153,9 @@ test('npm run order: bind/create use your location and 2 units; hold and cancel 
   assert.deepEqual(cliArgs('hold', cfg, 'ord_1'), ['app', 'test-order', 'hold', 'ord_1']);
   assert.deepEqual(cliArgs('cancel', cfg, 'ord_1'), ['app', 'test-order', 'cancel', 'ord_1']);
   assert.throws(() => cliArgs('cancel', cfg), /needs an orderId/);
+  assert.deepEqual(parseTotJson('{"order":{"orderId":"synthetic-123","stage":"preview"}}\n'), {
+    order: { orderId: 'synthetic-123', stage: 'preview' },
+  });
 });
 
 test('stage-candidate wraps tot app candidate --app apps/<app> --jwks <file> --request-consent', () => {

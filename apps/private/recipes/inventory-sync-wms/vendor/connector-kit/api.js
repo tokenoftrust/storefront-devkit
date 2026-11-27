@@ -216,7 +216,9 @@ export class ApiClient {
     if (res.status >= 300 && res.status < 400) return new TransportError({ code: 'redirect_refused', status: res.status, requestId });
     const code = safeCode(body?.code ?? body?.error ?? (body === null ? `http_${res.status}` : undefined));
     const holds = Array.isArray(body?.holds) ? body.holds.map(safeCode) : undefined;
-    const isInventoryBatchRefusal = path?.startsWith('/inventory/') && (res.status === 400 || res.status === 422);
+    const isInventoryBatchRefusal =
+      path?.startsWith('/inventory/') &&
+      (res.status === 400 || res.status === 422 || (res.status === 409 && code === 'balance-out-of-range'));
     return new ApiError({
       code,
       status: res.status,
