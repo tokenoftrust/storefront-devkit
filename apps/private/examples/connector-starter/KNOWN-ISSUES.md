@@ -2,8 +2,15 @@
 
 - **Request bodies: follow `openapi.yaml`.** Shipments need UPPERCASE `carrier` / `service`
   (`UPS`, `GROUND`) and `adultSignature: "accepted" | "refused" | "absent"`. Exceptions use `code`
-  (`backordered`, `out_of_stock`, `carrier_refused`, ...). Some older prose examples differ.
-  `400 malformed` with no `field` usually means one of these.
+  (`backordered`, `out_of_stock`, `carrier_refused`, ...), and an exception `note` must never contain
+  `@` or a run of 7 or more digits (`/\d[\d\s().-]{5,}\d/`, which rejects phone numbers and long
+  numeric vendor/shipment IDs — keep numeric vendor IDs in your app's own state or logs, not in
+  `note`). Some older prose examples differ. `400 malformed` with no `field` usually means one of these.
+
+- **`already_installed` on a shared store.** If another developer on the same store already installed
+  `com.example.<app>`, do **not** run `tot app update` on their `installId`. Add your own suffix to
+  `"id"` in `apps/<app>/tot-app.json` (e.g. `"com.example.<app>-<yourname>"`) and run
+  `tot app install` to create your own test install.
 
 - **tot CLI: "identity check failed (mcp_http_error)".** This is intermittent and works again after
   30-60 seconds. `npm run order` retries it for you.

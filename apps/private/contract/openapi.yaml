@@ -4226,7 +4226,16 @@ components:
           minItems: 1
           items: { $ref: '#/components/schemas/AssignmentLine' }
         code: { type: string, enum: [vendor_rejected, backordered, out_of_stock, damaged, address_undeliverable, carrier_refused, other] }
-        note: { type: string, minLength: 1, maxLength: 500, description: Free text; never contact data. }
+        note:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: >
+            Free-text operator note (1..500 printable characters); never contact data. Refused
+            with 400 `malformed` if it contains `@`, control characters (`U+0000`..`U+001F`,
+            `U+007F`), or a run of 7 or more digits (`/\d[\d\s().-]{5,}\d/`, which matches
+            phone numbers as well as long numeric vendor IDs — keep numeric vendor or shipment
+            IDs in your app's own state or logs, not in `note`).
 
     AssignmentExceptionView:
       type: object

@@ -36,6 +36,22 @@ const IS_WIN = process.platform === 'win32';
 const TOT_CMD = IS_WIN ? 'tot.cmd' : 'tot';
 const sleepMs = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
+/**
+ * Parse the JSON object from `tot ... --json` stdout alone, ignoring any stderr update nudge
+ * (`▸ Update available for \`tot\`: ...`) that follows on stderr.
+ */
+export function parseTotJson(stdout) {
+  const text = String(stdout ?? '');
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end < start) return null;
+  try {
+    return JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
 function tot(cfg, args) {
   for (let attempt = 1; attempt <= 5; attempt++) {
     const r = spawnSync(TOT_CMD, [...args, '--tenant', cfg.tenant, '--json'], { encoding: 'utf8', shell: IS_WIN });
@@ -43,19 +59,18 @@ function tot(cfg, args) {
       console.error(`could not run tot (${r.error.code ?? r.error.message}). Install it: npm i -g @tokenoftrust/cli`);
       process.exit(1);
     }
-    const out = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
-    if (/mcp_http_error|mcp_unreachable/.test(out) && attempt < 5) {
+    const stdout = (r.stdout ?? '').trim();
+    const stderr = (r.stderr ?? '').trim();
+    const combined = `${stdout}\n${stderr}`.trim();
+    if (/mcp_http_error|mcp_unreachable/.test(combined) && attempt < 5) {
       console.error(`  (tot: identity check failed, retry ${attempt}/4 in 20s)`);
       sleepMs(20_000);
       continue;
     }
-    console.log(out);
+    if (stdout) console.log(stdout);
+    if (stderr) console.error(stderr);
     if (r.status !== 0) process.exit(r.status ?? 1);
-    try {
-      return JSON.parse(out.slice(out.indexOf('{')));
-    } catch {
-      return null;
-    }
+    return parseTotJson(r.stdout);
   }
   process.exit(1);
 }

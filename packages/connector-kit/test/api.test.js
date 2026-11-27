@@ -276,6 +276,7 @@ test('inventory batch refusals expose only the documented field and index detail
   const gw = gateway(
     { status: 400, body: { code: 'malformed', field: 'items[0].quantityDelta', index: 0, message: 'fixture-message', error_description: 'fixture-description' } },
     { status: 422, body: { code: 'unknown-location', field: 'Idempotency-Key', index: 249 } },
+    { status: 409, body: { code: 'balance-out-of-range', index: 1 } },
     { status: 400, body: { code: 'malformed', field: 'invalid field <fixture>', index: -1, reasons: ['unavailable'] } },
     { status: 422, body: { code: 'unknown-location', field: 'x'.repeat(129), index: '2' } },
     { status: 422, body: { code: 'unknown-location', index: Number.MAX_SAFE_INTEGER + 1 } },
@@ -294,6 +295,10 @@ test('inventory batch refusals expose only the documented field and index detail
   const unknownLocation = await submit();
   assert.equal(unknownLocation.field, 'Idempotency-Key');
   assert.equal(unknownLocation.index, 249);
+  const outOfRange = await submit();
+  assert.equal(outOfRange.code, 'balance-out-of-range');
+  assert.equal(outOfRange.status, 409);
+  assert.equal(outOfRange.index, 1);
   for (const invalid of [await submit(), await submit(), await submit()]) {
     for (const detail of ['field', 'index', 'reasons']) assert.equal(Object.hasOwn(invalid.toJSON(), detail), false);
   }
