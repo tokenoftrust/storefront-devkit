@@ -95,8 +95,7 @@ test('a batch that would take a balance below zero is refused as a whole (409 ba
   ]);
   assert.equal(res.status, 409);
   assert.equal(res.body.code, 'balance-out-of-range');
-  // connector-kit 1.1.0 surfaces `index` only on 400/422 inventory refusals.
-  assert.equal(res.body.index, undefined);
+  assert.equal(res.body.index, 1);
   const inv = await client.getInventory({ sku: FIXTURE.secondSku, locationId: FIXTURE.location.locationId });
   assert.equal(inv.body.items[0].mirror.balance, FIXTURE.openingBalances[FIXTURE.secondSku]);
 });
